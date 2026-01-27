@@ -23,6 +23,11 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_APP_CLIENT_ID: ${{ secrets.VITE_APP_CLIENT_ID }}
+          VITE_APP_CLIENT_SECRET: ${{ secrets.VITE_APP_CLIENT_SECRET }}
+          VITE_APP_REFRESH_TOKEN: ${{ secrets.VITE_APP_REFRESH_TOKEN }}
+          VITE_APP_API_URL: "https://accounts.google.com/gsi/client"
         run: npm run build
 
       - name: Deploy to server

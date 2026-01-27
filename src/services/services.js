@@ -3,11 +3,13 @@ import Utils from "../config/utils.js";
 import AuthServices from "./authServices.js";
 import Router from "../router.js";
 
-var baseurl = "";
-if (import.meta.env.DEV) {
-  baseurl = "http://localhost/workerscheduling-t2";
-} else {
-  baseurl = "/workerscheduling-t2";
+let baseurl = import.meta.env.VITE_API_BASE;
+if (!baseurl) {
+  if (import.meta.env.DEV) {
+    baseurl = "http://localhost/workerscheduling-t2";
+  } else {
+    baseurl = "/workerscheduling-t2";
+  }
 }
 
 const apiClient = axios.create({

@@ -1,12 +1,15 @@
 <script setup>
-// This starter template is using Vue 3 <script setup> SFCs
-// Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 import MenuBar from "./components/MenuBar.vue";
+
+const route = useRoute();
+const showMenuBar = computed(() => route.name !== "login");
 </script>
 
 <template>
   <v-app>
-    <MenuBar :key="$route.fullPath" />
+    <MenuBar v-if="showMenuBar" :key="$route.fullPath" />
     <v-main>
       <router-view />
     </v-main>

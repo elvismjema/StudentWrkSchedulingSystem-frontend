@@ -1,5 +1,5 @@
 <template>
   <v-container class="py-12 text-center">
-    <h2>Team 2:Working on the App 😁......</h2>
+    <h2>Working on the App 😁....</h2>
   </v-container>
 </template>

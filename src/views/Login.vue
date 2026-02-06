@@ -50,7 +50,7 @@ const onLogin = () => {
       </div>
     </v-card>
 
-    <p class="login-footer">Oklahoma Christian University • Student Employment</p>
+    <p class="login-footer">Oklahoma Christian University</p>
   </v-container>
 </template>
 

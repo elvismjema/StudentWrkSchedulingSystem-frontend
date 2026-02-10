@@ -43,7 +43,7 @@
             class="user-menu-btn"
           >
             <v-avatar size="36" class="nav-user-avatar">
-              <span class="nav-user-initial">U</span>
+              <span class="nav-user-initial">{{ userInitials }}</span>
             </v-avatar>
           </v-btn>
         </template>
@@ -52,11 +52,11 @@
           <!-- Header Section -->
           <div class="profile-header">
             <v-avatar size="48" class="header-avatar">
-              <span class="header-initial">U</span>
+              <span class="header-initial">{{ userInitials }}</span>
             </v-avatar>
             <div class="header-info">
-              <div class="header-name">User</div>
-              <div class="header-email">user@oc.edu</div>
+              <div class="header-name">{{ userName }}</div>
+              <div class="header-email">{{ userEmail }}</div>
             </div>
           </div>
 
@@ -99,17 +99,41 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import Utils from '../config/utils'
+import AuthServices from '../services/authServices'
 
 const emit = defineEmits(['toggle-sidebar'])
 const router = useRouter()
 const menuOpen = ref(false)
+const user = ref(null)
 
 const menuItems = [
   { title: 'Profile', icon: 'mdi-account', route: '/student/profile' },
   { title: 'Settings', icon: 'mdi-cog', route: '/student/settings' }
 ]
+
+const syncUser = () => {
+  user.value = Utils.getStore('user')
+}
+
+const userName = computed(() => {
+  if (!user.value) return 'User'
+  const first = user.value.fName || ''
+  const last = user.value.lName || ''
+  const full = `${first} ${last}`.trim()
+  return full || 'User'
+})
+
+const userEmail = computed(() => user.value?.email || 'user@oc.edu')
+
+const userInitials = computed(() => {
+  const first = user.value?.fName?.[0] || ''
+  const last = user.value?.lName?.[0] || ''
+  const initials = `${first}${last}`.toUpperCase()
+  return initials || 'U'
+})
 
 const toggleSidebar = () => {
   emit('toggle-sidebar')
@@ -117,9 +141,14 @@ const toggleSidebar = () => {
 
 const handleSignOut = () => {
   menuOpen.value = false
-  // Handle sign out logic here
+  AuthServices.logoutUser(user.value).catch(() => {})
+  Utils.removeItem('user')
   router.push('/login')
 }
+
+onMounted(() => {
+  syncUser()
+})
 </script>
 
 <style scoped>

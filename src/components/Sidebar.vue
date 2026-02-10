@@ -44,11 +44,11 @@
         <v-list-item class="user-item">
           <template v-slot:prepend>
             <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">U</span>
+              <span class="user-initial">{{ userInitials }}</span>
             </v-avatar>
           </template>
           <div v-if="!rail" class="user-info">
-            <div class="user-name">User</div>
+            <div class="user-name">{{ userName }}</div>
             <div class="user-role">Student</div>
           </div>
         </v-list-item>
@@ -58,10 +58,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import Utils from '../config/utils'
 
 const drawer = ref(true)
 const rail = ref(false)
+const user = ref(null)
 
 const navItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
@@ -70,6 +72,25 @@ const navItems = [
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
   { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
 ]
+
+const userName = computed(() => {
+  if (!user.value) return 'User'
+  const first = user.value.fName || ''
+  const last = user.value.lName || ''
+  const full = `${first} ${last}`.trim()
+  return full || 'User'
+})
+
+const userInitials = computed(() => {
+  const first = user.value?.fName?.[0] || ''
+  const last = user.value?.lName?.[0] || ''
+  const initials = `${first}${last}`.toUpperCase()
+  return initials || 'U'
+})
+
+onMounted(() => {
+  user.value = Utils.getStore('user')
+})
 
 defineExpose({
   rail,

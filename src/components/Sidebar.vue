@@ -68,8 +68,7 @@ const navItems = [
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
-  { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' },
-  { title: 'Settings', icon: 'mdi-cog', route: '/student/settings' }
+  { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
 ]
 
 defineExpose({

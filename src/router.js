@@ -8,6 +8,7 @@ import ViewTutorial from "./views/ViewTutorial.vue";
 import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
+import Manager from "./views/Manager.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -90,6 +91,79 @@ const router = createRouter({
         }
       ]
     },
+    {
+      path: "/manager",
+      name: "manager",
+      component: Manager,
+      redirect: { name: "manager-dashboard" },
+      children: [
+        {
+          path: "dashboard",
+          name: "manager-dashboard",
+          component: () => import("./views/ManagerDashboard.vue")
+        },
+        {
+          path: "schedule",
+          name: "manager-schedule",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Schedule", description: "Build and manage worker schedules in this view." }
+        },
+        {
+          path: "create-shift",
+          name: "manager-create-shift",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Create Shift", description: "Create and assign new shifts for workers." }
+        },
+        {
+          path: "availability",
+          name: "manager-availability",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Availability", description: "Review worker availability and constraints." }
+        },
+        {
+          path: "approvals",
+          name: "manager-approvals",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Approvals", description: "Approve or reject pending requests." }
+        },
+        {
+          path: "time-attendance",
+          name: "manager-time-attendance",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Time & Attendance", description: "Track clock-in activity and attendance records." }
+        },
+        {
+          path: "workers",
+          name: "manager-workers",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Workers", description: "View and manage worker profiles." }
+        },
+        {
+          path: "tasks",
+          name: "manager-tasks",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Tasks", description: "Assign and monitor worker tasks." }
+        },
+        {
+          path: "reports",
+          name: "manager-reports",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Reports", description: "Generate operational and staffing reports." }
+        },
+        {
+          path: "notifications",
+          name: "manager-notifications",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Notifications", description: "Review manager alerts and notifications." }
+        },
+        {
+          path: "settings",
+          name: "manager-settings",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Settings", description: "Manage manager and department preferences." }
+        }
+      ]
+    }
   ],
 });
 

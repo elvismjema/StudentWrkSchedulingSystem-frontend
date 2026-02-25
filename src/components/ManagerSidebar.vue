@@ -40,12 +40,12 @@
         <v-list-item class="manager-user-item">
           <template #prepend>
             <v-avatar size="38" class="manager-user-avatar">
-              <span class="manager-user-initial">LM</span>
+              <span class="manager-user-initial">{{ displayInitial }}</span>
             </v-avatar>
           </template>
           <div v-if="!rail" class="manager-user-text">
-            <div class="manager-user-name">Lisa Martinez</div>
-            <div class="manager-user-role">Manager</div>
+            <div class="manager-user-name">{{ displayName }}</div>
+            <div class="manager-user-role">{{ displayRole }}</div>
           </div>
         </v-list-item>
       </div>
@@ -54,10 +54,30 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import Utils from "../config/utils";
 
 const drawer = ref(true);
 const rail = ref(false);
+const user = ref(Utils.getStore("user") || {});
+
+const displayName = computed(() => {
+  const first = user.value?.fName || "";
+  const last = user.value?.lName || "";
+  const fullName = `${first} ${last}`.trim();
+  return fullName || "User";
+});
+
+const displayRole = computed(() => {
+  const role = (user.value?.role || "student").toLowerCase();
+  return role === "manager" ? "Manager" : "Student";
+});
+
+const displayInitial = computed(() => {
+  const first = user.value?.fName?.[0] || "";
+  const last = user.value?.lName?.[0] || "";
+  return `${first}${last}`.toUpperCase() || "U";
+});
 
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import Utils from "./config/utils";
 
 import Login from "./views/Login.vue";
 
@@ -9,6 +10,17 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
+
+const getStoredRole = () => {
+  const user = Utils.getStore("user");
+  return (user?.role || "").toLowerCase();
+};
+
+const getDefaultDashboardRoute = () => {
+  return getStoredRole() === "manager"
+    ? { name: "manager-dashboard" }
+    : { name: "student-schedule" };
+};
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -22,7 +34,7 @@ const router = createRouter({
     {
       path: "/tutorials",
       name: "tutorials",
-      redirect: { name: "student-schedule" },
+      redirect: () => getDefaultDashboardRoute(),
     },
     {
       path: "/edit/:id",
@@ -165,6 +177,24 @@ const router = createRouter({
       ]
     }
   ],
+});
+
+router.beforeEach((to) => {
+  const role = getStoredRole();
+
+  if (!role || to.name === "login") {
+    return true;
+  }
+
+  if (to.path.startsWith("/manager") && role !== "manager") {
+    return { name: "student-schedule" };
+  }
+
+  if (to.path.startsWith("/student") && role === "manager") {
+    return { name: "manager-dashboard" };
+  }
+
+  return true;
 });
 
 export default router;

@@ -15,7 +15,7 @@
 
       <v-btn icon variant="text">
         <v-avatar size="52" class="profile-avatar">
-          <span class="profile-initials">LM</span>
+          <span class="profile-initials">{{ displayInitials }}</span>
         </v-avatar>
       </v-btn>
     </div>
@@ -23,7 +23,17 @@
 </template>
 
 <script setup>
+import { computed, ref } from "vue";
+import Utils from "../config/utils";
+
 const emit = defineEmits(["toggle-sidebar"]);
+const user = ref(Utils.getStore("user") || {});
+
+const displayInitials = computed(() => {
+  const first = user.value?.fName?.[0] || "";
+  const last = user.value?.lName?.[0] || "";
+  return `${first}${last}`.toUpperCase() || "U";
+});
 </script>
 
 <style scoped>

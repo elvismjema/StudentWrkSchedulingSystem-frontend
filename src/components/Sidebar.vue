@@ -44,12 +44,12 @@
         <v-list-item class="user-item">
           <template v-slot:prepend>
             <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">U</span>
+              <span class="user-initial">{{ displayInitial }}</span>
             </v-avatar>
           </template>
           <div v-if="!rail" class="user-info">
-            <div class="user-name">User</div>
-            <div class="user-role">Student</div>
+            <div class="user-name">{{ displayName }}</div>
+            <div class="user-role">{{ displayRole }}</div>
           </div>
         </v-list-item>
       </div>
@@ -58,10 +58,30 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import Utils from '../config/utils'
 
 const drawer = ref(true)
 const rail = ref(false)
+const user = ref(Utils.getStore("user") || {})
+
+const displayName = computed(() => {
+  const first = user.value?.fName || ''
+  const last = user.value?.lName || ''
+  const fullName = `${first} ${last}`.trim()
+  return fullName || 'User'
+})
+
+const displayRole = computed(() => {
+  const role = (user.value?.role || 'student').toLowerCase()
+  return role === 'manager' ? 'Manager' : 'Student'
+})
+
+const displayInitial = computed(() => {
+  const first = user.value?.fName?.[0] || ''
+  const last = user.value?.lName?.[0] || ''
+  return `${first}${last}`.toUpperCase() || 'U'
+})
 
 const navItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },

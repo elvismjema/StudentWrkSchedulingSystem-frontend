@@ -9,6 +9,10 @@ import ViewTutorial from "./views/ViewTutorial.vue";
 import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
+
+import StudentQualifications from "./views/StudentQualifications.vue";
+import ShiftManagement from "./views/ShiftManagement.vue";
+
 import Manager from "./views/Manager.vue";
 
 const getStoredRole = () => {
@@ -21,6 +25,7 @@ const getDefaultDashboardRoute = () => {
     ? { name: "manager-dashboard" }
     : { name: "student-schedule" };
 };
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -116,6 +121,22 @@ const router = createRouter({
     {
       path: "/manager",
       name: "manager",
+
+      component: () => import("./views/Manager.vue"),
+      children: [
+        {
+          path: "qualifications",
+          name: "manager-qualifications",
+          component: StudentQualifications
+        },
+        {
+          path: "shifts",
+          name: "manager-shifts",
+          component: ShiftManagement
+        }
+      ]
+    },
+
       component: Manager,
       redirect: { name: "manager-dashboard" },
       children: [
@@ -221,6 +242,7 @@ const router = createRouter({
         }
       ]
     }
+
   ],
 });
 

@@ -102,6 +102,11 @@ const router = createRouter({
           component: () => import("./views/StudentNotifications.vue")
         },
         {
+          path: "profile",
+          name: "student-profile",
+          component: () => import("./views/StudentProfile.vue")
+        },
+        {
           path: "settings",
           name: "student-settings",
           component: () => import("./views/StudentSettings.vue")

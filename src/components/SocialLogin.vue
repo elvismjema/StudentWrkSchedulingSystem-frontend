@@ -8,8 +8,10 @@ const router = useRouter();
 const fName = ref("");
 const lName = ref("");
 const user = ref({});
+const loginError = ref("");
 
 const loginWithGoogle = () => {
+  loginError.value = "";
   window.handleCredentialResponse = handleCredentialResponse;
   const client = import.meta.env.VITE_APP_CLIENT_ID;
   console.log(client);
@@ -29,19 +31,36 @@ const loginWithGoogle = () => {
 };
 
 const handleCredentialResponse = async (response) => {
+  loginError.value = "";
   let token = {
     credential: response.credential,
   };
   await AuthServices.loginUser(token)
     .then((response) => {
       user.value = response.data;
+      const role = (user.value.role || "").toLowerCase();
+      if (!user.value.token || (role !== "manager" && role !== "student")) {
+        loginError.value =
+          user.value.message ||
+          "Login failed. Please try again in a few moments.";
+        Utils.removeItem("user");
+        return;
+      }
+
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
-      router.push({ name: "student-schedule" });
+      if (role === "manager") {
+        router.push({ name: "manager-dashboard" });
+      } else if (role === "student") {
+        router.push({ name: "student-schedule" });
+      }
     })
     .catch((error) => {
       console.log("error", error);
+      loginError.value =
+        error?.response?.data?.message ||
+        "Login request failed. The backend may be temporarily unavailable.";
     });
 };
 
@@ -55,5 +74,14 @@ onMounted(() => {
     <v-row justify="center">
       <div display="flex" id="parent_id"></div>
     </v-row>
+    <v-alert
+      v-if="loginError"
+      class="mt-4"
+      type="error"
+      variant="tonal"
+      density="compact"
+    >
+      {{ loginError }}
+    </v-alert>
   </div>
 </template>

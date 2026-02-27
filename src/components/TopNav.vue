@@ -1,7 +1,7 @@
 <template>
   <v-app-bar
     elevation="0"
-    height="64"
+    height="60"
     class="top-nav"
     color="white"
   >
@@ -42,21 +42,21 @@
             variant="text"
             class="user-menu-btn"
           >
-            <v-avatar size="36" class="nav-user-avatar">
-              <span class="nav-user-initial">U</span>
+            <v-avatar size="34" class="nav-user-avatar">
+              <span class="nav-user-initial">{{ displayInitial }}</span>
             </v-avatar>
           </v-btn>
         </template>
 
-        <v-card class="profile-menu" min-width="280">
+        <v-card class="profile-menu" min-width="264">
           <!-- Header Section -->
           <div class="profile-header">
-            <v-avatar size="48" class="header-avatar">
-              <span class="header-initial">U</span>
+            <v-avatar size="44" class="header-avatar">
+              <span class="header-initial">{{ displayInitial }}</span>
             </v-avatar>
             <div class="header-info">
-              <div class="header-name">User</div>
-              <div class="header-email">user@oc.edu</div>
+              <div class="header-name">{{ displayName }}</div>
+              <div class="header-email">{{ displayEmail }}</div>
             </div>
           </div>
 
@@ -99,16 +99,32 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import Utils from '../config/utils'
 
 const emit = defineEmits(['toggle-sidebar'])
 const router = useRouter()
 const menuOpen = ref(false)
+const user = ref(Utils.getStore("user") || {})
+
+const displayName = computed(() => {
+  const first = user.value?.fName || ''
+  const last = user.value?.lName || ''
+  const fullName = `${first} ${last}`.trim()
+  return fullName || 'User'
+})
+
+const displayEmail = computed(() => user.value?.email || '')
+
+const displayInitial = computed(() => {
+  const first = user.value?.fName?.[0] || ''
+  const last = user.value?.lName?.[0] || ''
+  return `${first}${last}`.toUpperCase() || 'U'
+})
 
 const menuItems = [
-  { title: 'Profile', icon: 'mdi-account', route: '/student/profile' },
-  { title: 'Settings', icon: 'mdi-cog', route: '/student/settings' }
+  { title: 'Profile', icon: 'mdi-account', route: '/student/profile' }
 ]
 
 const toggleSidebar = () => {
@@ -117,7 +133,7 @@ const toggleSidebar = () => {
 
 const handleSignOut = () => {
   menuOpen.value = false
-  // Handle sign out logic here
+  Utils.removeItem('user')
   router.push('/login')
 }
 </script>
@@ -125,7 +141,7 @@ const handleSignOut = () => {
 <style scoped>
 .top-nav {
   border-bottom: 1px solid #e0e0e0;
-  padding: 0 16px;
+  padding: 0 12px;
 }
 
 .menu-btn {
@@ -149,7 +165,7 @@ const handleSignOut = () => {
 .nav-user-initial {
   color: white;
   font-weight: 500;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* Button hover effects */
@@ -161,15 +177,15 @@ const handleSignOut = () => {
 
 /* Profile Menu Styles */
 .profile-menu {
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .profile-header {
-  padding: 20px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-avatar {
@@ -179,7 +195,7 @@ const handleSignOut = () => {
 .header-initial {
   color: white;
   font-weight: 500;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .header-info {
@@ -187,14 +203,14 @@ const handleSignOut = () => {
 }
 
 .header-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: #333;
   line-height: 1.2;
 }
 
 .header-email {
-  font-size: 14px;
+  font-size: 13px;
   color: #666;
   line-height: 1.2;
   margin-top: 2px;
@@ -204,6 +220,11 @@ const handleSignOut = () => {
   margin: 0 8px;
   border-radius: 8px;
   transition: background-color 0.2s ease;
+}
+
+.menu-item :deep(.v-list-item-title),
+.sign-out-item :deep(.v-list-item-title) {
+  font-size: 14px;
 }
 
 .menu-item:hover {

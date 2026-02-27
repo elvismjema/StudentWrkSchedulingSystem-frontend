@@ -1,13 +1,5 @@
 <script setup>
-import { ref } from "vue";
 import SocialLogin from "../components/SocialLogin.vue";
-
-const email = ref("");
-const password = ref("");
-
-const onLogin = () => {
-  // Placeholder for future email/password login.
-};
 </script>
 
 <template>
@@ -22,28 +14,6 @@ const onLogin = () => {
       </div>
       <h1 class="login-title">Student Worker Scheduling System</h1>
       <p class="login-subtitle">Manage your campus work schedule</p>
-
-      <v-form class="login-form" @submit.prevent="onLogin">
-        <v-text-field
-          v-model="email"
-          label="Email"
-          placeholder="username@oc.edu"
-          variant="outlined"
-          density="comfortable"
-        />
-        <v-text-field
-          v-model="password"
-          label="Password"
-          type="password"
-          variant="outlined"
-          density="comfortable"
-        />
-        <v-btn class="login-btn" type="submit" block>Log In</v-btn>
-      </v-form>
-
-      <div class="login-divider">
-        <span>OR</span>
-      </div>
 
       <div class="login-social">
         <SocialLogin />
@@ -101,36 +71,6 @@ const onLogin = () => {
   color: #6b7280;
   font-size: 16px;
   margin-bottom: 24px;
-}
-
-.login-form :deep(.v-input) {
-  margin-bottom: 12px;
-}
-
-.login-btn {
-  background: #7a0026;
-  color: #ffffff;
-  font-weight: 600;
-  text-transform: none;
-  padding: 12px 0;
-  border-radius: 10px;
-}
-
-.login-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0 16px;
-  color: #9aa0a6;
-  font-size: 14px;
-}
-
-.login-divider::before,
-.login-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e7eb;
 }
 
 .login-social {

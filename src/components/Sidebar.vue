@@ -4,8 +4,8 @@
     :rail="rail"
     permanent
     class="sidebar"
-    width="280"
-    rail-width="56"
+    width="256"
+    rail-width="60"
   >
     <!-- Logo Section -->
     <div class="logo-section">
@@ -44,12 +44,17 @@
         <v-list-item class="user-item">
           <template v-slot:prepend>
             <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">U</span>
+              <span class="user-initial">{{ displayInitial }}</span>
             </v-avatar>
           </template>
           <div v-if="!rail" class="user-info">
+
             <div class="user-name">User</div>
             <div class="user-role">{{ isManagerRoute ? 'Manager' : 'Student' }}</div>
+
+            <div class="user-name">{{ displayName }}</div>
+            <div class="user-role">{{ displayRole }}</div>
+
           </div>
         </v-list-item>
       </div>
@@ -58,6 +63,7 @@
 </template>
 
 <script setup>
+
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -65,11 +71,38 @@ const drawer = ref(true)
 const rail = ref(false)
 const route = useRoute()
 
+import { computed, ref } from 'vue'
+import Utils from '../config/utils'
+
+const drawer = ref(true)
+const rail = ref(false)
+const user = ref(Utils.getStore("user") || {})
+
+const displayName = computed(() => {
+  const first = user.value?.fName || ''
+  const last = user.value?.lName || ''
+  const fullName = `${first} ${last}`.trim()
+  return fullName || 'User'
+})
+
+const displayRole = computed(() => {
+  const role = (user.value?.role || 'student').toLowerCase()
+  return role === 'manager' ? 'Manager' : 'Student'
+})
+
+const displayInitial = computed(() => {
+  const first = user.value?.fName?.[0] || ''
+  const last = user.value?.lName?.[0] || ''
+  return `${first}${last}`.toUpperCase() || 'U'
+})
+
+
 // Check if we're on a manager route
 const isManagerRoute = computed(() => route.path.startsWith('/manager'))
 
 const studentNavItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
+  { title: 'Departments', icon: 'mdi-domain', route: '/student/departments' },
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
@@ -99,7 +132,7 @@ defineExpose({
 }
 
 .logo-section {
-  padding: 16px;
+  padding: 14px;
 }
 
 .logo-container {
@@ -117,7 +150,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 15px;
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -127,27 +160,35 @@ defineExpose({
 }
 
 .main-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: #333;
   line-height: 1.2;
 }
 
 .sub-title {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
   line-height: 1.2;
   margin-top: 2px;
 }
 
 .nav-list {
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .nav-item {
   margin: 2px 8px;
   border-radius: 8px;
   transition: all 0.2s ease;
+}
+
+.nav-item :deep(.v-list-item__content) {
+  font-size: 14px;
+}
+
+.nav-item :deep(.v-list-item-title) {
+  font-size: 14px;
 }
 
 .nav-item:hover {
@@ -169,7 +210,7 @@ defineExpose({
 }
 
 .user-section {
-  padding: 8px;
+  padding: 6px;
 }
 
 .user-item {
@@ -184,12 +225,12 @@ defineExpose({
 .user-initial {
   color: white;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .user-name {
   color: #333;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -200,7 +241,7 @@ defineExpose({
 
 .user-role {
   color: #666;
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
 }
 

@@ -124,8 +124,7 @@ const displayInitial = computed(() => {
 })
 
 const menuItems = [
-  { title: 'Profile', icon: 'mdi-account', route: '/student/profile' },
-  { title: 'Settings', icon: 'mdi-cog', route: '/student/settings' }
+  { title: 'Profile', icon: 'mdi-account', route: '/student/profile' }
 ]
 
 const toggleSidebar = () => {

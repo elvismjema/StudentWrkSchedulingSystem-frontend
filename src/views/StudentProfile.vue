@@ -25,13 +25,13 @@
 
       <div class="avatar-row">
         <div class="avatar-shell">
-          <v-avatar size="132" class="profile-avatar">
+          <v-avatar size="112" class="profile-avatar">
             <span class="profile-initials">{{ displayInitials }}</span>
           </v-avatar>
           <v-btn
             class="camera-button"
             icon="mdi-camera-outline"
-            size="48"
+            size="42"
             variant="flat"
             aria-label="Profile photo placeholder"
           />
@@ -242,10 +242,12 @@ const saveProfile = () => {
 
 <style scoped>
 .profile-page {
-  padding: 32px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .profile-hero {
@@ -256,49 +258,49 @@ const saveProfile = () => {
 }
 
 .page-title {
-  font-size: 3rem;
-  line-height: 1.05;
+  font-size: 2.35rem;
+  line-height: 1.08;
   font-weight: 700;
   color: #24242b;
 }
 
 .page-subtitle {
-  margin-top: 8px;
-  font-size: 1.125rem;
+  margin-top: 6px;
+  font-size: 1rem;
   color: #6d7586;
 }
 
 .save-button {
-  border-radius: 14px;
-  min-width: 220px;
-  height: 78px;
-  font-size: 1rem;
+  border-radius: 12px;
+  min-width: 188px;
+  height: 60px;
+  font-size: 0.95rem;
   font-weight: 600;
   text-transform: none;
   box-shadow: none;
 }
 
 .profile-card {
-  padding: 40px 48px;
+  padding: 32px 36px;
   border: 1px solid #d9dce4;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
 }
 
 .section-header h2 {
-  font-size: 1.4rem;
+  font-size: 1.22rem;
   font-weight: 700;
   color: #24242b;
 }
 
 .section-header p {
-  margin-top: 10px;
+  margin-top: 8px;
   color: #6d7586;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .avatar-row {
-  padding: 34px 0 24px;
+  padding: 28px 0 20px;
 }
 
 .avatar-shell {
@@ -312,7 +314,7 @@ const saveProfile = () => {
 
 .profile-initials {
   color: #fff;
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 500;
 }
 
@@ -326,23 +328,23 @@ const saveProfile = () => {
 }
 
 .section-divider {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  gap: 24px;
 }
 
 .single-field {
-  margin-top: 28px;
+  margin-top: 22px;
 }
 
 .field-label {
   display: block;
-  margin-bottom: 12px;
-  font-size: 1rem;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #24242b;
 }
@@ -350,19 +352,19 @@ const saveProfile = () => {
 .assignment-stack {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .assignment-value {
-  min-height: 30px;
+  min-height: 24px;
   color: #2d2d35;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
 }
 
 .assignment-note {
-  margin-top: 42px;
+  margin-top: 28px;
   color: #6d7586;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .preference-row,
@@ -371,18 +373,19 @@ const saveProfile = () => {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 30px 0;
+  padding: 24px 0;
 }
 
 .preference-title {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: #24242b;
 }
 
 .preference-subtitle {
-  margin-top: 8px;
+  margin-top: 6px;
   color: #6d7586;
+  font-size: 0.95rem;
 }
 
 .reminder-row {
@@ -392,17 +395,28 @@ const saveProfile = () => {
 .reminder-input {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 270px;
+  gap: 14px;
+  min-width: 240px;
 }
 
 .reminder-input :deep(.v-input) {
-  max-width: 110px;
+  max-width: 96px;
+}
+
+.profile-page :deep(.v-field) {
+  min-height: 50px;
+  border-radius: 12px;
+}
+
+.profile-page :deep(.v-field__input) {
+  font-size: 0.95rem;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 @media (max-width: 960px) {
   .profile-page {
-    padding: 20px;
+    padding: 18px;
   }
 
   .profile-hero,
@@ -415,11 +429,11 @@ const saveProfile = () => {
   .save-button {
     width: 100%;
     min-width: 0;
-    height: 58px;
+    height: 54px;
   }
 
   .profile-card {
-    padding: 28px 20px;
+    padding: 24px 18px;
   }
 
   .form-grid {

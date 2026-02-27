@@ -4,8 +4,8 @@
     :rail="rail"
     permanent
     class="sidebar"
-    width="280"
-    rail-width="56"
+    width="256"
+    rail-width="60"
   >
     <!-- Logo Section -->
     <div class="logo-section">
@@ -103,7 +103,7 @@ defineExpose({
 }
 
 .logo-section {
-  padding: 16px;
+  padding: 14px;
 }
 
 .logo-container {
@@ -121,7 +121,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 15px;
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -131,27 +131,35 @@ defineExpose({
 }
 
 .main-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: #333;
   line-height: 1.2;
 }
 
 .sub-title {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
   line-height: 1.2;
   margin-top: 2px;
 }
 
 .nav-list {
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .nav-item {
   margin: 2px 8px;
   border-radius: 8px;
   transition: all 0.2s ease;
+}
+
+.nav-item :deep(.v-list-item__content) {
+  font-size: 14px;
+}
+
+.nav-item :deep(.v-list-item-title) {
+  font-size: 14px;
 }
 
 .nav-item:hover {
@@ -173,7 +181,7 @@ defineExpose({
 }
 
 .user-section {
-  padding: 8px;
+  padding: 6px;
 }
 
 .user-item {
@@ -188,12 +196,12 @@ defineExpose({
 .user-initial {
   color: white;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .user-name {
   color: #333;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -204,7 +212,7 @@ defineExpose({
 
 .user-role {
   color: #666;
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
 }
 

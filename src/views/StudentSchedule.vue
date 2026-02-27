@@ -185,9 +185,9 @@ const acknowledgeShift = () => {
 
 <style scoped>
 .schedule-container {
-  padding: 24px;
+  padding: 20px;
   background-color: #fafafa;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -198,11 +198,11 @@ const acknowledgeShift = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .month-year {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
   color: #333;
   margin: 0;
@@ -210,7 +210,7 @@ const acknowledgeShift = () => {
 
 .header-controls {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -228,8 +228,8 @@ const acknowledgeShift = () => {
 .next-shift-card {
   background: white;
   border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 32px;
+  padding: 20px;
+  margin-bottom: 24px;
   border: 1px solid #e0e0e0;
 }
 
@@ -255,7 +255,7 @@ const acknowledgeShift = () => {
 }
 
 .shift-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: #333;
   margin: 0 0 12px 0;
@@ -272,7 +272,7 @@ const acknowledgeShift = () => {
   align-items: center;
   gap: 8px;
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .detail-icon {

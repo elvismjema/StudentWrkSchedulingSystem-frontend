@@ -4,7 +4,7 @@
     <TopNav @toggle-sidebar="toggleSidebar" />
     
     <v-main class="main-content">
-      <v-container fluid class="pa-0">
+      <v-container fluid class="student-content pa-0">
         <router-view />
       </v-container>
     </v-main>
@@ -28,6 +28,12 @@ const toggleSidebar = () => {
 <style scoped>
 .main-content {
   background-color: #fafafa;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+.student-content {
+  height: 100%;
 }
 </style>

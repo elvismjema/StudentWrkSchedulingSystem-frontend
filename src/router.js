@@ -171,8 +171,7 @@ const router = createRouter({
         {
           path: "settings",
           name: "manager-settings",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Settings", description: "Manage manager and department preferences." }
+          component: () => import("./views/DepartmentSettings.vue")
         }
       ]
     }

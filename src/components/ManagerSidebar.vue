@@ -19,6 +19,13 @@
 
     <v-divider />
 
+    <!-- Department Switcher -->
+    <div class="px-3 py-3">
+      <DepartmentSwitcher />
+    </div>
+
+    <v-divider />
+
     <v-list nav class="manager-nav">
       <v-list-item
         v-for="item in navItems"
@@ -56,6 +63,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import Utils from "../config/utils";
+import DepartmentSwitcher from "./DepartmentSwitcher.vue";
 
 const drawer = ref(true);
 const rail = ref(false);

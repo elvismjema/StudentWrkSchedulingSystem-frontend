@@ -1,6 +1,7 @@
 <template>
   <v-app>
-    <ManagerSidebar ref="sidebarRef" />
+    <AdminSidebar v-if="isAdmin" ref="sidebarRef" />
+    <ManagerSidebar v-else ref="sidebarRef" />
     <ManagerTopNav @toggle-sidebar="toggleSidebar" />
 
     <v-main class="manager-main">
@@ -12,11 +13,18 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import ManagerSidebar from "../components/ManagerSidebar.vue";
+import AdminSidebar from "../components/AdminSidebar.vue";
 import ManagerTopNav from "../components/ManagerTopNav.vue";
+import Utils from "../config/utils";
 
 const sidebarRef = ref(null);
+
+const isAdmin = computed(() => {
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.permission_level >= 90;
+});
 
 const toggleSidebar = () => {
   if (sidebarRef.value) {

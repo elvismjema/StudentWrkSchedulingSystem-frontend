@@ -184,23 +184,68 @@ const router = createRouter({
           component: () => import("./views/DepartmentSettings.vue")
         }
       ]
+    },
+    {
+      path: "/admin",
+      name: "admin",
+      component: () => import("./views/Manager.vue"),
+      children: [
+        {
+          path: "",
+          name: "admin-dashboard",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Admin Dashboard", description: "System-wide administration and oversight." }
+        },
+        {
+          path: "users",
+          name: "admin-users",
+          component: () => import("./views/UserManagement.vue")
+        },
+        {
+          path: "departments",
+          name: "admin-departments",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Departments", description: "Manage departments and organizational structure." }
+        },
+        {
+          path: "reports",
+          name: "admin-reports",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "System Reports", description: "Generate system-wide reports and analytics." }
+        },
+        {
+          path: "settings",
+          name: "admin-settings",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
+        }
+      ]
     }
   ],
 });
 
 router.beforeEach((to) => {
   const role = getStoredRole();
+  const user = Utils.getStore("user");
+  const departmentContext = Utils.getStore("currentDepartmentContext");
 
   if (!role || to.name === "login") {
     return true;
   }
 
-  if (to.path.startsWith("/manager") && role !== "manager") {
+  // Check for admin role - can be based on permission level
+  const isAdmin = departmentContext?.permission_level >= 90;
+
+  if (to.path.startsWith("/admin") && !isAdmin) {
+    return role === "manager" ? { name: "manager-dashboard" } : { name: "student-schedule" };
+  }
+
+  if (to.path.startsWith("/manager") && role !== "manager" && !isAdmin) {
     return { name: "student-schedule" };
   }
 
-  if (to.path.startsWith("/student") && role === "manager") {
-    return { name: "manager-dashboard" };
+  if (to.path.startsWith("/student") && (role === "manager" || isAdmin)) {
+    return isAdmin ? { name: "admin-dashboard" } : { name: "manager-dashboard" };
   }
 
   return true;

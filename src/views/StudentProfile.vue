@@ -17,144 +17,148 @@
       </v-btn>
     </div>
 
-    <v-card class="profile-card" elevation="0">
-      <div class="section-header">
-        <h2>Profile</h2>
-        <p>Your personal information</p>
-      </div>
-
-      <div class="avatar-row">
-        <div class="avatar-shell">
-          <v-avatar size="112" class="profile-avatar">
-            <span class="profile-initials">{{ displayInitials }}</span>
-          </v-avatar>
-          <v-btn
-            class="camera-button"
-            icon="mdi-camera-outline"
-            size="42"
-            variant="flat"
-            aria-label="Profile photo placeholder"
-          />
+    <div class="profile-layout">
+      <v-card class="profile-card primary-card" elevation="0">
+        <div class="section-header">
+          <h2>Profile</h2>
+          <p>Your personal information</p>
         </div>
-      </div>
 
-      <v-divider class="section-divider" />
+        <div class="avatar-row">
+          <div class="avatar-shell">
+            <v-avatar size="104" class="profile-avatar">
+              <span class="profile-initials">{{ displayInitials }}</span>
+            </v-avatar>
+            <v-btn
+              class="camera-button"
+              icon="mdi-camera-outline"
+              size="40"
+              variant="flat"
+              aria-label="Profile photo placeholder"
+            />
+          </div>
+        </div>
 
-      <div class="form-grid">
-        <div>
-          <label class="field-label" for="full-name">Full Name</label>
+        <v-divider class="section-divider" />
+
+        <div class="form-grid">
+          <div>
+            <label class="field-label" for="full-name">Full Name</label>
+            <v-text-field
+              id="full-name"
+              v-model="profile.fullName"
+              variant="outlined"
+              hide-details
+              bg-color="white"
+            />
+          </div>
+
+          <div>
+            <label class="field-label" for="email">Email</label>
+            <v-text-field
+              id="email"
+              v-model="profile.email"
+              variant="outlined"
+              hide-details
+              bg-color="white"
+            />
+          </div>
+        </div>
+
+        <div class="single-field">
+          <label class="field-label" for="phone">Phone Number</label>
           <v-text-field
-            id="full-name"
-            v-model="profile.fullName"
+            id="phone"
+            v-model="profile.phone"
             variant="outlined"
             hide-details
             bg-color="white"
+            placeholder="405-555-0123"
           />
         </div>
+      </v-card>
 
-        <div>
-          <label class="field-label" for="email">Email</label>
-          <v-text-field
-            id="email"
-            v-model="profile.email"
-            variant="outlined"
-            hide-details
-            bg-color="white"
-          />
-        </div>
+      <div class="profile-side-column">
+        <v-card class="profile-card compact-card" elevation="0">
+          <div class="section-header">
+            <h2>Department & Positions</h2>
+            <p>Your work assignments</p>
+          </div>
+
+          <div class="assignment-stack">
+            <div>
+              <div class="field-label">Departments</div>
+              <div class="assignment-value">{{ departmentDisplay }}</div>
+            </div>
+
+            <div>
+              <div class="field-label">Positions</div>
+              <div class="assignment-value">{{ positionDisplay }}</div>
+            </div>
+          </div>
+
+          <p class="assignment-note">
+            Contact your manager to update your department or positions.
+          </p>
+        </v-card>
+
+        <v-card class="profile-card compact-card" elevation="0">
+          <div class="section-header">
+            <h2>Notifications</h2>
+            <p>How you want to be notified</p>
+          </div>
+
+          <div class="preference-row">
+            <div>
+              <div class="preference-title">Email Notifications</div>
+              <div class="preference-subtitle">Receive schedule updates via email</div>
+            </div>
+            <v-switch
+              v-model="preferences.emailNotifications"
+              color="#8B1538"
+              hide-details
+              inset
+            />
+          </div>
+
+          <v-divider />
+
+          <div class="preference-row">
+            <div>
+              <div class="preference-title">SMS Text Messages</div>
+              <div class="preference-subtitle">Get urgent reminders via text</div>
+            </div>
+            <v-switch
+              v-model="preferences.smsNotifications"
+              color="#8B1538"
+              hide-details
+              inset
+            />
+          </div>
+
+          <v-divider />
+
+          <div class="reminder-row">
+            <div>
+              <div class="preference-title">Shift Reminder Time</div>
+              <div class="preference-subtitle">Get notified before your shift starts</div>
+            </div>
+
+            <div class="reminder-input">
+              <v-text-field
+                v-model="preferences.shiftReminderMinutes"
+                variant="outlined"
+                hide-details
+                type="number"
+                min="0"
+                bg-color="white"
+              />
+              <span>minutes before</span>
+            </div>
+          </div>
+        </v-card>
       </div>
-
-      <div class="single-field">
-        <label class="field-label" for="phone">Phone Number</label>
-        <v-text-field
-          id="phone"
-          v-model="profile.phone"
-          variant="outlined"
-          hide-details
-          bg-color="white"
-          placeholder="405-555-0123"
-        />
-      </div>
-    </v-card>
-
-    <v-card class="profile-card" elevation="0">
-      <div class="section-header">
-        <h2>Department & Positions</h2>
-        <p>Your work assignments</p>
-      </div>
-
-      <div class="assignment-stack">
-        <div>
-          <div class="field-label">Departments</div>
-          <div class="assignment-value">{{ departmentDisplay }}</div>
-        </div>
-
-        <div>
-          <div class="field-label">Positions</div>
-          <div class="assignment-value">{{ positionDisplay }}</div>
-        </div>
-      </div>
-
-      <p class="assignment-note">
-        Contact your manager to update your department or positions.
-      </p>
-    </v-card>
-
-    <v-card class="profile-card" elevation="0">
-      <div class="section-header">
-        <h2>Notifications</h2>
-        <p>How you want to be notified</p>
-      </div>
-
-      <div class="preference-row">
-        <div>
-          <div class="preference-title">Email Notifications</div>
-          <div class="preference-subtitle">Receive schedule updates via email</div>
-        </div>
-        <v-switch
-          v-model="preferences.emailNotifications"
-          color="#8B1538"
-          hide-details
-          inset
-        />
-      </div>
-
-      <v-divider />
-
-      <div class="preference-row">
-        <div>
-          <div class="preference-title">SMS Text Messages</div>
-          <div class="preference-subtitle">Get urgent reminders via text</div>
-        </div>
-        <v-switch
-          v-model="preferences.smsNotifications"
-          color="#8B1538"
-          hide-details
-          inset
-        />
-      </div>
-
-      <v-divider />
-
-      <div class="reminder-row">
-        <div>
-          <div class="preference-title">Shift Reminder Time</div>
-          <div class="preference-subtitle">Get notified before your shift starts</div>
-        </div>
-
-        <div class="reminder-input">
-          <v-text-field
-            v-model="preferences.shiftReminderMinutes"
-            variant="outlined"
-            hide-details
-            type="number"
-            min="0"
-            bg-color="white"
-          />
-          <span>minutes before</span>
-        </div>
-      </div>
-    </v-card>
+    </div>
 
     <v-snackbar
       v-model="saveNoticeOpen"
@@ -248,6 +252,21 @@ const saveProfile = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  height: 100%;
+  overflow: auto;
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.profile-side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .profile-hero {
@@ -285,6 +304,14 @@ const saveProfile = () => {
   border: 1px solid #d9dce4;
   border-radius: 16px;
   background: #ffffff;
+}
+
+.primary-card {
+  min-height: 100%;
+}
+
+.compact-card {
+  padding: 26px 30px;
 }
 
 .section-header h2 {
@@ -417,6 +444,14 @@ const saveProfile = () => {
 @media (max-width: 960px) {
   .profile-page {
     padding: 18px;
+  }
+
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-side-column {
+    gap: 18px;
   }
 
   .profile-hero,

@@ -13,7 +13,6 @@
           </v-icon>
         </div>
         <p class="status-label">{{ currentStatusLabel }}</p>
-        <p class="status-meta">{{ currentStatusMeta }}</p>
       </div>
 
       <v-divider />
@@ -32,27 +31,24 @@
           </div>
 
           <div class="attendance-pill" :class="attendanceClass">
-            <v-icon size="18">{{ attendanceIcon }}</v-icon>
+            <v-icon size="20">{{ attendanceIcon }}</v-icon>
             <span>{{ attendanceLabel }}</span>
           </div>
         </div>
 
         <div class="detail-row">
           <div class="detail-item">
-            <v-icon size="20" class="detail-icon">mdi-clock-outline</v-icon>
+            <v-icon size="22" class="detail-icon">mdi-clock-outline</v-icon>
             <span>{{ currentShift.scheduledWindow }}</span>
           </div>
           <div class="detail-item">
-            <v-icon size="20" class="detail-icon">mdi-map-marker-outline</v-icon>
+            <v-icon size="22" class="detail-icon">mdi-map-marker-outline</v-icon>
             <span>{{ currentShift.campusLocation }}</span>
           </div>
         </div>
 
         <div v-if="isClockedIn" class="active-session">
-          <div class="active-session-label">Current session</div>
-          <div class="active-session-time">
-            Started at {{ formatTime(clockInTime) }} • {{ activeDurationLabel }}
-          </div>
+          Started at {{ formatTime(clockInTime) }} • {{ activeDurationLabel }}
         </div>
 
         <v-btn
@@ -67,7 +63,7 @@
       </div>
     </v-card>
 
-    <section class="history-section">
+    <v-card class="history-shell" elevation="0">
       <h2 class="history-title">Recent History</h2>
       <p class="history-subtitle">Your recent clock records</p>
 
@@ -82,7 +78,7 @@
             <div>
               <p class="history-date">{{ entry.dateLabel }}</p>
               <p class="history-time">
-                {{ entry.actualWindow }} • Scheduled: {{ entry.scheduledWindow }}
+                {{ entry.actualWindow }} <span class="history-dot">•</span> Scheduled: {{ entry.scheduledWindow }}
               </p>
             </div>
             <div class="history-status" :class="entry.statusClass">
@@ -91,7 +87,7 @@
           </div>
         </v-card>
       </div>
-    </section>
+    </v-card>
   </div>
 </template>
 
@@ -107,7 +103,13 @@ const currentShift = {
   scheduledStartMinute: 0,
 };
 
-const now = ref(new Date());
+const createDemoNow = () => {
+  const date = new Date();
+  date.setHours(15, 12, 0, 0);
+  return date;
+};
+
+const now = ref(createDemoNow());
 const isClockedIn = ref(false);
 const clockInTime = ref(null);
 const history = ref([
@@ -129,31 +131,40 @@ const scheduledStart = computed(() => {
   return date;
 });
 
+const lateMinutes = computed(() => {
+  const diffMs = now.value.getTime() - scheduledStart.value.getTime();
+  return Math.max(0, Math.floor(diffMs / 60000));
+});
+
 const attendanceState = computed(() => {
   if (isClockedIn.value && clockInTime.value) {
     return clockInTime.value <= scheduledStart.value ? "on-time" : "late";
   }
 
-  return now.value <= scheduledStart.value ? "on-time" : "upcoming";
+  if (now.value > scheduledStart.value) {
+    return "late";
+  }
+
+  return "upcoming";
 });
 
 const attendanceLabel = computed(() => {
   if (attendanceState.value === "late") {
-    return "Late";
+    return `${lateMinutes.value} minutes late`;
   }
 
   if (attendanceState.value === "upcoming") {
     return "Upcoming";
   }
 
-  return "On time";
+  return "On Time";
 });
 
 const attendanceClass = computed(() => attendanceState.value);
 
 const attendanceIcon = computed(() => {
   if (attendanceState.value === "late") {
-    return "mdi-alert-circle-outline";
+    return "mdi-alert-outline";
   }
 
   return "mdi-check-circle-outline";
@@ -162,14 +173,6 @@ const attendanceIcon = computed(() => {
 const currentStatusLabel = computed(() =>
   isClockedIn.value ? "Currently clocked in" : "Ready to clock in"
 );
-
-const currentStatusMeta = computed(() => {
-  if (isClockedIn.value && clockInTime.value) {
-    return `Started at ${formatTime(clockInTime.value)} today`;
-  }
-
-  return `Scheduled shift starts at ${formatTime(scheduledStart.value)}`;
-});
 
 const activeDurationLabel = computed(() => {
   if (!clockInTime.value) {
@@ -224,7 +227,7 @@ const formatHistoryDate = (value) =>
 
 onMounted(() => {
   timerId = window.setInterval(() => {
-    now.value = new Date();
+    now.value = new Date(now.value.getTime() + 1000);
   }, 1000);
 });
 
@@ -236,10 +239,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .clock-page {
   min-height: 100%;
-  padding: 32px;
-  background:
-    radial-gradient(circle at top right, rgba(209, 233, 217, 0.55), transparent 24%),
-    linear-gradient(180deg, #f7f7f4 0%, #f3f4f1 100%);
+  padding: 34px 36px 48px;
+  background: #f3f3f4;
   overflow-y: auto;
 }
 
@@ -249,40 +250,43 @@ onBeforeUnmount(() => {
 
 .page-title {
   margin: 0;
-  font-size: clamp(2.3rem, 4vw, 3.3rem);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
   font-weight: 800;
-  line-height: 1.05;
-  color: #1f2023;
+  line-height: 1.04;
   letter-spacing: -0.04em;
+  color: #222328;
 }
 
 .page-subtitle,
 .history-subtitle,
 .section-label,
 .history-time,
-.status-meta,
 .detail-item,
-.active-session-time {
-  color: #6f7685;
+.active-session {
+  color: #6e7584;
 }
 
 .page-subtitle {
   margin: 10px 0 0;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .clock-card,
+.history-shell,
 .history-card {
-  border: 1px solid #d7dadf;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 24px rgba(36, 43, 51, 0.06);
+  border: 1px solid #d4d7dd;
+  border-radius: 18px;
+  background: #f7f7f8;
+  box-shadow: 0 2px 8px rgba(26, 33, 46, 0.08);
+}
+
+.clock-card {
+  overflow: hidden;
 }
 
 .status-panel {
-  min-height: 360px;
-  padding: 40px 24px;
+  min-height: 410px;
+  padding: 42px 24px 38px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -293,28 +297,26 @@ onBeforeUnmount(() => {
 .status-icon-wrap {
   width: 124px;
   height: 124px;
+  margin-bottom: 28px;
+  border: 10px solid #b0b5bd;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  border: 10px solid #b6bac3;
-  color: #aeb3bc;
-  margin-bottom: 26px;
+}
+
+.status-icon {
+  color: #afb4bc;
 }
 
 .status-label {
   margin: 0;
-  font-size: clamp(2rem, 3vw, 2.7rem);
+  font-size: clamp(2rem, 3vw, 2.45rem);
   font-weight: 500;
-  color: #656d7e;
-}
-
-.status-meta {
-  margin: 14px 0 0;
-  font-size: 1rem;
+  color: #6b7281;
 }
 
 .shift-panel {
-  padding: 30px 48px 38px;
+  padding: 34px 48px 42px;
 }
 
 .shift-panel-top {
@@ -332,15 +334,15 @@ onBeforeUnmount(() => {
 .role-row {
   display: flex;
   align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
+  gap: 16px;
 }
 
 .location-chip {
-  border-color: #f3b186;
-  color: #f97316;
-  font-weight: 600;
-  background: #fff3eb;
+  background: #fbefe6;
+  border-color: #f1b38e;
+  color: #f27a21;
+  font-weight: 500;
 }
 
 .location-chip :deep(.v-chip__content) {
@@ -353,46 +355,37 @@ onBeforeUnmount(() => {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #f97316;
+  background: #f27a21;
 }
 
 .role-title {
-  font-size: 1.9rem;
-  font-weight: 500;
-  color: #222327;
+  color: #232428;
+  font-size: 2rem;
+  font-weight: 600;
 }
 
 .attendance-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 14px;
-  border-radius: 999px;
-  font-size: 0.98rem;
-  font-weight: 600;
+  gap: 10px;
+  font-size: 1rem;
   white-space: nowrap;
 }
 
-.attendance-pill.on-time {
-  color: #22c55e;
-  background: #e9f9ee;
-}
-
-.attendance-pill.upcoming {
-  color: #16a34a;
-  background: #edf9ee;
-}
-
 .attendance-pill.late {
-  color: #dc2626;
-  background: #fcebea;
+  color: #f1453d;
+}
+
+.attendance-pill.on-time,
+.attendance-pill.upcoming {
+  color: #22a44e;
 }
 
 .detail-row {
-  margin-top: 28px;
   display: flex;
   flex-wrap: wrap;
-  gap: 28px;
+  gap: 30px;
+  margin-top: 32px;
 }
 
 .detail-item {
@@ -403,66 +396,51 @@ onBeforeUnmount(() => {
 }
 
 .detail-icon {
-  color: #737b8b;
+  color: #747b88;
 }
 
 .active-session {
-  margin-top: 24px;
-  padding: 18px 20px;
-  border-radius: 16px;
-  background: #f5fbf7;
-  border: 1px solid #d7efde;
-}
-
-.active-session-label {
-  color: #1f7a3f;
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.active-session-time {
-  margin-top: 6px;
-  font-size: 1rem;
+  margin-top: 22px;
+  font-size: 0.98rem;
 }
 
 .clock-action {
   margin-top: 30px;
-  border-radius: 16px;
-  min-height: 74px;
-  font-size: 1.35rem;
+  min-height: 78px;
+  border-radius: 14px;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   text-transform: none;
 }
 
 .clock-action.clock-in {
-  background: linear-gradient(135deg, #22c55e 0%, #26b85b 100%);
+  background: #28c45a;
   color: #ffffff;
 }
 
 .clock-action.clock-out {
-  background: linear-gradient(135deg, #8b1538 0%, #b11f49 100%);
+  background: #8b1538;
   color: #ffffff;
 }
 
-.history-section {
-  margin-top: 44px;
+.history-shell {
+  margin-top: 50px;
+  padding: 30px 24px 24px;
 }
 
 .history-title {
   margin: 0;
-  font-size: clamp(2rem, 3vw, 2.7rem);
+  font-size: clamp(2rem, 3vw, 2.8rem);
   font-weight: 800;
   line-height: 1.05;
-  color: #1f2023;
   letter-spacing: -0.04em;
+  color: #222328;
 }
 
 .history-subtitle {
-  margin: 10px 0 24px;
-  font-size: 1.08rem;
+  margin: 16px 0 30px;
+  font-size: 1.1rem;
 }
 
 .history-list {
@@ -471,46 +449,51 @@ onBeforeUnmount(() => {
 }
 
 .history-card {
-  padding: 22px 24px;
+  padding: 18px 22px;
+  background: #f6f6f7;
 }
 
 .history-card-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
 }
 
 .history-date {
   margin: 0;
-  color: #202126;
-  font-size: 1.15rem;
+  color: #24252a;
+  font-size: 1.2rem;
   font-weight: 700;
 }
 
 .history-time {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 1rem;
+}
+
+.history-dot {
+  margin: 0 8px;
 }
 
 .history-status {
   padding: 10px 18px;
   border-radius: 999px;
   font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .history-status.on-time {
-  color: #22c55e;
-  background: #e9f9ee;
-  border: 1px solid #b8e8c5;
+  color: #20b24e;
+  background: #ebf7ee;
+  border: 1px solid #b7debf;
 }
 
 .history-status.late {
-  color: #dc2626;
-  background: #fef0ef;
-  border: 1px solid #f3bfbb;
+  color: #f1453d;
+  background: #fdeeed;
+  border: 1px solid #f1c0bc;
 }
 
 @media (max-width: 900px) {
@@ -519,7 +502,7 @@ onBeforeUnmount(() => {
   }
 
   .status-panel {
-    min-height: 300px;
+    min-height: 320px;
   }
 
   .shift-panel {
@@ -534,11 +517,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .page-title,
-  .history-title {
-    letter-spacing: -0.03em;
-  }
-
   .status-icon-wrap {
     width: 108px;
     height: 108px;
@@ -550,12 +528,16 @@ onBeforeUnmount(() => {
   }
 
   .role-title {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
   }
 
   .clock-action {
-    min-height: 64px;
-    font-size: 1.2rem;
+    min-height: 66px;
+    font-size: 1.25rem;
+  }
+
+  .history-shell {
+    padding: 22px 16px 16px;
   }
 }
 </style>

@@ -2,8 +2,8 @@
 const mockNotifications = [
   {
     id: 1,
-    title: 'Shift',
-    description: 'Your shift at the brew starts real soon...',
+    title: 'Shift Starting Soon',
+    description: 'Your shift at The Brew starts in 30 minutes (2:00 PM)',
     timestamp: 'Mar 1, 12:43 PM',
     unread: true,
     type: 'shift',

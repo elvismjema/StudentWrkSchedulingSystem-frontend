@@ -85,6 +85,7 @@ const displayInitial = computed(() => {
 
 const navItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
+  { title: 'Departments', icon: 'mdi-domain', route: '/student/departments' },
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },

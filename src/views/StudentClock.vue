@@ -239,21 +239,20 @@ onBeforeUnmount(() => {
 <style scoped>
 .clock-page {
   min-height: 100%;
-  padding: 34px 36px 48px;
+  padding: 24px;
   background: #f3f3f4;
   overflow-y: auto;
 }
 
 .page-header {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .page-title {
   margin: 0;
-  font-size: clamp(2.4rem, 4vw, 3.4rem);
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.04em;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
   color: #222328;
 }
 
@@ -267,8 +266,9 @@ onBeforeUnmount(() => {
 }
 
 .page-subtitle {
-  margin: 10px 0 0;
-  font-size: 1.15rem;
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .clock-card,
@@ -285,8 +285,8 @@ onBeforeUnmount(() => {
 }
 
 .status-panel {
-  min-height: 410px;
-  padding: 42px 24px 38px;
+  min-height: 360px;
+  padding: 40px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
 .status-icon-wrap {
   width: 124px;
   height: 124px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   border: 10px solid #b0b5bd;
   border-radius: 50%;
   display: grid;
@@ -310,25 +310,28 @@ onBeforeUnmount(() => {
 
 .status-label {
   margin: 0;
-  font-size: clamp(2rem, 3vw, 2.45rem);
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
   color: #6b7281;
 }
 
 .shift-panel {
-  padding: 34px 48px 42px;
+  padding: 24px;
 }
 
 .shift-panel-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
 }
 
 .section-label {
-  margin: 0 0 14px;
-  font-size: 1rem;
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 .role-row {
@@ -360,15 +363,18 @@ onBeforeUnmount(() => {
 
 .role-title {
   color: #232428;
-  font-size: 2rem;
+  font-size: 18px;
   font-weight: 600;
+  line-height: 28px;
 }
 
 .attendance-pill {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 1rem;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -384,15 +390,16 @@ onBeforeUnmount(() => {
 .detail-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 30px;
-  margin-top: 32px;
+  gap: 24px;
+  margin-top: 24px;
 }
 
 .detail-item {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  font-size: 1rem;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .detail-icon {
@@ -400,17 +407,19 @@ onBeforeUnmount(() => {
 }
 
 .active-session {
-  margin-top: 22px;
-  font-size: 0.98rem;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 .clock-action {
-  margin-top: 30px;
-  min-height: 78px;
+  margin-top: 24px;
+  min-height: 64px;
   border-radius: 14px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
   text-transform: none;
 }
 
@@ -425,31 +434,31 @@ onBeforeUnmount(() => {
 }
 
 .history-shell {
-  margin-top: 50px;
-  padding: 30px 24px 24px;
+  margin-top: 24px;
+  padding: 24px;
 }
 
 .history-title {
   margin: 0;
-  font-size: clamp(2rem, 3vw, 2.8rem);
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
   color: #222328;
 }
 
 .history-subtitle {
-  margin: 16px 0 30px;
-  font-size: 1.1rem;
+  margin: 8px 0 24px;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .history-list {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .history-card {
-  padding: 18px 22px;
+  padding: 20px 24px;
   background: #f6f6f7;
 }
 
@@ -457,19 +466,21 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
 }
 
 .history-date {
   margin: 0;
   color: #24252a;
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
 }
 
 .history-time {
-  margin: 10px 0 0;
-  font-size: 1rem;
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .history-dot {
@@ -477,10 +488,11 @@ onBeforeUnmount(() => {
 }
 
 .history-status {
-  padding: 10px 18px;
+  padding: 8px 16px;
   border-radius: 999px;
-  font-size: 0.98rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -498,7 +510,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 900px) {
   .clock-page {
-    padding: 24px 18px 32px;
+    padding: 24px 16px 32px;
   }
 
   .status-panel {
@@ -518,26 +530,26 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .status-icon-wrap {
-    width: 108px;
-    height: 108px;
+    width: 104px;
+    height: 104px;
     border-width: 8px;
   }
 
   .status-label {
-    font-size: 1.8rem;
+    font-size: 18px;
   }
 
   .role-title {
-    font-size: 1.6rem;
+    font-size: 18px;
   }
 
   .clock-action {
-    min-height: 66px;
-    font-size: 1.25rem;
+    min-height: 60px;
+    font-size: 16px;
   }
 
   .history-shell {
-    padding: 22px 16px 16px;
+    padding: 24px 16px;
   }
 }
 </style>

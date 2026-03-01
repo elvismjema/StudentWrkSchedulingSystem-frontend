@@ -4,7 +4,7 @@
     <ManagerTopNav @toggle-sidebar="toggleSidebar" />
 
     <v-main class="manager-main">
-      <v-container fluid class="pa-0">
+      <v-container fluid class="manager-content pa-0">
         <router-view />
       </v-container>
     </v-main>
@@ -28,6 +28,17 @@ const toggleSidebar = () => {
 <style scoped>
 .manager-main {
   background: #f4f5f7;
-  min-height: 100vh;
+  min-height: calc(100vh - 76px);
+  height: calc(100vh - 76px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.manager-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

@@ -30,10 +30,15 @@ const toggleSidebar = () => {
   background-color: #fafafa;
   min-height: calc(100vh - 60px);
   height: calc(100vh - 60px);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .student-content {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

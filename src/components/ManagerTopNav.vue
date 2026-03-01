@@ -7,11 +7,7 @@
     <v-spacer />
 
     <div class="top-actions">
-      <v-badge content="1" color="error" floating offset-x="8" offset-y="8">
-        <v-btn icon variant="text" class="notify-btn">
-          <v-icon size="26">mdi-bell-outline</v-icon>
-        </v-btn>
-      </v-badge>
+      <NotificationDropdown @notification-click="handleNotificationClick" />
 
       <v-btn icon variant="text">
         <v-avatar size="52" class="profile-avatar">
@@ -25,6 +21,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import Utils from "../config/utils";
+import NotificationDropdown from "./NotificationDropdown.vue";
 
 const emit = defineEmits(["toggle-sidebar"]);
 const user = ref(Utils.getStore("user") || {});
@@ -34,6 +31,11 @@ const displayInitials = computed(() => {
   const last = user.value?.lName?.[0] || "";
   return `${first}${last}`.toUpperCase() || "U";
 });
+
+const handleNotificationClick = (notification) => {
+  // Handle notification click logic here
+  console.log('Manager notification clicked:', notification);
+};
 </script>
 
 <style scoped>
@@ -43,8 +45,7 @@ const displayInitials = computed(() => {
   background: #ffffff;
 }
 
-.panel-btn,
-.notify-btn {
+.panel-btn {
   color: #1f2328;
 }
 

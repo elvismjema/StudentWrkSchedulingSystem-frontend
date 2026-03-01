@@ -20,13 +20,7 @@
     <!-- Right side - Notifications and User -->
     <div class="nav-actions">
       <!-- Notifications -->
-      <v-btn
-        icon
-        variant="text"
-        class="notification-btn"
-      >
-        <v-icon size="24">mdi-bell</v-icon>
-      </v-btn>
+      <NotificationDropdown @notification-click="handleNotificationClick" />
 
       <!-- User Avatar with Dropdown -->
       <v-menu
@@ -102,6 +96,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Utils from '../config/utils'
+import NotificationDropdown from './NotificationDropdown.vue'
 
 const emit = defineEmits(['toggle-sidebar'])
 const router = useRouter()
@@ -135,6 +130,11 @@ const handleSignOut = () => {
   menuOpen.value = false
   Utils.removeItem('user')
   router.push('/login')
+}
+
+const handleNotificationClick = (notification) => {
+  // Handle notification click logic here
+  console.log('Notification clicked:', notification)
 }
 </script>
 

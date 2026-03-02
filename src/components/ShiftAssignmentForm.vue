@@ -105,7 +105,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import shiftService from '../services/shiftService.js'
-import apiClient from '../services/services.js'
+import UserRoleServices from '../services/userRoleServices.js'
 
 const props = defineProps({
   shiftInfo: {
@@ -155,7 +155,7 @@ const formatDate = (dateString) => {
 const loadAvailableUsers = async () => {
   try {
     usersLoading.value = true
-    const response = await apiClient.get('/user-departments/admin/users-with-roles')
+    const response = await UserRoleServices.getAllUsersWithRoles(true)
     const users = response?.data || []
 
     const departmentMembers = users.filter((user) =>

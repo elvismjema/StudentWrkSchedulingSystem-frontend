@@ -1,201 +1,410 @@
 <template>
-  <div class="schedule-page">
-    <section class="page-header">
-      <h1 class="page-title">My Schedule</h1>
-      <p class="page-subtitle">Published and assigned shifts</p>
-    </section>
-
-    <v-card elevation="0">
-      <v-card-title class="d-flex align-center">
-        Shifts
-        <v-spacer />
-        <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="loadData">
-          Refresh
-        </v-btn>
-      </v-card-title>
-      <v-card-text class="pt-0">
-        <v-data-table
-          :headers="headers"
-          :items="rows"
-          :loading="loading"
-          item-key="shift_id"
-          density="comfortable"
+  <div class="schedule-container">
+    <!-- Header with Month/Year Navigation -->
+    <div class="calendar-header">
+      <div class="header-left">
+        <h1 class="month-year">{{ currentMonthYear }}</h1>
+      </div>
+      <div class="header-controls">
+        <v-btn
+          variant="outlined"
+          prepend-icon="mdi-chevron-left"
+          @click="previousMonth"
+          class="nav-btn"
         >
-          <template #item.shift_date="{ item }">
-            {{ formatDate(item.shift_date) }}
-          </template>
-          <template #item.time="{ item }">
-            {{ formatTime(item.start_time) }} - {{ formatTime(item.end_time) }}
-          </template>
-          <template #item.department="{ item }">
-            {{ item.department?.department_name || "-" }}
-          </template>
-          <template #item.position="{ item }">
-            {{ item.position?.position_name || "-" }}
-          </template>
-          <template #item.shift_status="{ item }">
-            <v-chip size="small" :color="statusColor(item.shift_status)" variant="tonal">
-              {{ item.shift_status }}
-            </v-chip>
-          </template>
-          <template #item.acknowledgement="{ item }">
-            <v-chip
-              size="small"
-              :color="isAcknowledged(item) ? 'success' : 'warning'"
-              variant="tonal"
-            >
-              {{ isAcknowledged(item) ? "Acknowledged" : "Pending" }}
-            </v-chip>
-          </template>
-          <template #item.actions="{ item }">
-            <v-btn
-              v-if="!isAcknowledged(item)"
-              size="small"
-              color="primary"
-              :loading="acknowledgingId === item.shift_id"
-              @click="acknowledge(item)"
-            >
-              Acknowledge
-            </v-btn>
-            <span v-else class="text-medium-emphasis">Done</span>
-          </template>
-        </v-data-table>
-      </v-card-text>
+          Previous
+        </v-btn>
+        <v-btn
+          variant="flat"
+          color="#8B1538"
+          @click="goToToday"
+          class="today-btn"
+        >
+          Today
+        </v-btn>
+        <v-btn
+          variant="outlined"
+          append-icon="mdi-chevron-right"
+          @click="nextMonth"
+          class="nav-btn"
+        >
+          Next
+        </v-btn>
+      </div>
+    </div>
+
+    <!-- Next Shift Card -->
+    <v-card class="next-shift-card" elevation="2">
+      <div class="shift-header">
+        <div class="shift-badges">
+          <v-chip size="small" color="success" class="shift-badge">Open</v-chip>
+          <v-chip size="small" color="warning" class="shift-badge">Needs Acknowledgement</v-chip>
+        </div>
+        <v-btn icon="mdi-dots-vertical" variant="text" size="small"></v-btn>
+      </div>
+      
+      <div class="shift-content">
+        <h3 class="shift-title">Barista</h3>
+        <div class="shift-details">
+          <div class="detail-item">
+            <v-icon size="16" class="detail-icon">mdi-calendar</v-icon>
+            <span>Tomorrow, Feb 11, 2026</span>
+          </div>
+          <div class="detail-item">
+            <v-icon size="16" class="detail-icon">mdi-clock</v-icon>
+            <span>8:00 AM - 12:00 PM</span>
+          </div>
+          <div class="detail-item">
+            <v-icon size="16" class="detail-icon">mdi-map-marker</v-icon>
+            <span>Campus Coffee Shop</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="shift-actions">
+        <v-btn
+          variant="outlined"
+          prepend-icon="mdi-calendar-plus"
+          class="action-btn"
+        >
+          Add to Calendar
+        </v-btn>
+        <v-btn
+          variant="flat"
+          color="#8B1538"
+          @click="acknowledgeShift"
+          class="action-btn"
+        >
+          Acknowledge
+        </v-btn>
+      </div>
     </v-card>
 
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
-      {{ snackbar.text }}
-    </v-snackbar>
+    <!-- Calendar Grid -->
+    <div class="calendar-scroll-container">
+      <div class="calendar-container">
+        <div class="calendar-grid">
+          <!-- Time labels on left -->
+          <div class="time-column">
+            <div v-for="hour in timeSlots" :key="hour" class="time-slot">
+              {{ formatTime(hour) }}
+            </div>
+          </div>
+          
+          <!-- Day columns -->
+          <div class="days-container">
+            <div v-for="day in weekDays" :key="day.date" class="day-column">
+              <div class="day-header">
+                <div class="day-name">{{ day.name }}</div>
+                <div class="day-date" :class="{ 'today': day.isToday }">
+                  {{ day.date }}
+                </div>
+              </div>
+              
+              <!-- Hour slots for this day -->
+              <div class="hour-slots">
+                <div v-for="hour in timeSlots" :key="`${day.date}-${hour}`" class="hour-slot">
+                  <!-- Mock shift for Tuesday 8AM-12PM -->
+                  <div
+                    v-if="day.name === 'Tue' && hour === 8"
+                    class="shift-block"
+                  >
+                    <div class="shift-block-title">Barista</div>
+                    <div class="shift-block-time">8 AM - 12 PM</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import Utils from "../config/utils.js";
-import shiftService from "../services/shiftService.js";
-import shiftAcknowledgementService from "../services/shiftAcknowledgementService.js";
+import { ref, computed } from 'vue'
 
-const currentUser = Utils.getStore("user") || {};
-const userId = currentUser.userId;
+const currentDate = ref(new Date())
 
-const loading = ref(false);
-const acknowledgingId = ref(null);
-const shifts = ref([]);
-const acknowledgements = ref([]);
-const snackbar = ref({ show: false, text: "", color: "success" });
+const currentMonthYear = computed(() => {
+  return currentDate.value.toLocaleDateString('en-US', { 
+    month: 'long', 
+    year: 'numeric' 
+  })
+})
 
-const headers = [
-  { title: "Date", key: "shift_date" },
-  { title: "Time", key: "time", sortable: false },
-  { title: "Department", key: "department", sortable: false },
-  { title: "Position", key: "position", sortable: false },
-  { title: "Status", key: "shift_status" },
-  { title: "Acknowledgement", key: "acknowledgement", sortable: false },
-  { title: "Actions", key: "actions", sortable: false },
-];
+const timeSlots = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM to 8 PM
 
-const notify = (text, color = "success") => {
-  snackbar.value = { show: true, text, color };
-};
+const weekDays = computed(() => {
+  const days = []
+  const startOfWeek = new Date(currentDate.value)
+  const day = startOfWeek.getDay()
+  const diff = startOfWeek.getDate() - day
+  startOfWeek.setDate(diff)
 
-const ackByShiftId = computed(() => {
-  const map = new Map();
-  for (const item of acknowledgements.value) {
-    if (item.shiftId) {
-      map.set(Number(item.shiftId), item);
-    }
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(startOfWeek)
+    date.setDate(startOfWeek.getDate() + i)
+    
+    const today = new Date()
+    const isToday = date.toDateString() === today.toDateString()
+    
+    days.push({
+      name: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i],
+      date: date.getDate(),
+      isToday
+    })
   }
-  return map;
-});
+  
+  return days
+})
 
-const rows = computed(() =>
-  (shifts.value || [])
-    .filter((shift) => shift.shift_status !== "cancelled")
-    .sort((a, b) => {
-      const aDate = new Date(`${a.shift_date || "2100-01-01"}T${a.start_time || "00:00:00"}`);
-      const bDate = new Date(`${b.shift_date || "2100-01-01"}T${b.start_time || "00:00:00"}`);
-      return aDate - bDate;
-    }),
-);
+const formatTime = (hour) => {
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  return `${displayHour} ${period}`
+}
 
-const formatDate = (value) => {
-  if (!value) return "-";
-  return new Date(`${value}T00:00:00`).toLocaleDateString();
-};
+const previousMonth = () => {
+  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1)
+}
 
-const formatTime = (value) => (value ? String(value).slice(0, 5) : "-");
+const nextMonth = () => {
+  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1)
+}
 
-const statusColor = (status) => {
-  if (status === "published") return "success";
-  if (status === "changed") return "warning";
-  if (status === "cancelled") return "error";
-  return "grey";
-};
+const goToToday = () => {
+  currentDate.value = new Date()
+}
 
-const isAcknowledged = (shift) => {
-  const ack = ackByShiftId.value.get(Number(shift.shift_id));
-  return Boolean(ack?.acknowledged);
-};
-
-const loadData = async () => {
-  if (!userId) {
-    notify("Missing logged-in user context.", "error");
-    return;
-  }
-
-  loading.value = true;
-  try {
-    const [shiftResponse, ackResponse] = await Promise.all([
-      shiftService.listShifts({ assigned_user_id: userId }),
-      shiftAcknowledgementService.listForUser(userId),
-    ]);
-    shifts.value = shiftResponse?.data || [];
-    acknowledgements.value = ackResponse?.data || [];
-  } catch (error) {
-    notify(error?.response?.data?.message || "Failed to load schedule.", "error");
-  } finally {
-    loading.value = false;
-  }
-};
-
-const acknowledge = async (shift) => {
-  const ack = ackByShiftId.value.get(Number(shift.shift_id));
-  if (!ack?.id) {
-    notify("No acknowledgement record found for this shift.", "error");
-    return;
-  }
-
-  acknowledgingId.value = shift.shift_id;
-  try {
-    await shiftAcknowledgementService.acknowledge(ack.id);
-    notify("Shift acknowledged.");
-    await loadData();
-  } catch (error) {
-    notify(error?.response?.data?.message || "Failed to acknowledge shift.", "error");
-  } finally {
-    acknowledgingId.value = null;
-  }
-};
-
-onMounted(loadData);
+const acknowledgeShift = () => {
+  console.log('Shift acknowledged')
+}
 </script>
 
 <style scoped>
-.schedule-page {
-  padding: 24px;
+.schedule-container {
+  padding: 20px;
+  background-color: #fafafa;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.page-header {
-  margin-bottom: 16px;
+/* Calendar Header */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.page-title {
+.month-year {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
   margin: 0;
 }
 
-.page-subtitle {
-  margin-top: 6px;
-  color: #667085;
+.header-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.nav-btn {
+  border-color: #e0e0e0;
+  color: #666;
+}
+
+.today-btn {
+  background-color: #8B1538;
+  color: white;
+}
+
+/* Next Shift Card */
+.next-shift-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid #e0e0e0;
+}
+
+.shift-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.shift-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.shift-badge {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.shift-content {
+  margin-bottom: 20px;
+}
+
+.shift-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.shift-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 13px;
+}
+
+.detail-icon {
+  color: #8B1538;
+}
+
+.shift-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
+  flex: 1;
+}
+
+/* Calendar Scroll Container */
+.calendar-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Important for flexbox scrolling */
+}
+
+/* Calendar Grid */
+.calendar-container {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  min-height: 600px;
+}
+
+.calendar-grid {
+  display: flex;
+  min-height: 600px;
+}
+
+.time-column {
+  width: 80px;
+  border-right: 1px solid #e0e0e0;
+  background-color: #fafafa;
+}
+
+.time-slot {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #666;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.days-container {
+  flex: 1;
+  display: flex;
+}
+
+.day-column {
+  flex: 1;
+  border-right: 1px solid #e0e0e0;
+}
+
+.day-column:last-child {
+  border-right: none;
+}
+
+.day-header {
+  height: 80px;
+  padding: 16px 8px;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #fafafa;
+}
+
+.day-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.day-date {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-top: 4px;
+}
+
+.day-date.today {
+  color: #8B1538;
+  background-color: #f8e6ea;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.hour-slots {
+  height: calc(100% - 80px);
+}
+
+.hour-slot {
+  height: 40px;
+  border-bottom: 1px solid #f0f0f0;
+  position: relative;
+}
+
+.shift-block {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 0;
+  height: 160px; /* 4 hours * 40px per hour */
+  background-color: #8B1538;
+  color: white;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.shift-block-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.shift-block-time {
+  opacity: 0.9;
+  font-size: 11px;
 }
 </style>
-

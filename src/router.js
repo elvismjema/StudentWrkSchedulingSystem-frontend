@@ -145,8 +145,7 @@ const router = createRouter({
         {
           path: "approvals",
           name: "manager-approvals",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Approvals", description: "Approve or reject pending requests." }
+          component: () => import("./views/StudentQualifications.vue")
         },
         {
           path: "time-attendance",

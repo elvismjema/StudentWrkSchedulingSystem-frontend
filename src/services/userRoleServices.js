@@ -32,8 +32,15 @@ const apiClient = axios.create({
 
 const UserRoleServices = {
   // Admin: Get all users with their roles
-  getAllUsersWithRoles() {
-    return apiClient.get("/user-departments/admin/users-with-roles");
+  getAllUsersWithRoles(activeOnly = false) {
+    const params = activeOnly ? { activeOnly: true } : {};
+    return apiClient.get("/user-departments/admin/users-with-roles", { params });
+  },
+
+  deactivateUser(userId, removeFutureShifts = false) {
+    return apiClient.patch(`/users/${userId}/deactivate`, {
+      remove_future_shifts: removeFutureShifts,
+    });
   },
 
   // Admin: Assign or update user role

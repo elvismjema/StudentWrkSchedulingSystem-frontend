@@ -3,11 +3,13 @@ import Utils from "../config/utils.js";
 import AuthServices from "./authServices.js";
 import Router from "../router.js";
 
-var baseurl = "";
-if (import.meta.env.DEV) {
-  baseurl = "http://localhost/workerscheduling-t2";
-} else {
-  baseurl = "/workerscheduling-t2";
+let baseurl = import.meta.env.VITE_API_BASE;
+if (!baseurl) {
+  if (import.meta.env.DEV) {
+    baseurl = "http://localhost/workerscheduling-t2";
+  } else {
+    baseurl = "/workerscheduling-t2";
+  }
 }
 
 const apiClient = axios.create({
@@ -29,11 +31,26 @@ const apiClient = axios.create({
     return JSON.stringify(data);
   },
   transformResponse: function (data) {
-    data = JSON.parse(data);
+    let parsedData = data;
+    if (typeof data === "string" && data.length > 0) {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (err) {
+        // Backend/proxy can return HTML on outages (e.g. 503), so avoid hard crash.
+        return {
+          message: "Service unavailable. Please try again later.",
+          raw: data,
+        };
+      }
+    }
     // if (!data.success && data.code == "expired-session") {
     //   localStorage.deleteItem("user");
     // }
-    if (data.message !== undefined && data.message.includes("Unauthorized")) {
+    if (
+      parsedData &&
+      parsedData.message !== undefined &&
+      parsedData.message.includes("Unauthorized")
+    ) {
       AuthServices.logoutUser(Utils.getStore("user"))
         .then((response) => {
           console.log(response);
@@ -46,7 +63,7 @@ const apiClient = axios.create({
       // Utils.removeItem("user")
     }
     // console.log(Utils.getStore("user"))
-    return data;
+    return parsedData;
   },
 });
 

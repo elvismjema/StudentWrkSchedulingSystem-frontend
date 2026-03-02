@@ -39,6 +39,27 @@
         </template>
         <v-list-item-title>{{ item.title }}</v-list-item-title>
       </v-list-item>
+
+      <!-- Admin-only section -->
+      <template v-if="isAdmin">
+        <v-divider class="my-2 mx-3" />
+        <div v-if="!rail" class="admin-section-label px-4 pb-1 text-caption text-uppercase font-weight-bold"
+          style="color: #930033; letter-spacing: 0.08em;">
+          Admin
+        </div>
+        <v-list-item
+          v-for="item in adminNavItems"
+          :key="item.title"
+          :to="item.route"
+          class="manager-nav-item"
+          active-class="manager-active-nav-item"
+        >
+          <template #prepend>
+            <v-icon :icon="item.icon" size="22" color="#930033" />
+          </template>
+          <v-list-item-title>{{ item.title }}</v-list-item-title>
+        </v-list-item>
+      </template>
     </v-list>
 
     <template #append>
@@ -88,6 +109,10 @@ const displayInitial = computed(() => {
   return `${first}${last}`.toUpperCase() || "U";
 });
 
+const isAdmin = computed(() => {
+  return (user.value?.role || "").toLowerCase() === "admin";
+});
+
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
@@ -100,6 +125,11 @@ const navItems = [
   { title: "Reports", icon: "mdi-chart-bar", route: "/manager/reports" },
   { title: "Notifications", icon: "mdi-bell-outline", route: "/manager/notifications" },
   { title: "Settings", icon: "mdi-cog-outline", route: "/manager/settings" }
+];
+
+const adminNavItems = [
+  { title: "Manage Users", icon: "mdi-account-cog", route: "/manager/admin/users" },
+  { title: "Manage Departments", icon: "mdi-office-building-cog", route: "/manager/admin/departments" },
 ];
 
 defineExpose({

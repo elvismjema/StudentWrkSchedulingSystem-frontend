@@ -213,6 +213,7 @@
 import { ref, computed, onMounted } from 'vue';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
+import apiClient from '../services/services.js';
 
 // State
 const loading = ref(false);
@@ -302,14 +303,13 @@ const loadDepartmentRoles = async () => {
   if (!roleFormData.value.department_id) return;
 
   try {
-    const response = await UserRoleServices.getAllRoles(roleFormData.value.department_id);
-    if (response.data.success) {
-      availableRoles.value = response.data.data;
-    }
+    const [rolesResponse, positionsResponse] = await Promise.all([
+      UserRoleServices.getAllRoles(roleFormData.value.department_id),
+      apiClient.get(`/positions?department_id=${roleFormData.value.department_id}`),
+    ]);
 
-    // Load positions for the department
-    const dept = departments.value.find(d => d.department_id === roleFormData.value.department_id);
-    availablePositions.value = dept?.positions || [];
+    availableRoles.value = rolesResponse?.data?.data || [];
+    availablePositions.value = positionsResponse?.data?.data || [];
   } catch (err) {
     error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
   }

@@ -39,7 +39,7 @@ const handleCredentialResponse = async (response) => {
     .then((response) => {
       user.value = response.data;
       const role = (user.value.role || "").toLowerCase();
-      if (!user.value.token || (role !== "manager" && role !== "student")) {
+      if (!user.value.token || (role !== "manager" && role !== "admin" && role !== "student")) {
         loginError.value =
           user.value.message ||
           "Login failed. Please try again in a few moments.";
@@ -50,7 +50,7 @@ const handleCredentialResponse = async (response) => {
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
-      if (role === "manager") {
+      if (role === "manager" || role === "admin") {
         router.push({ name: "manager-dashboard" });
       } else if (role === "student") {
         router.push({ name: "student-schedule" });

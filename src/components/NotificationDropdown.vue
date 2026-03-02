@@ -106,10 +106,14 @@ const loadNotifications = async () => {
   }
 }
 
-const handleNotificationClick = (notification) => {
+const handleNotificationClick = async (notification) => {
   if (notification.unread) {
-    NotificationService.markAsRead(notification.id)
-    notification.unread = false
+    try {
+      await NotificationService.markAsRead(notification.id)
+      notification.unread = false
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
   }
   emit('notification-click', notification)
   isOpen.value = false

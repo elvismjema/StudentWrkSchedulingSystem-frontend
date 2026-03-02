@@ -78,6 +78,7 @@ const displayName = computed(() => {
 
 const displayRole = computed(() => {
   const role = (user.value?.role || "student").toLowerCase();
+  if (role === "admin") return "Admin";
   return role === "manager" ? "Manager" : "Student";
 });
 

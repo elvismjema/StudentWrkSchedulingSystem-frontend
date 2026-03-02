@@ -180,7 +180,18 @@ const router = createRouter({
           path: "settings",
           name: "manager-settings",
           component: () => import("./views/DepartmentSettings.vue"),
-        }
+        },
+        // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "admin/users",
+          name: "admin-users",
+          component: () => import("./views/AdminUsers.vue"),
+        },
+        {
+          path: "admin/departments",
+          name: "admin-departments",
+          component: () => import("./views/AdminDepartments.vue"),
+        },
       ]
     }
   ],
@@ -195,6 +206,11 @@ router.beforeEach((to) => {
 
   if (to.path.startsWith("/manager") && role !== "manager" && role !== "admin") {
     return { name: "student-schedule" };
+  }
+
+  // Admin-only routes — managers without admin role are redirected to dashboard
+  if (to.path.startsWith("/manager/admin") && role !== "admin") {
+    return { name: "manager-dashboard" };
   }
 
   if (to.path.startsWith("/student") && (role === "manager" || role === "admin")) {

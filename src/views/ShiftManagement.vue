@@ -126,13 +126,6 @@
                   {{ item.department?.department_name }}
                 </div>
               </div>
-              <v-btn
-                @click="showPositionQualifications(item.position_id, item.position?.position_name)"
-                icon="mdi-information"
-                size="x-small"
-                variant="text"
-                class="ml-2"
-              ></v-btn>
             </div>
           </template>
 
@@ -140,15 +133,15 @@
           <template v-slot:item.assigned_user="{ item }">
             <div v-if="item.assignedUser">
               <div class="d-flex align-center">
-                <v-avatar size="32" color="primary" class="mr-2">
-                  <span class="text-white text-caption font-weight-medium">
-                    {{ getInitials(item.assignedUser.first_name, item.assignedUser.last_name) }}
-                  </span>
-                </v-avatar>
-                <div>
-                  <div class="font-weight-medium">
-                    {{ item.assignedUser.first_name }} {{ item.assignedUser.last_name }}
-                  </div>
+                    <v-avatar size="32" color="primary" class="mr-2">
+                      <span class="text-white text-caption font-weight-medium">
+                        {{ getInitials(item.assignedUser.fName, item.assignedUser.lName) }}
+                      </span>
+                    </v-avatar>
+                    <div>
+                      <div class="font-weight-medium">
+                        {{ item.assignedUser.fName }} {{ item.assignedUser.lName }}
+                      </div>
                   <div class="text-caption text-medium-emphasis">
                     {{ item.assignedUser.email }}
                   </div>
@@ -303,13 +296,6 @@
       />
     </v-dialog>
 
-    <!-- Position Qualifications Modal -->
-    <PositionQualificationsModal
-      v-model="showQualificationsModal"
-      :position-id="selectedPositionId"
-      :position-name="selectedPositionName"
-    />
-
     <!-- Success/Error Snackbars -->
     <v-snackbar
       v-model="showSuccess"
@@ -333,9 +319,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import ShiftAssignmentForm from '@/components/ShiftAssignmentForm.vue'
-import PositionQualificationsModal from '@/components/PositionQualificationsModal.vue'
-import shiftService from '@/services/shiftService.js'
+import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
+import shiftService from '../services/shiftService.js'
+import apiClient from '../services/services.js'
 
 // State
 const shifts = ref([])
@@ -350,7 +336,6 @@ const filters = ref({
 // Dialog states
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
-const showQualificationsModal = ref(false)
 
 // Form states
 const createFormRef = ref(null)
@@ -366,8 +351,6 @@ const newShift = ref({
 
 // Selection states
 const selectedShift = ref(null)
-const selectedPositionId = ref(null)
-const selectedPositionName = ref('')
 
 // Loading states
 const shiftsLoading = ref(false)
@@ -445,16 +428,8 @@ const loadShifts = async () => {
 
 const loadDepartments = async () => {
   try {
-    // This would call your department service
-    // const response = await departmentService.listDepartments()
-    // departments.value = response.data || []
-    
-    // Mock data
-    departments.value = [
-      { department_id: 1, department_name: 'Library' },
-      { department_id: 2, department_name: 'IT Help Desk' },
-      { department_id: 3, department_name: 'Cafeteria' }
-    ]
+    const response = await apiClient.get('/departments')
+    departments.value = response?.data?.data || []
   } catch (error) {
     console.error('Error loading departments:', error)
   }
@@ -462,16 +437,8 @@ const loadDepartments = async () => {
 
 const loadPositions = async () => {
   try {
-    // This would call your position service
-    // const response = await positionService.listPositions()
-    // positions.value = response.data || []
-    
-    // Mock data
-    positions.value = [
-      { position_id: 1, position_name: 'Student Assistant' },
-      { position_id: 2, position_name: 'Lab Monitor' },
-      { position_id: 3, position_name: 'Food Service Worker' }
-    ]
+    const response = await apiClient.get('/positions')
+    positions.value = response?.data?.data || []
   } catch (error) {
     console.error('Error loading positions:', error)
   }
@@ -536,12 +503,6 @@ const deleteShift = async (shift) => {
     errorMessage.value = 'Failed to delete shift'
     showError.value = true
   }
-}
-
-const showPositionQualifications = (positionId, positionName) => {
-  selectedPositionId.value = positionId
-  selectedPositionName.value = positionName
-  showQualificationsModal.value = true
 }
 
 const onShiftAssigned = (assignmentData) => {

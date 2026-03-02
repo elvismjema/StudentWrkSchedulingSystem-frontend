@@ -10,6 +10,7 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
+import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {
   const user = Utils.getStore("user");
@@ -17,7 +18,8 @@ const getStoredRole = () => {
 };
 
 const getDefaultDashboardRoute = () => {
-  return getStoredRole() === "manager"
+  const role = getStoredRole();
+  return role === "manager" || role === "admin"
     ? { name: "manager-dashboard" }
     : { name: "student-schedule" };
 };
@@ -127,14 +129,12 @@ const router = createRouter({
         {
           path: "schedule",
           name: "manager-schedule",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Schedule", description: "Build and manage worker schedules in this view." }
+          component: ShiftManagement,
         },
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Create Shift", description: "Create and assign new shifts for workers." }
+          component: ShiftManagement,
         },
         {
           path: "availability",
@@ -157,8 +157,7 @@ const router = createRouter({
         {
           path: "workers",
           name: "manager-workers",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Workers", description: "View and manage worker profiles." }
+          component: () => import("./views/UserManagement.vue"),
         },
         {
           path: "tasks",
@@ -181,8 +180,7 @@ const router = createRouter({
         {
           path: "settings",
           name: "manager-settings",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Settings", description: "Manage manager and department preferences." }
+          component: () => import("./views/DepartmentSettings.vue"),
         }
       ]
     }
@@ -196,11 +194,11 @@ router.beforeEach((to) => {
     return true;
   }
 
-  if (to.path.startsWith("/manager") && role !== "manager") {
+  if (to.path.startsWith("/manager") && role !== "manager" && role !== "admin") {
     return { name: "student-schedule" };
   }
 
-  if (to.path.startsWith("/student") && role === "manager") {
+  if (to.path.startsWith("/student") && (role === "manager" || role === "admin")) {
     return { name: "manager-dashboard" };
   }
 

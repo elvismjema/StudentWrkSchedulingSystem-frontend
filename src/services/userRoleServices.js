@@ -33,34 +33,34 @@ const apiClient = axios.create({
 const UserRoleServices = {
   // Admin: Get all users with their roles
   getAllUsersWithRoles() {
-    return apiClient.get("/api/user-departments/admin/users-with-roles");
+    return apiClient.get("/user-departments/admin/users-with-roles");
   },
 
   // Admin: Assign or update user role
   assignUserRole(data) {
-    return apiClient.post("/api/user-departments/admin/assign-role", data);
+    return apiClient.post("/user-departments/admin/assign-role", data);
   },
 
   // Admin: Remove user role from department
   removeUserRole(udId) {
-    return apiClient.delete(`/api/user-departments/admin/remove-role/${udId}`);
+    return apiClient.delete(`/user-departments/admin/remove-role/${udId}`);
   },
 
   // Get user's active roles across all departments
   getUserRoles(userId) {
-    return apiClient.get(`/api/user-departments/roles/${userId}`);
+    return apiClient.get(`/user-departments/roles/${userId}`);
   },
 
   // Get user departments
   getUserDepartments(userId) {
-    return apiClient.get(`/api/user-departments/user/${userId}`);
+    return apiClient.get(`/user-departments/user/${userId}`);
   },
 
   // Get all roles
   getAllRoles(departmentId = null) {
     const url = departmentId
-      ? `/api/roles?department_id=${departmentId}`
-      : "/api/roles";
+      ? `/roles?department_id=${departmentId}`
+      : "/roles";
     return apiClient.get(url);
   },
 };

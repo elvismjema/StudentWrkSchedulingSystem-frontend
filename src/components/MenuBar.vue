@@ -1,16 +1,27 @@
 <script setup>
 import ocLogo from "/oc-logo-white.png";
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import Utils from "../config/utils";
 import AuthServices from "../services/authServices";
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from "vue-router";
 
-const router = useRouter()
+const router = useRouter();
 const user = ref(null);
 const title = ref("Worker Scheduling T2");
 const initials = ref("");
 const name = ref("");
 const logoURL = ref("");
+
+const isManager = computed(
+  () => {
+    const role = String(user.value?.role || "").toLowerCase();
+    return role === "manager" || role === "admin";
+  },
+);
+
+const homeRoute = computed(() =>
+  isManager.value ? { name: "managerDashboard" } : { name: "tutorials" },
+);
 
 const resetMenu = () => {
   user.value = null;
@@ -23,8 +34,7 @@ const resetMenu = () => {
 
 const logout = () => {
   AuthServices.logoutUser(user.value)
-    .then((response) => {
-      
+    .then(() => {
       Utils.removeItem("user");
       router.push({ name: "login" });
     })
@@ -42,7 +52,7 @@ onMounted(() => {
 <template>
   <div>
     <v-app-bar app>
-      <router-link :to="{ name: 'tutorials' }">
+      <router-link :to="homeRoute">
         <v-img
           class="mx-2"
           :src="logoURL"
@@ -56,8 +66,13 @@ onMounted(() => {
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <div v-if="user">
-        <v-btn class="mx-2" :to="{ name: 'tutorials' }"> List </v-btn>
-        <v-btn class="mx-2" :to="{ name: 'add' }"> Add Tutorial </v-btn>
+        <v-btn class="mx-2" :to="homeRoute">
+          {{ isManager ? "Dashboard" : "List" }}
+        </v-btn>
+        <v-btn v-if="isManager" class="mx-2" :to="{ name: 'tutorials' }">
+          Tutorials
+        </v-btn>
+        <v-btn v-else class="mx-2" :to="{ name: 'add' }"> Add Tutorial </v-btn>
       </div>
       <v-menu bottom min-width="200px" rounded offset-y v-if="user">
         <template v-slot:activator="{ props }">

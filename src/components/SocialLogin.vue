@@ -9,10 +9,17 @@ const fName = ref("");
 const lName = ref("");
 const user = ref({});
 
+const getDefaultRouteForUser = (loggedInUser) => {
+  const role = String(loggedInUser?.role || "").toLowerCase();
+  if (role === "manager" || role === "admin") {
+    return { name: "managerDashboard" };
+  }
+  return { name: "tutorials" };
+};
+
 const loginWithGoogle = () => {
   window.handleCredentialResponse = handleCredentialResponse;
   const client = import.meta.env.VITE_APP_CLIENT_ID;
-  console.log(client);
   window.google.accounts.id.initialize({
     client_id: client,
     cancel_on_tap_outside: false,
@@ -38,7 +45,7 @@ const handleCredentialResponse = async (response) => {
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
-      router.push({ name: "tutorials" });
+      router.push(getDefaultRouteForUser(user.value));
     })
     .catch((error) => {
       console.log("error", error);

@@ -33,52 +33,10 @@
       </div>
     </div>
 
-    <!-- Next Shift Card -->
-    <v-card class="next-shift-card" elevation="2">
-      <div class="shift-header">
-        <div class="shift-badges">
-          <v-chip size="small" color="success" class="shift-badge">Open</v-chip>
-          <v-chip size="small" color="warning" class="shift-badge">Needs Acknowledgement</v-chip>
-        </div>
-        <v-btn icon="mdi-dots-vertical" variant="text" size="small"></v-btn>
-      </div>
-      
-      <div class="shift-content">
-        <h3 class="shift-title">Barista</h3>
-        <div class="shift-details">
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-calendar</v-icon>
-            <span>Tomorrow, Feb 11, 2026</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-clock</v-icon>
-            <span>8:00 AM - 12:00 PM</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-map-marker</v-icon>
-            <span>Campus Coffee Shop</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="shift-actions">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-calendar-plus"
-          class="action-btn"
-        >
-          Add to Calendar
-        </v-btn>
-        <v-btn
-          variant="flat"
-          color="#8B1538"
-          @click="acknowledgeShift"
-          class="action-btn"
-        >
-          Acknowledge
-        </v-btn>
-      </div>
-    </v-card>
+    <div class="greeting-banner">
+      <h2 class="greeting-title">Hi There</h2>
+      <p class="greeting-date">{{ currentGreetingDate }}</p>
+    </div>
 
     <!-- Calendar Grid -->
     <div class="calendar-scroll-container">
@@ -134,6 +92,17 @@ const currentMonthYear = computed(() => {
   })
 })
 
+const currentGreetingDate = computed(() => {
+  const formattedDate = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date())
+
+  return `It's ${formattedDate}`
+})
+
 const timeSlots = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM to 8 PM
 
 const weekDays = computed(() => {
@@ -178,9 +147,6 @@ const goToToday = () => {
   currentDate.value = new Date()
 }
 
-const acknowledgeShift = () => {
-  console.log('Shift acknowledged')
-}
 </script>
 
 <style scoped>
@@ -224,68 +190,27 @@ const acknowledgeShift = () => {
   color: white;
 }
 
-/* Next Shift Card */
-.next-shift-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1px solid #e0e0e0;
-}
-
-.shift-header {
+.greeting-banner {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.shift-badges {
-  display: flex;
-  gap: 8px;
-}
-
-.shift-badge {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.shift-content {
-  margin-bottom: 20px;
-}
-
-.shift-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 12px 0;
-}
-
-.shift-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detail-item {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  color: #666;
-  font-size: 13px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-.detail-icon {
-  color: #8B1538;
+.greeting-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
 }
 
-.shift-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.action-btn {
-  flex: 1;
+.greeting-date {
+  font-size: 18px;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0;
+  text-align: right;
 }
 
 /* Calendar Scroll Container */
@@ -406,5 +331,16 @@ const acknowledgeShift = () => {
 .shift-block-time {
   opacity: 0.9;
   font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .greeting-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .greeting-date {
+    text-align: left;
+  }
 }
 </style>

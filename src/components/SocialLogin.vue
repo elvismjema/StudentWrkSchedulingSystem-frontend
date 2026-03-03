@@ -50,7 +50,9 @@ const handleCredentialResponse = async (response) => {
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
-      if (role === "manager" || role === "admin") {
+      if (role === "admin") {
+        router.push({ name: "admin-dashboard" });
+      } else if (role === "manager") {
         router.push({ name: "manager-dashboard" });
       } else if (role === "student") {
         router.push({ name: "student-schedule" });

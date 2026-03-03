@@ -392,6 +392,15 @@
               :disabled="!roleFormData.department_id"
               class="mb-3"
             />
+            <v-switch
+              v-model="roleFormData.apply_to_all_departments"
+              color="primary"
+              inset
+              label="Apply this role to all departments"
+              hint="Admin role assignments are always applied across all departments."
+              persistent-hint
+              class="mb-2"
+            />
             <v-select
               v-model="roleFormData.position_id"
               :items="availablePositions"
@@ -401,7 +410,7 @@
               variant="outlined"
               density="comfortable"
               clearable
-              :disabled="!roleFormData.department_id"
+              :disabled="!roleFormData.department_id || roleFormData.apply_to_all_departments || selectedRoleIsAdmin"
             />
           </v-form>
         </v-card-text>
@@ -535,7 +544,12 @@ const assignRoleDialog = ref(false);
 const roleFormValid = ref(false);
 const roleForm = ref(null);
 const selectedUser = ref(null);
-const roleFormData = ref({ department_id: null, role_id: null, position_id: null });
+const roleFormData = ref({
+  department_id: null,
+  role_id: null,
+  position_id: null,
+  apply_to_all_departments: false,
+});
 
 const deactivateDialog = ref(false);
 const futureShiftDialog = ref(false);
@@ -576,6 +590,16 @@ const filteredUsers = computed(() => {
   return users.value.filter((u) =>
     u.userDepartments?.some((ud) => ud.department_id === filterDepartment.value)
   );
+});
+
+const selectedRole = computed(() =>
+  availableRoles.value.find((role) => role.role_id === roleFormData.value.role_id),
+);
+
+const selectedRoleIsAdmin = computed(() => {
+  const permission = Number(selectedRole.value?.permission_level || 0);
+  const roleName = String(selectedRole.value?.role_name || '').toLowerCase();
+  return permission >= 90 || roleName.includes('admin');
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -758,7 +782,12 @@ const cancelPending = async (id) => {
 // ─── Assign Role ──────────────────────────────────────────────────────────────
 const openAssignRoleDialog = (user) => {
   selectedUser.value = user;
-  roleFormData.value = { department_id: null, role_id: null, position_id: null };
+  roleFormData.value = {
+    department_id: null,
+    role_id: null,
+    position_id: null,
+    apply_to_all_departments: false,
+  };
   availableRoles.value = [];
   availablePositions.value = [];
   assignRoleDialog.value = true;
@@ -777,6 +806,12 @@ const assignRole = async () => {
     await UserRoleServices.assignUserRole({
       user_id: selectedUser.value.id,
       ...roleFormData.value,
+      apply_to_all_departments:
+        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value,
+      position_id:
+        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value
+          ? null
+          : roleFormData.value.position_id,
     });
     successMessage.value = 'Role assigned successfully!';
     await loadUsers();

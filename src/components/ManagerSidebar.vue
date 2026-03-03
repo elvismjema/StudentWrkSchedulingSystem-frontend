@@ -121,7 +121,6 @@ const navItems = [
   { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
   { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" },
   { title: "Tasks", icon: "mdi-format-list-checks", route: "/manager/tasks" },
-  { title: "Reports", icon: "mdi-chart-bar", route: "/manager/reports" },
   { title: "Notifications", icon: "mdi-bell-outline", route: "/manager/notifications" },
   { title: "Settings", icon: "mdi-cog-outline", route: "/manager/settings" }
 ];

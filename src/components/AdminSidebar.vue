@@ -18,14 +18,6 @@
     </div>
 
     <v-divider />
-
-    <!-- Department Switcher -->
-    <div class="switcher-section">
-      <DepartmentSwitcher />
-    </div>
-
-    <v-divider />
-
     <v-list nav class="nav-list">
       <v-list-item
         v-for="item in navItems"
@@ -63,8 +55,6 @@
 <script setup>
 import { computed, ref } from "vue";
 import Utils from "../config/utils";
-import DepartmentSwitcher from "./DepartmentSwitcher.vue";
-
 const drawer = ref(true);
 const rail = ref(false);
 const user = ref(Utils.getStore("user") || {});
@@ -91,7 +81,6 @@ const navItems = [
   { title: "Dashboard", icon: "mdi-view-dashboard", route: "/admin/dashboard" },
   { title: "User Management", icon: "mdi-account-multiple", route: "/admin/users" },
   { title: "Departments", icon: "mdi-office-building", route: "/admin/departments" },
-  { title: "Reports", icon: "mdi-chart-box", route: "/admin/reports" },
   { title: "System Settings", icon: "mdi-cog", route: "/admin/settings" }
 ];
 
@@ -148,10 +137,6 @@ defineExpose({
   color: #666;
   line-height: 1.2;
   margin-top: 2px;
-}
-
-.switcher-section {
-  padding: 12px;
 }
 
 .nav-list {
@@ -232,10 +217,6 @@ defineExpose({
 
 .v-navigation-drawer--rail .logo-container {
   justify-content: center;
-}
-
-.v-navigation-drawer--rail .switcher-section {
-  padding: 12px 8px;
 }
 
 .v-navigation-drawer--rail .nav-item {

@@ -150,7 +150,15 @@ const goToToday = () => {
 </script>
 
 <style scoped>
+.schedule-container,
+.schedule-container * {
+  box-sizing: border-box;
+}
+
 .schedule-container {
+  --calendar-time-column-width: 88px;
+  --calendar-header-height: 80px;
+  --calendar-hour-height: 60px;
   padding: 20px;
   background-color: #fafafa;
   height: 100%;
@@ -226,22 +234,30 @@ const goToToday = () => {
   border-radius: 12px;
   border: 1px solid #e0e0e0;
   overflow: hidden;
-  min-height: 600px;
 }
 
 .calendar-grid {
   display: flex;
-  min-height: 600px;
+  align-items: flex-start;
+  background: white;
 }
 
 .time-column {
-  width: 80px;
+  width: var(--calendar-time-column-width);
+  flex: 0 0 var(--calendar-time-column-width);
   border-right: 1px solid #e0e0e0;
   background-color: #fafafa;
 }
 
+.time-column::before {
+  content: "";
+  display: block;
+  height: var(--calendar-header-height);
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .time-slot {
-  height: 40px;
+  height: var(--calendar-hour-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,12 +268,15 @@ const goToToday = () => {
 
 .days-container {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .day-column {
-  flex: 1;
+  min-width: 0;
   border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
 }
 
 .day-column:last-child {
@@ -265,11 +284,15 @@ const goToToday = () => {
 }
 
 .day-header {
-  height: 80px;
+  height: var(--calendar-header-height);
   padding: 16px 8px;
   text-align: center;
   border-bottom: 1px solid #e0e0e0;
   background-color: #fafafa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .day-name {
@@ -300,11 +323,11 @@ const goToToday = () => {
 }
 
 .hour-slots {
-  height: calc(100% - 80px);
+  display: grid;
+  grid-template-rows: repeat(15, var(--calendar-hour-height));
 }
 
 .hour-slot {
-  height: 40px;
   border-bottom: 1px solid #f0f0f0;
   position: relative;
 }
@@ -314,7 +337,7 @@ const goToToday = () => {
   left: 4px;
   right: 4px;
   top: 0;
-  height: 160px; /* 4 hours * 40px per hour */
+  height: calc(var(--calendar-hour-height) * 4);
   background-color: #8B1538;
   color: white;
   border-radius: 6px;

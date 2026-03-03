@@ -1,5 +1,10 @@
 <template>
   <div class="schedule-container">
+    <div class="greeting-banner">
+      <h2 class="greeting-title">Hi There</h2>
+      <p class="greeting-date">{{ currentGreetingDate }}</p>
+    </div>
+
     <!-- Header with Month/Year Navigation -->
     <div class="calendar-header">
       <div class="header-left">
@@ -31,11 +36,6 @@
           Next
         </v-btn>
       </div>
-    </div>
-
-    <div class="greeting-banner">
-      <h2 class="greeting-title">Hi There</h2>
-      <p class="greeting-date">{{ currentGreetingDate }}</p>
     </div>
 
     <!-- Calendar Grid -->
@@ -164,7 +164,7 @@ const goToToday = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .month-year {
@@ -195,7 +195,7 @@ const goToToday = () => {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .greeting-title {

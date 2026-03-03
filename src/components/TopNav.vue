@@ -19,6 +19,20 @@
 
     <!-- Right side - Notifications and User -->
     <div class="nav-actions">
+      <v-tooltip text="My Tasks" location="bottom">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            icon
+            variant="text"
+            class="tasks-btn"
+            @click="goToTasks"
+          >
+            <v-icon size="24">mdi-clipboard-text-outline</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+
       <!-- Notifications -->
       <NotificationDropdown @notification-click="handleNotificationClick" />
 
@@ -126,6 +140,10 @@ const toggleSidebar = () => {
   emit('toggle-sidebar')
 }
 
+const goToTasks = () => {
+  router.push('/student/tasks')
+}
+
 const handleSignOut = () => {
   menuOpen.value = false
   Utils.removeItem('user')
@@ -158,6 +176,10 @@ const handleNotificationClick = (notification) => {
   margin-right: 8px;
 }
 
+.tasks-btn {
+  color: #4b5563;
+}
+
 .nav-user-avatar {
   background-color: #8B1538; /* OC Maroon */
 }
@@ -170,6 +192,7 @@ const handleNotificationClick = (notification) => {
 
 /* Button hover effects */
 .menu-btn:hover,
+.tasks-btn:hover,
 .notification-btn:hover,
 .user-menu-btn:hover {
   background-color: #f5f5f5;

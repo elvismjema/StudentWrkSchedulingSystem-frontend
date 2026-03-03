@@ -5,11 +5,6 @@
         <h1 class="page-title">Shift Trade Board</h1>
         <p class="page-subtitle">Pick up open shifts or request shift coverage</p>
       </div>
-
-      <v-btn class="post-button" size="large" @click="postDialogOpen = true">
-        <v-icon start size="20">mdi-hand-back-right-outline</v-icon>
-        Post My Shift
-      </v-btn>
     </section>
 
     <div class="tab-row">
@@ -24,48 +19,6 @@
         {{ tab.label }}
       </button>
     </div>
-
-    <section class="filters-card">
-      <div class="filter-group">
-        <label class="filter-label" for="department-filter">Department</label>
-        <v-select
-          id="department-filter"
-          v-model="selectedDepartment"
-          :items="departmentOptions"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          class="filter-control"
-        />
-      </div>
-
-      <div class="filter-group">
-        <label class="filter-label" for="request-filter">Request Type</label>
-        <v-select
-          id="request-filter"
-          v-model="selectedRequestType"
-          :items="requestTypeOptions"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          class="filter-control"
-        />
-      </div>
-
-      <div class="filter-group search-group">
-        <label class="filter-label" for="trade-search">Search</label>
-        <v-text-field
-          id="trade-search"
-          v-model="searchQuery"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          placeholder="Search by role, location, or reason"
-          prepend-inner-icon="mdi-magnify"
-          class="filter-control"
-        />
-      </div>
-    </section>
 
     <div class="board-grid">
       <v-card
@@ -131,60 +84,17 @@
 
     <div v-if="filteredTrades.length === 0" class="empty-state">
       <h2 class="empty-title">No trade requests match your filters</h2>
-      <p class="empty-copy">Try a different department, request type, or search term.</p>
+      <p class="empty-copy">There are no shifts to show right now.</p>
     </div>
-
-    <v-dialog v-model="postDialogOpen" max-width="640">
-      <v-card class="post-dialog">
-        <div class="dialog-header">
-          <h2 class="dialog-title">Post a Shift Trade</h2>
-          <p class="dialog-copy">Create a trade request for coverage, swap, or pickup.</p>
-        </div>
-
-        <div class="dialog-body">
-          <v-select
-            v-model="draftTrade.shiftId"
-            :items="shiftOptions"
-            item-title="label"
-            item-value="value"
-            label="Shift"
-            variant="outlined"
-            density="comfortable"
-          />
-
-          <v-select
-            v-model="draftTrade.requestType"
-            :items="postTypeOptions"
-            label="Request Type"
-            variant="outlined"
-            density="comfortable"
-          />
-
-          <v-textarea
-            v-model="draftTrade.reason"
-            label="Reason (optional)"
-            variant="outlined"
-            density="comfortable"
-            rows="3"
-          />
-        </div>
-
-        <div class="dialog-actions">
-          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn class="submit-button" @click="submitTrade">Post Request</v-btn>
-        </div>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, ref } from "vue";
 
 const tabs = [
   { label: "Available Shifts", value: "available" },
   { label: "My Requests", value: "my-requests" },
-  { label: "All Activity", value: "activity" },
 ];
 
 const tradeRequests = ref([
@@ -194,7 +104,7 @@ const tradeRequests = ref([
     departmentTheme: "brew",
     position: "Barista",
     dateLabel: "Tuesday, Mar 3",
-    timeRange: "08:00 - 12:00",
+    timeRange: "8:00 AM - 12:00 PM",
     location: "The Brew - Main Campus",
     requestType: "pickup",
     status: "claimed",
@@ -208,7 +118,7 @@ const tradeRequests = ref([
     departmentTheme: "fitness",
     position: "Lifeguard",
     dateLabel: "Wednesday, Mar 4",
-    timeRange: "14:00 - 18:00",
+    timeRange: "2:00 PM - 6:00 PM",
     location: "Gaylord Fitness Center - Pool",
     requestType: "giveaway",
     status: "pending",
@@ -222,7 +132,7 @@ const tradeRequests = ref([
     departmentTheme: "dining",
     position: "Cashier",
     dateLabel: "Thursday, Mar 5",
-    timeRange: "11:00 - 15:00",
+    timeRange: "11:00 AM - 3:00 PM",
     location: "Student Center Dining Hall",
     requestType: "swap",
     status: "approved",
@@ -236,7 +146,7 @@ const tradeRequests = ref([
     departmentTheme: "library",
     position: "Desk Assistant",
     dateLabel: "Friday, Mar 6",
-    timeRange: "18:00 - 21:00",
+    timeRange: "6:00 PM - 9:00 PM",
     location: "Mabee Library - Front Desk",
     requestType: "pickup",
     status: "pending",
@@ -250,7 +160,7 @@ const tradeRequests = ref([
     departmentTheme: "mail",
     position: "Sorting Clerk",
     dateLabel: "Monday, Mar 9",
-    timeRange: "09:00 - 13:00",
+    timeRange: "9:00 AM - 1:00 PM",
     location: "Mail Center",
     requestType: "giveaway",
     status: "denied",
@@ -260,68 +170,9 @@ const tradeRequests = ref([
   },
 ]);
 
-const studentShifts = [
-  {
-    value: 101,
-    label: "Barista • Tue, Mar 10 • 08:00 - 12:00",
-    department: "The Brew",
-    departmentTheme: "brew",
-    position: "Barista",
-    dateLabel: "Tuesday, Mar 10",
-    timeRange: "08:00 - 12:00",
-    location: "The Brew - Main Campus",
-  },
-  {
-    value: 102,
-    label: "Desk Assistant • Fri, Mar 13 • 18:00 - 21:00",
-    department: "Library",
-    departmentTheme: "library",
-    position: "Desk Assistant",
-    dateLabel: "Friday, Mar 13",
-    timeRange: "18:00 - 21:00",
-    location: "Mabee Library - Front Desk",
-  },
-];
-
 const activeTab = ref("available");
-const selectedDepartment = ref("All Departments");
-const selectedRequestType = ref("All Request Types");
-const searchQuery = ref("");
-const postDialogOpen = ref(false);
-
-const draftTrade = reactive({
-  shiftId: studentShifts[0].value,
-  requestType: "giveaway",
-  reason: "",
-});
-
-const departmentOptions = [
-  "All Departments",
-  "The Brew",
-  "Fitness Center",
-  "Campus Dining",
-  "Library",
-  "Mail Services",
-];
-
-const requestTypeOptions = [
-  "All Request Types",
-  "Swap",
-  "Giveaway",
-  "Pickup",
-];
-
-const postTypeOptions = [
-  { title: "Swap", value: "swap" },
-  { title: "Giveaway", value: "giveaway" },
-  { title: "Pickup", value: "pickup" },
-];
-
-const shiftOptions = studentShifts;
 
 const filteredTrades = computed(() => {
-  const search = searchQuery.value.trim().toLowerCase();
-
   return tradeRequests.value.filter((trade) => {
     if (activeTab.value === "available" && !trade.openForClaim) {
       return false;
@@ -331,34 +182,7 @@ const filteredTrades = computed(() => {
       return false;
     }
 
-    if (
-      selectedDepartment.value !== "All Departments" &&
-      trade.department !== selectedDepartment.value
-    ) {
-      return false;
-    }
-
-    if (
-      selectedRequestType.value !== "All Request Types" &&
-      requestTypeLabel(trade.requestType) !== selectedRequestType.value
-    ) {
-      return false;
-    }
-
-    if (!search) {
-      return true;
-    }
-
-    return [
-      trade.department,
-      trade.position,
-      trade.location,
-      trade.reason,
-      trade.dateLabel,
-      trade.timeRange,
-    ]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(search));
+    return true;
   });
 });
 
@@ -416,39 +240,6 @@ const claimShift = (tradeId) => {
       : trade
   );
 };
-
-const closeDialog = () => {
-  postDialogOpen.value = false;
-  draftTrade.shiftId = studentShifts[0].value;
-  draftTrade.requestType = "giveaway";
-  draftTrade.reason = "";
-};
-
-const submitTrade = () => {
-  const selectedShift = studentShifts.find((shift) => shift.value === draftTrade.shiftId);
-
-  if (!selectedShift) {
-    return;
-  }
-
-  tradeRequests.value.unshift({
-    id: Date.now(),
-    department: selectedShift.department,
-    departmentTheme: selectedShift.departmentTheme,
-    position: selectedShift.position,
-    dateLabel: selectedShift.dateLabel,
-    timeRange: selectedShift.timeRange,
-    location: selectedShift.location,
-    requestType: draftTrade.requestType,
-    status: draftTrade.requestType === "pickup" ? "approved" : "pending",
-    reason: draftTrade.reason || "No extra details provided.",
-    owner: "me",
-    openForClaim: draftTrade.requestType !== "pickup",
-  });
-
-  activeTab.value = "my-requests";
-  closeDialog();
-};
 </script>
 
 <style scoped>
@@ -459,10 +250,6 @@ const submitTrade = () => {
 }
 
 .page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
   margin-bottom: 24px;
 }
 
@@ -479,18 +266,6 @@ const submitTrade = () => {
   font-size: 16px;
   line-height: 24px;
   color: #6f7685;
-}
-
-.post-button,
-.submit-button {
-  min-height: 48px;
-  padding: 0 20px;
-  border-radius: 12px;
-  background: #98002e;
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
-  text-transform: none;
 }
 
 .tab-row {
@@ -520,36 +295,6 @@ const submitTrade = () => {
   background: #ffffff;
   color: #202228;
   box-shadow: 0 1px 4px rgba(25, 30, 38, 0.08);
-}
-
-.filters-card {
-  display: grid;
-  grid-template-columns: 220px 220px minmax(260px, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-  align-items: end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.search-group {
-  max-width: 420px;
-}
-
-.filter-label {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  color: #6f7685;
-}
-
-.filter-control :deep(.v-field) {
-  border-radius: 12px;
-  background: #ffffff;
 }
 
 .board-grid {

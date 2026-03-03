@@ -98,7 +98,7 @@ const currentShift = {
   role: "Barista",
   location: "The Brew",
   campusLocation: "The Brew - Main Campus",
-  scheduledWindow: "14:00 - 18:00",
+  scheduledWindow: "2:00 PM - 6:00 PM",
   scheduledStartHour: 14,
   scheduledStartMinute: 0,
 };
@@ -117,7 +117,7 @@ const history = ref([
     id: 1,
     dateLabel: "Saturday, Feb 28",
     actualWindow: "1:43 PM - 5:43 PM",
-    scheduledWindow: "14:00 - 18:00",
+    scheduledWindow: "2:00 PM - 6:00 PM",
     status: "On Time",
     statusClass: "on-time",
   },
@@ -282,11 +282,12 @@ onBeforeUnmount(() => {
 
 .clock-card {
   overflow: hidden;
+  max-width: 760px;
 }
 
 .status-panel {
-  min-height: 360px;
-  padding: 40px 24px;
+  min-height: 260px;
+  padding: 28px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -295,10 +296,10 @@ onBeforeUnmount(() => {
 }
 
 .status-icon-wrap {
-  width: 124px;
-  height: 124px;
-  margin-bottom: 24px;
-  border: 10px solid #b0b5bd;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 16px;
+  border: 8px solid #b0b5bd;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -310,14 +311,14 @@ onBeforeUnmount(() => {
 
 .status-label {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 28px;
+  line-height: 24px;
   color: #6b7281;
 }
 
 .shift-panel {
-  padding: 24px;
+  padding: 20px 24px 24px;
 }
 
 .shift-panel-top {
@@ -415,7 +416,7 @@ onBeforeUnmount(() => {
 
 .clock-action {
   margin-top: 24px;
-  min-height: 64px;
+  min-height: 56px;
   border-radius: 14px;
   font-size: 16px;
   font-weight: 600;
@@ -514,7 +515,7 @@ onBeforeUnmount(() => {
   }
 
   .status-panel {
-    min-height: 320px;
+    min-height: 220px;
   }
 
   .shift-panel {

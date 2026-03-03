@@ -14,7 +14,7 @@
         <v-btn
           variant="outlined"
           prepend-icon="mdi-chevron-left"
-          @click="previousMonth"
+          @click="previousWeek"
           class="nav-btn"
         >
           Previous
@@ -30,7 +30,7 @@
         <v-btn
           variant="outlined"
           append-icon="mdi-chevron-right"
-          @click="nextMonth"
+          @click="nextWeek"
           class="nav-btn"
         >
           Next
@@ -68,7 +68,7 @@
                     class="shift-block"
                   >
                     <div class="shift-block-title">Barista</div>
-                    <div class="shift-block-time">8 AM - 12 PM</div>
+                    <div class="shift-block-time">8:00 AM - 12:00 PM</div>
                   </div>
                 </div>
               </div>
@@ -132,15 +132,19 @@ const weekDays = computed(() => {
 const formatTime = (hour) => {
   const period = hour >= 12 ? 'PM' : 'AM'
   const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-  return `${displayHour} ${period}`
+  return `${displayHour}:00 ${period}`
 }
 
-const previousMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1)
+const previousWeek = () => {
+  const nextDate = new Date(currentDate.value)
+  nextDate.setDate(nextDate.getDate() - 7)
+  currentDate.value = nextDate
 }
 
-const nextMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1)
+const nextWeek = () => {
+  const nextDate = new Date(currentDate.value)
+  nextDate.setDate(nextDate.getDate() + 7)
+  currentDate.value = nextDate
 }
 
 const goToToday = () => {

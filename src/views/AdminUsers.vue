@@ -35,6 +35,14 @@
         <v-chip class="ml-2" size="small" color="primary" variant="tonal">
           {{ users.length }}
         </v-chip>
+        <v-chip
+          v-if="usersDataSource"
+          size="x-small"
+          color="grey"
+          variant="outlined"
+        >
+          Source: {{ usersDataSource }}
+        </v-chip>
         <v-spacer />
         <!-- Search -->
         <v-text-field
@@ -168,6 +176,14 @@
         <span>Pending Invitations</span>
         <v-chip class="ml-2" size="small" color="warning" variant="tonal">
           {{ pendingAssignments.length }}
+        </v-chip>
+        <v-chip
+          v-if="pendingDataSource"
+          size="x-small"
+          color="grey"
+          variant="outlined"
+        >
+          Source: {{ pendingDataSource }}
         </v-chip>
         <v-spacer />
         <v-btn variant="outlined" size="small" prepend-icon="mdi-refresh" @click="loadPendingAssignments">
@@ -503,6 +519,8 @@ const availableRoles = ref([]);
 const availablePositions = ref([]);
 const inviteRoles = ref([]);
 const invitePositions = ref([]);
+const usersDataSource = ref('');
+const pendingDataSource = ref('');
 
 const searchQuery = ref('');
 const filterDepartment = ref(null);
@@ -599,13 +617,36 @@ const formatDate = (date) => {
   return new Date(date).toLocaleDateString();
 };
 
+const normalizeUsersPayload = (payload) => {
+  const list = payload?.data || payload;
+  if (!Array.isArray(list)) return [];
+  return list.map((user) => ({
+    ...user,
+    userDepartments: Array.isArray(user.userDepartments) ? user.userDepartments : [],
+  }));
+};
+
 // ─── Data Loading ─────────────────────────────────────────────────────────────
 const loadUsers = async () => {
   try {
     loading.value = true;
     error.value = null;
-    const response = await AdminServices.getAllUsers();
-    users.value = response.data?.data || response.data || [];
+    usersDataSource.value = '';
+
+    try {
+      const response = await AdminServices.getAllUsers();
+      users.value = normalizeUsersPayload(response.data);
+      usersDataSource.value = 'admin/users';
+      return;
+    } catch (primaryErr) {
+      if (primaryErr?.response?.status !== 404) {
+        throw primaryErr;
+      }
+    }
+
+    const fallbackResponse = await UserRoleServices.getAllUsersWithRoles();
+    users.value = normalizeUsersPayload(fallbackResponse.data);
+    usersDataSource.value = 'user-departments/admin/users-with-roles';
   } catch (err) {
     error.value = 'Failed to load users: ' + (err.response?.data?.message || err.message);
   } finally {
@@ -616,8 +657,19 @@ const loadUsers = async () => {
 const loadPendingAssignments = async () => {
   try {
     loadingPending.value = true;
-    const response = await AdminServices.getPendingAssignments();
-    pendingAssignments.value = response.data?.data || [];
+    pendingDataSource.value = '';
+    try {
+      const response = await AdminServices.getPendingAssignments();
+      pendingAssignments.value = response.data?.data || [];
+      pendingDataSource.value = 'admin/pending-assignments';
+      return;
+    } catch (primaryErr) {
+      if (primaryErr?.response?.status !== 404) {
+        throw primaryErr;
+      }
+      pendingAssignments.value = [];
+      pendingDataSource.value = 'not available on deployed backend';
+    }
   } catch (err) {
     error.value = 'Failed to load pending assignments: ' + (err.response?.data?.message || err.message);
   } finally {

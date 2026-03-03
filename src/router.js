@@ -10,6 +10,7 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
+import Admin from "./views/Admin.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {
@@ -19,9 +20,9 @@ const getStoredRole = () => {
 
 const getDefaultDashboardRoute = () => {
   const role = getStoredRole();
-  return role === "manager" || role === "admin"
-    ? { name: "manager-dashboard" }
-    : { name: "student-schedule" };
+  if (role === "admin") return { name: "admin-dashboard" };
+  if (role === "manager") return { name: "manager-dashboard" };
+  return { name: "student-schedule" };
 };
 
 const router = createRouter({
@@ -182,6 +183,41 @@ const router = createRouter({
           component: () => import("./views/DepartmentSettings.vue"),
         }
       ]
+    },
+    {
+      path: "/admin",
+      name: "admin",
+      component: Admin,
+      redirect: { name: "admin-dashboard" },
+      children: [
+        {
+          path: "dashboard",
+          name: "admin-dashboard",
+          component: () => import("./views/ManagerDashboard.vue"),
+        },
+        {
+          path: "users",
+          name: "admin-users",
+          component: () => import("./views/UserManagement.vue"),
+        },
+        {
+          path: "departments",
+          name: "admin-departments",
+          component: () => import("./views/DepartmentSettings.vue"),
+        },
+        {
+          path: "reports",
+          name: "admin-reports",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Reports", description: "View system-wide staffing and operations reports." }
+        },
+        {
+          path: "settings",
+          name: "admin-settings",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "System Settings", description: "Manage global system configuration." }
+        }
+      ]
     }
   ],
 });
@@ -197,8 +233,16 @@ router.beforeEach((to) => {
     return { name: "student-schedule" };
   }
 
+  if (to.path.startsWith("/admin") && role !== "admin") {
+    return role === "manager" ? { name: "manager-dashboard" } : { name: "student-schedule" };
+  }
+
+  if (to.path.startsWith("/manager") && role === "admin") {
+    return { name: "admin-dashboard" };
+  }
+
   if (to.path.startsWith("/student") && (role === "manager" || role === "admin")) {
-    return { name: "manager-dashboard" };
+    return role === "admin" ? { name: "admin-dashboard" } : { name: "manager-dashboard" };
   }
 
   return true;

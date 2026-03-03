@@ -89,6 +89,7 @@ const navItems = [
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
+  { title: 'My Tasks', icon: 'mdi-clipboard-text-outline', route: '/student/tasks' },
   { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
 ]
 

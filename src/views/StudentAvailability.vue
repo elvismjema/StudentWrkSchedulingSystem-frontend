@@ -224,9 +224,9 @@ const days = [
 ];
 
 const timeSlots = [];
-for (let h = 8; h <= 17; h++) {
+for (let h = 6; h <= 20; h++) {
   const period = h >= 12 ? "PM" : "AM";
-  const display = h > 12 ? h - 12 : h;
+  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
   timeSlots.push({ label: `${display}:00 ${period}`, value: h });
 }
 
@@ -330,8 +330,8 @@ const applyTimeRange = () => {
   // Fill slots for the range (round to full hours)
   const effectiveStart = startM > 0 ? startH : startH;
   const effectiveEnd = endM > 0 ? endH + 1 : endH;
-  for (let h = effectiveStart; h < effectiveEnd && h <= 17; h++) {
-    if (h >= 8) updated.add(slotKey(dayValue, h));
+  for (let h = effectiveStart; h < effectiveEnd && h <= 20; h++) {
+    if (h >= 6) updated.add(slotKey(dayValue, h));
   }
   selectedSlots.value = updated;
   showTimeRangeDialog.value = false;
@@ -599,4 +599,3 @@ onMounted(loadAvailabilities);
   margin-bottom: 8px;
 }
 </style>
-

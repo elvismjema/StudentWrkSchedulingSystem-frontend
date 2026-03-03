@@ -7,12 +7,12 @@
 
     <v-card class="clock-card" elevation="0">
       <div class="status-panel">
-        <div class="status-icon-wrap">
+        <div class="status-icon-wrap" :class="attendanceClass">
           <v-icon size="72" class="status-icon">
-            {{ isClockedIn ? "mdi-timer-play-outline" : "mdi-clock-outline" }}
+            {{ statusIcon }}
           </v-icon>
         </div>
-        <p class="status-label">{{ currentStatusLabel }}</p>
+        <p class="status-label" :class="attendanceClass">{{ currentStatusLabel }}</p>
       </div>
 
       <v-divider />
@@ -30,17 +30,9 @@
             </div>
           </div>
 
-          <div class="attendance-pill" :class="attendanceClass">
-            <v-icon size="20">{{ attendanceIcon }}</v-icon>
-            <span>{{ attendanceLabel }}</span>
-          </div>
         </div>
 
         <div class="detail-row">
-          <div class="detail-item">
-            <v-icon size="22" class="detail-icon">mdi-clock-outline</v-icon>
-            <span>{{ currentShift.scheduledWindow }}</span>
-          </div>
           <div class="detail-item">
             <v-icon size="22" class="detail-icon">mdi-map-marker-outline</v-icon>
             <span>{{ currentShift.campusLocation }}</span>
@@ -78,11 +70,8 @@
             <div>
               <p class="history-date">{{ entry.dateLabel }}</p>
               <p class="history-time">
-                {{ entry.actualWindow }} <span class="history-dot">•</span> Scheduled: {{ entry.scheduledWindow }}
+                {{ entry.actualWindow }}
               </p>
-            </div>
-            <div class="history-status" :class="entry.statusClass">
-              {{ entry.status }}
             </div>
           </div>
         </v-card>
@@ -170,9 +159,21 @@ const attendanceIcon = computed(() => {
   return "mdi-check-circle-outline";
 });
 
-const currentStatusLabel = computed(() =>
-  isClockedIn.value ? "Currently clocked in" : "Ready to clock in"
-);
+const statusIcon = computed(() => {
+  if (isClockedIn.value) {
+    return "mdi-timer-play-outline";
+  }
+
+  return attendanceIcon.value;
+});
+
+const currentStatusLabel = computed(() => {
+  if (isClockedIn.value) {
+    return "Currently clocked in";
+  }
+
+  return attendanceLabel.value;
+});
 
 const activeDurationLabel = computed(() => {
   if (!clockInTime.value) {
@@ -283,6 +284,7 @@ onBeforeUnmount(() => {
 .clock-card {
   overflow: hidden;
   max-width: 760px;
+  margin: 0 auto;
 }
 
 .status-panel {
@@ -309,6 +311,24 @@ onBeforeUnmount(() => {
   color: #afb4bc;
 }
 
+.status-icon-wrap.late {
+  border-color: #f7c0bb;
+}
+
+.status-icon-wrap.late .status-icon {
+  color: #f1453d;
+}
+
+.status-icon-wrap.on-time,
+.status-icon-wrap.upcoming {
+  border-color: #b7debf;
+}
+
+.status-icon-wrap.on-time .status-icon,
+.status-icon-wrap.upcoming .status-icon {
+  color: #22a44e;
+}
+
 .status-label {
   margin: 0;
   font-size: 16px;
@@ -317,15 +337,17 @@ onBeforeUnmount(() => {
   color: #6b7281;
 }
 
-.shift-panel {
-  padding: 20px 24px 24px;
+.status-label.late {
+  color: #f1453d;
 }
 
-.shift-panel-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+.status-label.on-time,
+.status-label.upcoming {
+  color: #22a44e;
+}
+
+.shift-panel {
+  padding: 20px 24px 24px;
 }
 
 .section-label {
@@ -367,25 +389,6 @@ onBeforeUnmount(() => {
   font-size: 18px;
   font-weight: 600;
   line-height: 28px;
-}
-
-.attendance-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.attendance-pill.late {
-  color: #f1453d;
-}
-
-.attendance-pill.on-time,
-.attendance-pill.upcoming {
-  color: #22a44e;
 }
 
 .detail-row {
@@ -484,31 +487,6 @@ onBeforeUnmount(() => {
   line-height: 24px;
 }
 
-.history-dot {
-  margin: 0 8px;
-}
-
-.history-status {
-  padding: 8px 16px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.history-status.on-time {
-  color: #20b24e;
-  background: #ebf7ee;
-  border: 1px solid #b7debf;
-}
-
-.history-status.late {
-  color: #f1453d;
-  background: #fdeeed;
-  border: 1px solid #f1c0bc;
-}
-
 @media (max-width: 900px) {
   .clock-page {
     padding: 24px 16px 32px;
@@ -522,7 +500,6 @@ onBeforeUnmount(() => {
     padding: 24px;
   }
 
-  .shift-panel-top,
   .history-card-content {
     flex-direction: column;
     align-items: flex-start;

@@ -41,8 +41,8 @@
               v-for="day in days"
               :key="`${day.value}-${hour.value}`"
               class="slot-cell"
-              :class="{ selected: isSelected(day.value, hour.value) }"
-              @click="openTimeRangeDialog(day, hour.value)"
+              :class="{ selected: isSelected(day.value, hour.value), disabled: hour.disabled }"
+              @click="hour.disabled ? null : openTimeRangeDialog(day, hour.value)"
             />
           </tr>
         </tbody>
@@ -224,10 +224,11 @@ const days = [
 ];
 
 const timeSlots = [];
-for (let h = 6; h <= 20; h++) {
-  const period = h >= 12 ? "PM" : "AM";
-  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  timeSlots.push({ label: `${display}:00 ${period}`, value: h });
+for (let h = 6; h <= 24; h++) {
+  const normalizedHour = h === 24 ? 0 : h;
+  const period = normalizedHour >= 12 ? "PM" : "AM";
+  const display = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour;
+  timeSlots.push({ label: `${display}:00 ${period}`, value: h, disabled: h === 24 });
 }
 
 // --- Exception Form ---
@@ -330,7 +331,7 @@ const applyTimeRange = () => {
   // Fill slots for the range (round to full hours)
   const effectiveStart = startM > 0 ? startH : startH;
   const effectiveEnd = endM > 0 ? endH + 1 : endH;
-  for (let h = effectiveStart; h < effectiveEnd && h <= 20; h++) {
+  for (let h = effectiveStart; h < effectiveEnd && h <= 24; h++) {
     if (h >= 6) updated.add(slotKey(dayValue, h));
   }
   selectedSlots.value = updated;
@@ -558,8 +559,17 @@ onMounted(loadAvailabilities);
   background-color: white;
 }
 
+.slot-cell.disabled {
+  cursor: default;
+  background-color: #fafafa;
+}
+
 .slot-cell:hover {
   background-color: #e0f2f1;
+}
+
+.slot-cell.disabled:hover {
+  background-color: #fafafa;
 }
 
 .slot-cell.selected {

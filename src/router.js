@@ -186,12 +186,12 @@ const router = createRouter({
         {
           path: "admin/users",
           name: "manager-admin-users",
-          component: () => import("./views/AdminUsers.vue"),
+          component: () => import("./views/UserManagement.vue"),
         },
         {
           path: "admin/departments",
           name: "manager-admin-departments",
-          component: () => import("./views/AdminDepartments.vue"),
+          component: () => import("./views/DepartmentSettings.vue"),
         },
       ]
     },
@@ -209,12 +209,12 @@ const router = createRouter({
         {
           path: "users",
           name: "admin-users",
-          component: () => import("./views/AdminUsers.vue"),
+          component: () => import("./views/UserManagement.vue"),
         },
         {
           path: "departments",
           name: "admin-departments",
-          component: () => import("./views/AdminDepartments.vue"),
+          component: () => import("./views/DepartmentSettings.vue"),
         },
         {
           path: "reports",

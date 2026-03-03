@@ -183,6 +183,12 @@ const router = createRouter({
           props: { title: "Notifications", description: "Review manager alerts and notifications." }
         },
         {
+          path: "profile",
+          name: "manager-profile",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Profile", description: "Review your account profile and role details." }
+        },
+        {
           path: "settings",
           name: "manager-settings",
           component: () => import("./views/DepartmentSettings.vue"),
@@ -226,6 +232,12 @@ const router = createRouter({
           name: "admin-reports",
           component: () => import("./views/ManagerPlaceholder.vue"),
           props: { title: "Reports", description: "View system-wide staffing and operations reports." }
+        },
+        {
+          path: "profile",
+          name: "admin-profile",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Profile", description: "Review your admin account profile and access details." }
         },
         {
           path: "settings",

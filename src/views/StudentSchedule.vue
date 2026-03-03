@@ -103,7 +103,7 @@ const currentGreetingDate = computed(() => {
   return `It's ${formattedDate}`
 })
 
-const timeSlots = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM to 8 PM
+const timeSlots = Array.from({ length: 19 }, (_, i) => i + 6) // 6 AM to 12 AM
 
 const weekDays = computed(() => {
   const days = []
@@ -130,8 +130,9 @@ const weekDays = computed(() => {
 })
 
 const formatTime = (hour) => {
-  const period = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const normalizedHour = hour === 24 ? 0 : hour
+  const period = normalizedHour >= 12 ? 'PM' : 'AM'
+  const displayHour = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour
   return `${displayHour}:00 ${period}`
 }
 
@@ -163,6 +164,7 @@ const goToToday = () => {
   --calendar-time-column-width: 88px;
   --calendar-header-height: 80px;
   --calendar-hour-height: 60px;
+  --calendar-row-count: 19;
   padding: 20px;
   background-color: #fafafa;
   height: 100%;
@@ -328,7 +330,7 @@ const goToToday = () => {
 
 .hour-slots {
   display: grid;
-  grid-template-rows: repeat(15, var(--calendar-hour-height));
+  grid-template-rows: repeat(var(--calendar-row-count), var(--calendar-hour-height));
 }
 
 .hour-slot {

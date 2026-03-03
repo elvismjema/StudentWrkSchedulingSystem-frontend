@@ -71,101 +71,99 @@
 
       <v-card-text class="pa-5">
         <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
-        <v-data-table
-          :headers="userHeaders"
-          :items="filteredUsers"
-          :search="searchQuery"
-          :loading="loading"
-          class="elevation-0"
-          item-value="id"
-        >
-          <!-- Name column -->
-          <template #item.name="{ item }">
-            <div>
-              <div class="font-weight-medium">{{ item.fName }} {{ item.lName }}</div>
-              <div class="text-caption text-medium-emphasis">{{ item.email }}</div>
-            </div>
-          </template>
+        <v-table class="admin-table" density="comfortable">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Status</th>
+              <th>Highest Role</th>
+              <th>Department Roles</th>
+              <th class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in filteredUsers" :key="item.id">
+              <td>
+                <div class="font-weight-medium">{{ item.fName }} {{ item.lName }}</div>
+                <div class="text-caption text-medium-emphasis">{{ item.email }}</div>
+              </td>
+              <td>
+                <v-chip
+                  size="small"
+                  :color="item.is_active === false ? 'error' : 'success'"
+                  variant="tonal"
+                >
+                  {{ item.is_active === false ? 'Inactive' : 'Active' }}
+                </v-chip>
+              </td>
+              <td>
+                <v-chip
+                  size="small"
+                  :color="getHighestRoleColor(item)"
+                  variant="tonal"
+                  class="font-weight-medium"
+                >
+                  <v-icon start size="14">{{ getHighestRoleIcon(item) }}</v-icon>
+                  {{ getHighestRole(item) }}
+                </v-chip>
+              </td>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  <v-chip
+                    v-for="ud in item.userDepartments"
+                    :key="ud.ud_id"
+                    size="x-small"
+                    :color="getRoleColor(ud.role?.permission_level)"
+                    variant="tonal"
+                  >
+                    {{ ud.department?.department_name }}: {{ ud.role?.role_name || 'No Role' }}
+                  </v-chip>
+                  <v-chip
+                    v-if="!item.userDepartments || item.userDepartments.length === 0"
+                    size="x-small"
+                    color="grey"
+                    variant="tonal"
+                  >
+                    No Roles
+                  </v-chip>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex align-center justify-center gap-1">
+                  <v-tooltip text="Assign / Edit Role" location="top">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="primary" variant="text"
+                        @click="openAssignRoleDialog(item)">
+                        <v-icon>mdi-account-edit</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
 
-          <!-- Account status -->
-          <template #item.account_status="{ item }">
-            <v-chip
-              size="small"
-              :color="item.is_active === false ? 'error' : 'success'"
-              variant="tonal"
-            >
-              {{ item.is_active === false ? 'Inactive' : 'Active' }}
-            </v-chip>
-          </template>
+                  <v-tooltip v-if="item.is_active !== false" text="Deactivate Account" location="top">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="warning" variant="text"
+                        @click="openDeactivateDialog(item)">
+                        <v-icon>mdi-account-off</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
 
-          <!-- Highest role badge -->
-          <template #item.highest_role="{ item }">
-            <v-chip
-              size="small"
-              :color="getHighestRoleColor(item)"
-              variant="tonal"
-              class="font-weight-medium"
-            >
-              <v-icon start size="14">{{ getHighestRoleIcon(item) }}</v-icon>
-              {{ getHighestRole(item) }}
-            </v-chip>
-          </template>
-
-          <!-- Department roles -->
-          <template #item.roles="{ item }">
-            <div class="d-flex flex-wrap gap-1">
-              <v-chip
-                v-for="ud in item.userDepartments"
-                :key="ud.ud_id"
-                size="x-small"
-                :color="getRoleColor(ud.role?.permission_level)"
-                variant="tonal"
-              >
-                {{ ud.department?.department_name }}: {{ ud.role?.role_name || 'No Role' }}
-              </v-chip>
-              <v-chip
-                v-if="!item.userDepartments || item.userDepartments.length === 0"
-                size="x-small"
-                color="grey"
-                variant="tonal"
-              >
-                No Roles
-              </v-chip>
-            </div>
-          </template>
-
-          <!-- Actions -->
-          <template #item.actions="{ item }">
-            <div class="d-flex align-center justify-center gap-1">
-              <v-tooltip text="Assign / Edit Role" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" icon size="small" color="primary" variant="text"
-                    @click="openAssignRoleDialog(item)">
-                    <v-icon>mdi-account-edit</v-icon>
-                  </v-btn>
-                </template>
-              </v-tooltip>
-
-              <v-tooltip v-if="item.is_active !== false" text="Deactivate Account" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" icon size="small" color="warning" variant="text"
-                    @click="openDeactivateDialog(item)">
-                    <v-icon>mdi-account-off</v-icon>
-                  </v-btn>
-                </template>
-              </v-tooltip>
-
-              <v-tooltip text="Remove User Permanently" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" icon size="small" color="error" variant="text"
-                    @click="openDeleteDialog(item)">
-                    <v-icon>mdi-delete-forever</v-icon>
-                  </v-btn>
-                </template>
-              </v-tooltip>
-            </div>
-          </template>
-        </v-data-table>
+                  <v-tooltip text="Remove User Permanently" location="top">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="error" variant="text"
+                        @click="openDeleteDialog(item)">
+                        <v-icon>mdi-delete-forever</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!loading && filteredUsers.length === 0">
+              <td colspan="5" class="text-center text-medium-emphasis py-6">No users found.</td>
+            </tr>
+          </tbody>
+        </v-table>
       </v-card-text>
     </v-card>
 
@@ -196,41 +194,46 @@
 
       <v-card-text class="pa-5">
         <v-progress-linear v-if="loadingPending" indeterminate color="warning" class="mb-4" />
-        <v-data-table
-          :headers="pendingHeaders"
-          :items="pendingAssignments"
-          :loading="loadingPending"
-          class="elevation-0"
-          :no-data-text="'No pending invitations'"
-        >
-          <template #item.email="{ item }">
-            <span class="font-weight-medium">{{ item.email }}</span>
-          </template>
-          <template #item.department="{ item }">
-            {{ item.department?.department_name || '—' }}
-          </template>
-          <template #item.role="{ item }">
-            <v-chip size="small" :color="getRoleColor(item.role?.permission_level)" variant="tonal">
-              {{ item.role?.role_name || '—' }}
-            </v-chip>
-          </template>
-          <template #item.created_at="{ item }">
-            {{ formatDate(item.created_at) }}
-          </template>
-          <template #item.created_by="{ item }">
-            {{ item.creator ? `${item.creator.fName} ${item.creator.lName}` : '—' }}
-          </template>
-          <template #item.actions="{ item }">
-            <v-tooltip text="Cancel Invitation" location="top">
-              <template #activator="{ props }">
-                <v-btn v-bind="props" icon size="small" color="error" variant="text"
-                  @click="cancelPending(item.id)">
-                  <v-icon>mdi-close-circle-outline</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-          </template>
-        </v-data-table>
+        <v-table class="admin-table" density="comfortable">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Department</th>
+              <th>Role</th>
+              <th>Created</th>
+              <th>Created By</th>
+              <th class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in pendingAssignments" :key="item.id">
+              <td><span class="font-weight-medium">{{ item.email }}</span></td>
+              <td>{{ item.department?.department_name || '—' }}</td>
+              <td>
+                <v-chip size="small" :color="getRoleColor(item.role?.permission_level)" variant="tonal">
+                  {{ item.role?.role_name || '—' }}
+                </v-chip>
+              </td>
+              <td>{{ formatDate(item.created_at) }}</td>
+              <td>{{ item.creator ? `${item.creator.fName} ${item.creator.lName}` : '—' }}</td>
+              <td>
+                <div class="d-flex justify-center">
+                  <v-tooltip text="Cancel Invitation" location="top">
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="error" variant="text"
+                        @click="cancelPending(item.id)">
+                        <v-icon>mdi-close-circle-outline</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!loadingPending && pendingAssignments.length === 0">
+              <td colspan="6" class="text-center text-medium-emphasis py-6">No pending invitations.</td>
+            </tr>
+          </tbody>
+        </v-table>
       </v-card-text>
     </v-card>
 
@@ -566,30 +569,28 @@ const rules = {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v || '') || 'Enter a valid email address',
 };
 
-// ─── Table Headers ───────────────────────────────────────────────────────────
-const userHeaders = [
-  { title: 'User', key: 'name', sortable: true },
-  { title: 'Status', key: 'account_status', sortable: false },
-  { title: 'Highest Role', key: 'highest_role', sortable: false },
-  { title: 'Department Roles', key: 'roles', sortable: false },
-  { title: 'Actions', key: 'actions', sortable: false, align: 'center' },
-];
-
-const pendingHeaders = [
-  { title: 'Email', key: 'email', sortable: true },
-  { title: 'Department', key: 'department', sortable: false },
-  { title: 'Role', key: 'role', sortable: false },
-  { title: 'Created', key: 'created_at', sortable: true },
-  { title: 'Created By', key: 'created_by', sortable: false },
-  { title: 'Actions', key: 'actions', sortable: false, align: 'center' },
-];
-
 // ─── Computed ────────────────────────────────────────────────────────────────
 const filteredUsers = computed(() => {
-  if (!filterDepartment.value) return users.value;
-  return users.value.filter((u) =>
-    u.userDepartments?.some((ud) => ud.department_id === filterDepartment.value)
-  );
+  let filtered = users.value;
+
+  if (filterDepartment.value) {
+    filtered = filtered.filter((u) =>
+      u.userDepartments?.some((ud) => ud.department_id === filterDepartment.value),
+    );
+  }
+
+  const query = searchQuery.value.trim().toLowerCase();
+  if (!query) return filtered;
+
+  return filtered.filter((u) => {
+    const fullName = `${u.fName || ''} ${u.lName || ''}`.trim().toLowerCase();
+    const email = String(u.email || '').toLowerCase();
+    const roleBlob = (u.userDepartments || [])
+      .map((ud) => `${ud.department?.department_name || ''} ${ud.role?.role_name || ''}`)
+      .join(' ')
+      .toLowerCase();
+    return fullName.includes(query) || email.includes(query) || roleBlob.includes(query);
+  });
 });
 
 const selectedRole = computed(() =>

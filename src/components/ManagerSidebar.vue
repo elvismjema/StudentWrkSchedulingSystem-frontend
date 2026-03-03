@@ -4,15 +4,15 @@
     :rail="rail"
     permanent
     class="manager-sidebar"
-    width="290"
-    rail-width="68"
+    width="256"
+    rail-width="60"
   >
-    <div class="brand-wrap">
-      <div class="brand-row">
-        <div class="oc-badge">OC</div>
-        <div v-if="!rail" class="brand-text">
-          <div class="brand-title">Oklahoma Christian</div>
-          <div class="brand-subtitle">Student Worker Scheduling</div>
+    <div class="logo-section">
+      <div class="logo-container">
+        <div class="oc-logo">OC</div>
+        <div v-if="!rail" class="logo-text">
+          <div class="main-title">Oklahoma Christian</div>
+          <div class="sub-title">Student Worker Scheduling</div>
         </div>
       </div>
     </div>
@@ -20,42 +20,41 @@
     <v-divider />
 
     <!-- Department Switcher -->
-    <div class="px-3 py-3">
+    <div class="switcher-section">
       <DepartmentSwitcher />
     </div>
 
     <v-divider />
 
-    <v-list nav class="manager-nav">
+    <v-list nav class="nav-list">
       <v-list-item
         v-for="item in navItems"
         :key="item.title"
         :to="item.route"
-        class="manager-nav-item"
-        active-class="manager-active-nav-item"
+        class="nav-item"
+        active-class="active-nav-item"
       >
         <template #prepend>
-          <v-icon :icon="item.icon" size="22" />
+          <v-icon :icon="item.icon" size="20" />
         </template>
         <v-list-item-title>{{ item.title }}</v-list-item-title>
       </v-list-item>
 
       <!-- Admin-only section -->
       <template v-if="isAdmin">
-        <v-divider class="my-2 mx-3" />
-        <div v-if="!rail" class="admin-section-label px-4 pb-1 text-caption text-uppercase font-weight-bold"
-          style="color: #930033; letter-spacing: 0.08em;">
+        <v-divider class="section-divider" />
+        <div v-if="!rail" class="section-label">
           Admin
         </div>
         <v-list-item
           v-for="item in adminNavItems"
           :key="item.title"
           :to="item.route"
-          class="manager-nav-item"
-          active-class="manager-active-nav-item"
+          class="nav-item"
+          active-class="active-nav-item"
         >
           <template #prepend>
-            <v-icon :icon="item.icon" size="22" color="#930033" />
+            <v-icon :icon="item.icon" size="20" />
           </template>
           <v-list-item-title>{{ item.title }}</v-list-item-title>
         </v-list-item>
@@ -64,16 +63,16 @@
 
     <template #append>
       <v-divider />
-      <div class="manager-user-wrap">
-        <v-list-item class="manager-user-item">
+      <div class="user-section">
+        <v-list-item class="user-item">
           <template #prepend>
-            <v-avatar size="38" class="manager-user-avatar">
-              <span class="manager-user-initial">{{ displayInitial }}</span>
+            <v-avatar size="32" class="user-avatar">
+              <span class="user-initial">{{ displayInitial }}</span>
             </v-avatar>
           </template>
-          <div v-if="!rail" class="manager-user-text">
-            <div class="manager-user-name">{{ displayName }}</div>
-            <div class="manager-user-role">{{ displayRole }}</div>
+          <div v-if="!rail" class="user-info">
+            <div class="user-name">{{ displayName }}</div>
+            <div class="user-role">{{ displayRole }}</div>
           </div>
         </v-list-item>
       </div>
@@ -142,105 +141,157 @@ defineExpose({
 
 <style scoped>
 .manager-sidebar {
-  border-right: 1px solid #e3e5e8;
-  background: #ffffff;
+  border-right: 1px solid #e0e0e0;
 }
 
-.brand-wrap {
-  padding: 18px 14px;
+.logo-section {
+  padding: 14px;
 }
 
-.brand-row {
+.logo-container {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
-.oc-badge {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: #930033;
-  color: #ffffff;
-  font-size: 22px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+.oc-logo {
+  background-color: #8B1538;
+  color: white;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 15px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
-.brand-title {
-  font-size: 19px;
-  font-weight: 700;
-  color: #1f2328;
-  line-height: 1.05;
+.logo-text {
+  flex: 1;
 }
 
-.brand-subtitle {
-  margin-top: 4px;
+.main-title {
   font-size: 15px;
-  color: #667085;
-  line-height: 1.1;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
 }
 
-.manager-nav {
-  padding: 12px 0;
+.sub-title {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
-.manager-nav-item {
-  margin: 3px 12px;
-  border-radius: 12px;
-  min-height: 48px;
+.switcher-section {
+  padding: 12px;
 }
 
-.manager-nav-item:hover {
-  background: #f7f7f8;
+.nav-list {
+  padding: 6px 0;
 }
 
-.manager-active-nav-item {
-  background: #f8ecef !important;
-  color: #930033 !important;
+.nav-item {
+  margin: 2px 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
-.manager-active-nav-item .v-icon,
-.manager-active-nav-item .v-list-item-title {
-  color: #930033 !important;
+.nav-item :deep(.v-list-item__content) {
+  font-size: 14px;
+}
+
+.nav-item :deep(.v-list-item-title) {
+  font-size: 14px;
+}
+
+.nav-item:hover {
+  background-color: #f5f5f5;
+}
+
+.active-nav-item {
+  background-color: #f8e6ea !important;
+  color: #8B1538 !important;
+}
+
+.active-nav-item .v-icon {
+  color: #8B1538 !important;
+}
+
+.active-nav-item .v-list-item-title {
+  color: #8B1538 !important;
+  font-weight: 500;
+}
+
+.section-divider {
+  margin: 8px 12px;
+}
+
+.section-label {
+  padding: 0 16px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8B1538;
+}
+
+.user-section {
+  padding: 6px;
+}
+
+.user-item {
+  border-radius: 8px;
+  margin: 0 8px;
+}
+
+.user-avatar {
+  background-color: #8B1538;
+}
+
+.user-initial {
+  color: white;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.user-name {
+  color: #333;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.manager-user-wrap {
-  padding: 10px;
-}
-
-.manager-user-item {
-  border-radius: 12px;
-  min-height: 66px;
-}
-
-.manager-user-avatar {
-  background: #930033;
-}
-
-.manager-user-initial {
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.manager-user-text {
+.user-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-.manager-user-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2328;
+.user-role {
+  color: #666;
+  font-size: 11px;
+  margin-top: 2px;
 }
 
-.manager-user-role {
-  font-size: 14px;
-  color: #667085;
+.v-navigation-drawer--rail .logo-section {
+  padding: 16px 8px;
+}
+
+.v-navigation-drawer--rail .logo-container {
+  justify-content: center;
+}
+
+.v-navigation-drawer--rail .switcher-section {
+  padding: 12px 8px;
+}
+
+.v-navigation-drawer--rail .nav-item {
+  margin: 2px 4px;
+}
+
+.v-navigation-drawer--rail .user-item {
+  margin: 0 4px;
 }
 </style>

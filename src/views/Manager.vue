@@ -3,8 +3,8 @@
     <ManagerSidebar ref="sidebarRef" />
     <ManagerTopNav @toggle-sidebar="toggleSidebar" />
 
-    <v-main class="manager-main">
-      <v-container fluid class="manager-content pa-0">
+    <v-main class="main-content">
+      <v-container fluid class="role-content pa-0">
         <router-view />
       </v-container>
     </v-main>
@@ -26,16 +26,16 @@ const toggleSidebar = () => {
 </script>
 
 <style scoped>
-.manager-main {
-  background: #f4f5f7;
-  min-height: calc(100vh - 76px);
-  height: calc(100vh - 76px);
+.main-content {
+  background-color: #fafafa;
+  min-height: calc(100vh - 60px);
+  height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.manager-content {
+.role-content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;

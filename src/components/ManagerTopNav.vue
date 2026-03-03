@@ -1,7 +1,7 @@
 <template>
-  <v-app-bar elevation="0" height="76" class="manager-top-nav">
+  <v-app-bar elevation="0" height="60" class="manager-top-nav" color="white">
     <v-btn icon variant="text" class="panel-btn" @click="emit('toggle-sidebar')">
-      <v-icon size="26">mdi-view-column-outline</v-icon>
+      <v-icon size="24">mdi-menu</v-icon>
     </v-btn>
 
     <v-spacer />
@@ -17,7 +17,7 @@
       >
         <template #activator="{ props }">
           <v-btn v-bind="props" icon variant="text" class="user-menu-btn">
-            <v-avatar size="52" class="profile-avatar">
+            <v-avatar size="34" class="profile-avatar">
               <span class="profile-initials">{{ displayInitials }}</span>
             </v-avatar>
           </v-btn>
@@ -116,29 +116,28 @@ const handleNotificationClick = (notification) => {
 
 <style scoped>
 .manager-top-nav {
-  border-bottom: 1px solid #e3e5e8;
-  padding: 0 16px;
-  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 12px;
 }
 
 .panel-btn {
-  color: #1f2328;
+  margin-right: 8px;
 }
 
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .profile-avatar {
-  background: #930033;
+  background: #8B1538;
 }
 
 .profile-initials {
   color: #fff;
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .user-menu-btn:hover {
@@ -158,7 +157,7 @@ const handleNotificationClick = (notification) => {
 }
 
 .header-avatar {
-  background: #930033;
+  background: #8B1538;
 }
 
 .header-initials {

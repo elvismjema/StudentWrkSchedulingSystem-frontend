@@ -181,7 +181,18 @@ const router = createRouter({
           path: "settings",
           name: "manager-settings",
           component: () => import("./views/DepartmentSettings.vue"),
-        }
+        },
+        // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "admin/users",
+          name: "manager-admin-users",
+          component: () => import("./views/AdminUsers.vue"),
+        },
+        {
+          path: "admin/departments",
+          name: "manager-admin-departments",
+          component: () => import("./views/AdminDepartments.vue"),
+        },
       ]
     },
     {
@@ -198,12 +209,12 @@ const router = createRouter({
         {
           path: "users",
           name: "admin-users",
-          component: () => import("./views/UserManagement.vue"),
+          component: () => import("./views/AdminUsers.vue"),
         },
         {
           path: "departments",
           name: "admin-departments",
-          component: () => import("./views/DepartmentSettings.vue"),
+          component: () => import("./views/AdminDepartments.vue"),
         },
         {
           path: "reports",
@@ -233,11 +244,16 @@ router.beforeEach((to) => {
     return { name: "student-schedule" };
   }
 
+  // Admin-only routes under manager path — managers without admin role are redirected.
+  if (to.path.startsWith("/manager/admin") && role !== "admin") {
+    return { name: "manager-dashboard" };
+  }
+
   if (to.path.startsWith("/admin") && role !== "admin") {
     return role === "manager" ? { name: "manager-dashboard" } : { name: "student-schedule" };
   }
 
-  if (to.path.startsWith("/manager") && role === "admin") {
+  if (to.path.startsWith("/manager") && role === "admin" && !to.path.startsWith("/manager/admin")) {
     return { name: "admin-dashboard" };
   }
 

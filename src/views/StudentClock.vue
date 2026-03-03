@@ -6,30 +6,14 @@
     </section>
 
     <v-card class="clock-card" elevation="0">
-      <div class="status-panel">
-        <div class="status-icon-wrap" :class="attendanceClass">
-          <v-icon size="72" class="status-icon">
-            {{ statusIcon }}
-          </v-icon>
-        </div>
-        <p class="status-label" :class="attendanceClass">{{ currentStatusLabel }}</p>
-      </div>
-
-      <v-divider />
-
       <div class="shift-panel">
-        <div class="shift-panel-top">
-          <div>
-            <p class="section-label">Today's Shift</p>
-            <div class="role-row">
-              <v-chip class="location-chip" size="large" variant="outlined">
-                <span class="chip-dot" />
-                {{ currentShift.location }}
-              </v-chip>
-              <span class="role-title">{{ currentShift.role }}</span>
-            </div>
-          </div>
-
+        <p class="section-label">Today's Shift</p>
+        <div class="role-row">
+          <v-chip class="location-chip" size="large" variant="outlined">
+            <span class="chip-dot" />
+            {{ currentShift.location }}
+          </v-chip>
+          <span class="role-title">{{ currentShift.role }}</span>
         </div>
 
         <div class="detail-row">
@@ -118,61 +102,6 @@ const scheduledStart = computed(() => {
   const date = new Date(now.value);
   date.setHours(currentShift.scheduledStartHour, currentShift.scheduledStartMinute, 0, 0);
   return date;
-});
-
-const lateMinutes = computed(() => {
-  const diffMs = now.value.getTime() - scheduledStart.value.getTime();
-  return Math.max(0, Math.floor(diffMs / 60000));
-});
-
-const attendanceState = computed(() => {
-  if (isClockedIn.value && clockInTime.value) {
-    return clockInTime.value <= scheduledStart.value ? "on-time" : "late";
-  }
-
-  if (now.value > scheduledStart.value) {
-    return "late";
-  }
-
-  return "upcoming";
-});
-
-const attendanceLabel = computed(() => {
-  if (attendanceState.value === "late") {
-    return `${lateMinutes.value} minutes late`;
-  }
-
-  if (attendanceState.value === "upcoming") {
-    return "Upcoming";
-  }
-
-  return "On Time";
-});
-
-const attendanceClass = computed(() => attendanceState.value);
-
-const attendanceIcon = computed(() => {
-  if (attendanceState.value === "late") {
-    return "mdi-alert-outline";
-  }
-
-  return "mdi-check-circle-outline";
-});
-
-const statusIcon = computed(() => {
-  if (isClockedIn.value) {
-    return "mdi-timer-play-outline";
-  }
-
-  return attendanceIcon.value;
-});
-
-const currentStatusLabel = computed(() => {
-  if (isClockedIn.value) {
-    return "Currently clocked in";
-  }
-
-  return attendanceLabel.value;
 });
 
 const activeDurationLabel = computed(() => {
@@ -287,67 +216,8 @@ onBeforeUnmount(() => {
   margin: 0 auto;
 }
 
-.status-panel {
-  min-height: 260px;
-  padding: 28px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.status-icon-wrap {
-  width: 96px;
-  height: 96px;
-  margin-bottom: 16px;
-  border: 8px solid #b0b5bd;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.status-icon {
-  color: #afb4bc;
-}
-
-.status-icon-wrap.late {
-  border-color: #f7c0bb;
-}
-
-.status-icon-wrap.late .status-icon {
-  color: #f1453d;
-}
-
-.status-icon-wrap.on-time,
-.status-icon-wrap.upcoming {
-  border-color: #b7debf;
-}
-
-.status-icon-wrap.on-time .status-icon,
-.status-icon-wrap.upcoming .status-icon {
-  color: #22a44e;
-}
-
-.status-label {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  color: #6b7281;
-}
-
-.status-label.late {
-  color: #f1453d;
-}
-
-.status-label.on-time,
-.status-label.upcoming {
-  color: #22a44e;
-}
-
 .shift-panel {
-  padding: 20px 24px 24px;
+  padding: 24px;
 }
 
 .section-label {
@@ -492,10 +362,6 @@ onBeforeUnmount(() => {
     padding: 24px 16px 32px;
   }
 
-  .status-panel {
-    min-height: 220px;
-  }
-
   .shift-panel {
     padding: 24px;
   }
@@ -507,16 +373,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .status-icon-wrap {
-    width: 104px;
-    height: 104px;
-    border-width: 8px;
-  }
-
-  .status-label {
-    font-size: 18px;
-  }
-
   .role-title {
     font-size: 18px;
   }

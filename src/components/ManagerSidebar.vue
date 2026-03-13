@@ -19,13 +19,6 @@
 
     <v-divider />
 
-    <!-- Department Switcher -->
-    <div class="switcher-section">
-      <DepartmentSwitcher />
-    </div>
-
-    <v-divider />
-
     <v-list nav class="nav-list">
       <v-list-item
         v-for="item in navItems"
@@ -83,7 +76,6 @@
 <script setup>
 import { computed, ref } from "vue";
 import Utils from "../config/utils";
-import DepartmentSwitcher from "./DepartmentSwitcher.vue";
 
 const drawer = ref(true);
 const rail = ref(false);
@@ -185,10 +177,6 @@ defineExpose({
   margin-top: 2px;
 }
 
-.switcher-section {
-  padding: 12px;
-}
-
 .nav-list {
   padding: 6px 0;
 }
@@ -280,10 +268,6 @@ defineExpose({
 
 .v-navigation-drawer--rail .logo-container {
   justify-content: center;
-}
-
-.v-navigation-drawer--rail .switcher-section {
-  padding: 12px 8px;
 }
 
 .v-navigation-drawer--rail .nav-item {

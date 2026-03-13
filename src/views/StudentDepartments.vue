@@ -24,14 +24,22 @@
         <v-card
           v-for="dept in myDepartments"
           :key="'my-' + dept.ud_id"
-          class="dept-card joined-card"
+          class="dept-card"
+          :class="dept.request_status === 'approved' ? 'joined-card' : 'pending-card'"
           elevation="0"
         >
           <div class="dept-card-header">
-            <div class="dept-icon joined-icon">
+            <div class="dept-icon" :class="dept.request_status === 'approved' ? 'joined-icon' : 'pending-icon'">
               <v-icon size="28">mdi-domain</v-icon>
             </div>
-            <v-chip size="small" color="success" variant="flat" class="joined-chip">Joined</v-chip>
+            <v-chip
+              size="small"
+              :color="dept.request_status === 'approved' ? 'success' : 'warning'"
+              variant="flat"
+              class="joined-chip"
+            >
+              {{ dept.request_status === 'approved' ? 'Joined' : 'Waiting for Approval' }}
+            </v-chip>
           </div>
           <h3 class="dept-name">{{ dept.department?.department_name || "Department" }}</h3>
           <p class="dept-desc">{{ dept.department?.description || "No description" }}</p>
@@ -68,13 +76,14 @@
           <p class="dept-desc">{{ dept.description || "No description available" }}</p>
           <v-btn
             class="join-btn"
+            :class="{ 'pending-btn': getMembershipStatus(dept.department_id) === 'pending' }"
             variant="flat"
             block
             :loading="joiningId === dept.department_id"
-            :disabled="isAlreadyJoined(dept.department_id)"
+            :disabled="getMembershipStatus(dept.department_id) !== null"
             @click="joinDepartment(dept)"
           >
-            {{ isAlreadyJoined(dept.department_id) ? "Already Joined" : "Join Department" }}
+            {{ getJoinButtonLabel(dept.department_id) }}
           </v-btn>
         </v-card>
       </div>
@@ -130,10 +139,19 @@ const filteredDepartments = computed(() => {
   );
 });
 
-const isAlreadyJoined = (deptId) => {
-  return myDepartments.value.some(
-    (m) => m.department_id === deptId && m.is_active
+const getMembershipStatus = (deptId) => {
+  const membership = myDepartments.value.find(
+    (m) => m.department_id === deptId && (m.is_active || m.request_status === "pending")
   );
+  if (!membership) return null;
+  return membership.request_status || (membership.is_active ? "approved" : null);
+};
+
+const getJoinButtonLabel = (deptId) => {
+  const status = getMembershipStatus(deptId);
+  if (status === "pending") return "Request Sent";
+  if (status === "approved") return "Already Joined";
+  return "Join Department";
 };
 
 const fetchDepartments = async () => {
@@ -293,6 +311,21 @@ onMounted(() => {
 .join-btn:disabled {
   background: #e5e7eb !important;
   color: #9ca3af !important;
+}
+
+.join-btn.pending-btn:disabled {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.pending-card {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.pending-icon {
+  background: #fef3c7;
+  color: #d97706;
 }
 
 .empty-state {

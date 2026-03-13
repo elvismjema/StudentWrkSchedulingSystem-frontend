@@ -85,16 +85,34 @@
             <p>Your work assignments</p>
           </div>
 
-          <div class="assignment-stack">
-            <div>
-              <div class="field-label">Departments</div>
-              <div class="assignment-value">{{ departmentDisplay }}</div>
-            </div>
+          <v-progress-linear v-if="loadingDepts" indeterminate color="#8B1538" class="mb-4" />
 
-            <div>
-              <div class="field-label">Positions</div>
-              <div class="assignment-value">{{ positionDisplay }}</div>
+          <div v-if="!loadingDepts && memberships.length" class="membership-list">
+            <div
+              v-for="m in memberships"
+              :key="m.ud_id"
+              class="membership-item"
+            >
+              <div class="membership-header">
+                <span class="membership-dept">{{ m.department?.department_name || 'Department' }}</span>
+                <v-chip
+                  size="x-small"
+                  :color="m.request_status === 'approved' ? 'success' : m.request_status === 'pending' ? 'warning' : 'error'"
+                  variant="flat"
+                >
+                  {{ m.request_status === 'approved' ? 'Active' : m.request_status === 'pending' ? 'Pending' : 'Rejected' }}
+                </v-chip>
+              </div>
+              <div class="membership-meta">
+                <span v-if="m.role" class="membership-role">{{ m.role.role_name }}</span>
+                <span v-else class="membership-role text-grey">No role assigned</span>
+                <span v-if="m.position" class="membership-position"> · {{ m.position.position_name }}</span>
+              </div>
             </div>
+          </div>
+
+          <div v-else-if="!loadingDepts" class="text-grey" style="font-size: 0.95rem;">
+            Not assigned to any department yet.
           </div>
 
           <p class="assignment-note">
@@ -171,8 +189,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, onMounted } from "vue";
 import Utils from "../config/utils";
+import apiClient from "../services/services.js";
 
 const storedUser = Utils.getStore("user") || {};
 const storedProfile = Utils.getStore("studentProfile") || {};
@@ -193,6 +212,24 @@ const preferences = reactive({
 });
 
 const saveNoticeOpen = ref(false);
+const loadingDepts = ref(false);
+const memberships = ref([]);
+
+const fetchMemberships = async () => {
+  const userId = storedUser?.id;
+  if (!userId) return;
+  loadingDepts.value = true;
+  try {
+    const res = await apiClient.get(`/user-departments/user/${userId}`);
+    memberships.value = Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    console.error("Failed to load department memberships:", err);
+  } finally {
+    loadingDepts.value = false;
+  }
+};
+
+onMounted(fetchMemberships);
 
 const displayInitials = computed(() => {
   const parts = profile.fullName.trim().split(/\s+/).filter(Boolean);
@@ -201,21 +238,6 @@ const displayInitials = computed(() => {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 });
 
-const departmentDisplay = computed(() => {
-  const departments = storedUser.departments || storedProfile.departments;
-  if (Array.isArray(departments) && departments.length) {
-    return departments.join(", ");
-  }
-  return "Not assigned";
-});
-
-const positionDisplay = computed(() => {
-  const positions = storedUser.positions || storedProfile.positions;
-  if (Array.isArray(positions) && positions.length) {
-    return positions.join(", ");
-  }
-  return "Not assigned";
-});
 
 const saveProfile = () => {
   const nameParts = profile.fullName.trim().split(/\s+/).filter(Boolean);
@@ -386,6 +408,43 @@ const saveProfile = () => {
   min-height: 24px;
   color: #2d2d35;
   font-size: 0.98rem;
+}
+
+.membership-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.membership-item {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.membership-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.membership-dept {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #24242b;
+}
+
+.membership-meta {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: #6d7586;
+}
+
+.membership-role {
+  font-weight: 500;
 }
 
 .assignment-note {

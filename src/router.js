@@ -185,7 +185,7 @@ const router = createRouter({
         {
           path: "profile",
           name: "manager-profile",
-          component: () => import("./views/StudentProfile.vue"),
+          component: () => import("./views/ManagerProfile.vue"),
         },
         {
           path: "settings",

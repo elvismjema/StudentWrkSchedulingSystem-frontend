@@ -3,7 +3,7 @@
     <v-card class="management-card" elevation="2">
       <v-card-title class="text-h4 mb-4">
         <v-icon left>mdi-account-multiple</v-icon>
-        User Management
+        Student Workers
       </v-card-title>
 
       <v-card-text>
@@ -25,7 +25,7 @@
           <v-col cols="12" md="12">
             <v-text-field
               v-model="searchQuery"
-              label="Search users..."
+              label="Search"
               prepend-inner-icon="mdi-magnify"
               outlined
               dense

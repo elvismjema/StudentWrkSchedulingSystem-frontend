@@ -140,7 +140,7 @@ const router = createRouter({
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: ShiftManagement,
+          redirect: { name: "manager-schedule" },
         },
         {
           path: "availability",

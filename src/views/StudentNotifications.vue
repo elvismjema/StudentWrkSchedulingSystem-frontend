@@ -27,14 +27,22 @@
         v-for="notification in notifications"
         :key="notification.id"
         class="notification-card"
-        :class="{ 'unread': notification.unread }"
+        :class="{ 'unread': notification.unread, 'priority-high': notification.priority === 'high' }"
         @click="handleNotificationClick(notification)"
       >
-        <div class="notification-icon">
+        <div class="notification-icon" :class="{ 'icon-critical': notification.priority === 'high' }">
           <v-icon :icon="notification.icon" size="24"></v-icon>
         </div>
         <div class="notification-content">
-          <div class="notification-title">{{ notification.title }}</div>
+          <div class="notification-title">
+            {{ notification.title }}
+            <v-chip
+              v-if="notification.priority === 'high'"
+              color="error"
+              size="x-small"
+              class="ml-2"
+            >URGENT</v-chip>
+          </div>
           <div class="notification-description">{{ notification.description }}</div>
           <div class="notification-time">{{ notification.timestamp }}</div>
         </div>
@@ -54,8 +62,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
 
+const router = useRouter()
 const notifications = ref([])
 
 const unreadCount = computed(() => {
@@ -70,13 +80,26 @@ const loadNotifications = async () => {
   }
 }
 
+/**
+ * Mark the notification as read, then navigate to its deep-link if one exists.
+ * US1 AC3, US3 AC3 – clicking a notification takes the user directly to the
+ * relevant shift or schedule view.
+ */
 const handleNotificationClick = async (notification) => {
   if (notification.unread) {
     await NotificationService.markAsRead(notification.id)
     notification.unread = false
   }
-  // Add additional logic for handling notification clicks
-  console.log('Notification clicked:', notification)
+
+  if (notification.link) {
+    // Use Vue Router for client-side navigation if the link is an internal path
+    try {
+      await router.push(notification.link)
+    } catch {
+      // Fallback to full page navigation for any router mismatch
+      window.location.href = notification.link
+    }
+  }
 }
 
 const handleMarkAllRead = async () => {
@@ -162,6 +185,15 @@ onMounted(() => {
 .notification-card.unread {
   background: #f8faff;
   border-color: #1976d2;
+}
+
+.notification-card.priority-high {
+  background: #fff8f8;
+  border-color: #d32f2f;
+}
+
+.icon-critical {
+  color: #d32f2f !important;
 }
 
 .notification-icon {

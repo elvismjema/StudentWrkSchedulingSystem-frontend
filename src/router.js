@@ -151,7 +151,7 @@ const router = createRouter({
         {
           path: "approvals",
           name: "manager-approvals",
-          component: () => import("./views/StudentQualifications.vue")
+          component: () => import("./views/ManagerJoinRequests.vue")
         },
         {
           path: "time-attendance",

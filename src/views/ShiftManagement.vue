@@ -5,75 +5,22 @@
       <p class="greeting-date">{{ currentGreetingDate }}</p>
     </div>
 
-    <!-- Filters -->
-    <v-card class="mb-4" elevation="2">
-      <v-card-text>
-        <v-row>
-          <v-col cols="12" md="4">
-            <v-select
-              v-model="filters.position_id"
-              :items="positions"
-              item-title="position_name"
-              item-value="position_id"
-              label="Position"
-              variant="outlined"
-              density="compact"
-              clearable
-              hide-details
-            ></v-select>
-          </v-col>
-          <v-col cols="12" md="4">
-            <v-text-field
-              v-model="filters.shift_date"
-              type="date"
-              label="Date"
-              variant="outlined"
-              density="compact"
-              clearable
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" md="4">
-            <v-btn
-              @click="loadShifts"
-              color="primary"
-              variant="elevated"
-              block
-              height="40"
-              :loading="shiftsLoading"
-            >
-              <v-icon left>mdi-refresh</v-icon>
-              Refresh
-            </v-btn>
-          </v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
-
-    <!-- Shifts Table -->
-    <v-card elevation="2">
-      <v-card-title class="d-flex align-center">
-        <v-icon class="mr-2">mdi-calendar-text</v-icon>
-        Shifts
-        <v-spacer></v-spacer>
-        <v-chip
-          v-if="filteredShifts.length > 0"
-          color="primary"
-          size="small"
-        >
-          {{ filteredShifts.length }} shifts
-        </v-chip>
-      </v-card-title>
-      
-      <v-divider></v-divider>
-      
-      <v-card-text class="pa-0">
-        <v-data-table
-          :headers="headers"
-          :items="filteredShifts"
-          :loading="shiftsLoading"
-          class="elevation-0"
-        >
+    <!-- Calendar Header -->
+    <div class="calendar-header">
+      <div>
+        <p class="selected-shift-note" v-if="selectedShift">
+          Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
+        </p>
+      </div>
+      <div class="header-controls">
+        <v-btn variant="outlined" class="nav-btn" @click="previousWeek">
+          <v-icon>mdi-chevron-left</v-icon>
+        </v-btn>
+        <v-btn variant="outlined" class="today-btn" @click="goToToday">Today</v-btn>
+        <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
+          <v-icon>mdi-chevron-right</v-icon>
+        </v-btn>
+        <v-btn color="primary" variant="elevated" @click="showCreateDialog = true" prepend-icon="mdi-plus">
           Add to Schedule
         </v-btn>
       </div>
@@ -316,17 +263,35 @@ const headers = [
 ]
 
 // Computed
+const weekDays = computed(() => {
+  const today = new Date()
+  const todayIso = today.toISOString().split('T')[0]
+  const startOfWeek = new Date(currentDate.value)
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek)
+    d.setDate(startOfWeek.getDate() + i)
+    const isoDate = d.toISOString().split('T')[0]
+    return {
+      isoDate,
+      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: d.getDate(),
+      isToday: isoDate === todayIso
+    }
+  })
+})
+
+const timeSlots = computed(() => Array.from({ length: 19 }, (_, i) => i + 5))
+
+const currentGreetingDate = computed(() => {
+  if (!weekDays.value.length) return ''
+  const first = new Date(weekDays.value[0].isoDate)
+  const last = new Date(weekDays.value[6].isoDate)
+  return `${first.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+})
+
 const filteredShifts = computed(() => {
-  let filtered = shifts.value
-
-  if (filters.value.position_id) {
-    filtered = filtered.filter(shift => shift.position_id === filters.value.position_id)
-  }
-  if (filters.value.shift_date) {
-    filtered = filtered.filter(shift => shift.shift_date === filters.value.shift_date)
-  }
-
-  return days
+  return shifts.value
 })
 
 const formatTime = (hour) => {

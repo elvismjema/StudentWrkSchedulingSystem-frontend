@@ -7,12 +7,21 @@
     width="256"
     rail-width="60"
   >
+
+    <div class="brand-wrap">
+      <div class="brand-row">
+        <div class="oc-badge">OC</div>
+        <div v-if="!rail" class="brand-text">
+          <div class="brand-title">{{ displayDepartment }}</div>
+          <div class="brand-subtitle">{{ displayRole }}</div>
+
     <div class="logo-section">
       <div class="logo-container">
         <div class="oc-logo">OC</div>
         <div v-if="!rail" class="logo-text">
           <div class="main-title">Oklahoma Christian</div>
           <div class="sub-title">Student Worker Scheduling</div>
+
         </div>
       </div>
     </div>
@@ -89,9 +98,19 @@ const displayName = computed(() => {
 });
 
 const displayRole = computed(() => {
+
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.role_name || "Manager";
+});
+
+const displayDepartment = computed(() => {
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.department_name || "Student Worker Scheduling";
+
   const role = (user.value?.role || "student").toLowerCase();
   if (role === "admin") return "Admin";
   return role === "manager" ? "Manager" : "Student";
+
 });
 
 const displayInitial = computed(() => {

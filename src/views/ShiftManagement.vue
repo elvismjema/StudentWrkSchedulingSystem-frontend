@@ -5,33 +5,74 @@
       <p class="greeting-date">{{ currentGreetingDate }}</p>
     </div>
 
-    <div class="calendar-header">
-      <div class="header-left">
-        <h1 class="month-year">{{ currentMonthYear }}</h1>
-        <p v-if="selectedShift" class="selected-shift-note">
-          Selected: {{ selectedShift.position?.position_name || 'Shift' }} on {{ selectedShift.shift_date }}
-        </p>
-      </div>
+    <!-- Filters -->
+    <v-card class="mb-4" elevation="2">
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.position_id"
+              :items="positions"
+              item-title="position_name"
+              item-value="position_id"
+              label="Position"
+              variant="outlined"
+              density="compact"
+              clearable
+              hide-details
+            ></v-select>
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="filters.shift_date"
+              type="date"
+              label="Date"
+              variant="outlined"
+              density="compact"
+              clearable
+              hide-details
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-btn
+              @click="loadShifts"
+              color="primary"
+              variant="elevated"
+              block
+              height="40"
+              :loading="shiftsLoading"
+            >
+              <v-icon left>mdi-refresh</v-icon>
+              Refresh
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
 
-      <div class="header-controls">
-        <v-btn variant="outlined" prepend-icon="mdi-chevron-left" @click="previousWeek" class="nav-btn">
-          Previous
-        </v-btn>
-        <v-btn variant="flat" color="#8B1538" @click="goToToday" class="today-btn">
-          Today
-        </v-btn>
-        <v-btn variant="outlined" append-icon="mdi-chevron-right" @click="nextWeek" class="nav-btn">
-          Next
-        </v-btn>
-        <v-btn color="primary" variant="elevated" prepend-icon="mdi-plus" @click="showCreateDialog = true">
-          Create
-        </v-btn>
-        <v-btn
-          color="success"
-          variant="elevated"
-          prepend-icon="mdi-account-plus"
-          :disabled="!selectedShift"
-          @click="openAddToSchedule"
+    <!-- Shifts Table -->
+    <v-card elevation="2">
+      <v-card-title class="d-flex align-center">
+        <v-icon class="mr-2">mdi-calendar-text</v-icon>
+        Shifts
+        <v-spacer></v-spacer>
+        <v-chip
+          v-if="filteredShifts.length > 0"
+          color="primary"
+          size="small"
+        >
+          {{ filteredShifts.length }} shifts
+        </v-chip>
+      </v-card-title>
+      
+      <v-divider></v-divider>
+      
+      <v-card-text class="pa-0">
+        <v-data-table
+          :headers="headers"
+          :items="filteredShifts"
+          :loading="shiftsLoading"
+          class="elevation-0"
         >
           Add to Schedule
         </v-btn>
@@ -80,29 +121,31 @@
       <v-progress-circular indeterminate color="primary" />
     </div>
 
-    <v-dialog v-model="showCreateDialog" max-width="600px">
+    <!-- Create/Edit Shift Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="640px">
       <v-card>
         <v-card-title>
           <v-icon class="mr-2">mdi-plus</v-icon>
           Create New Shift
         </v-card-title>
 
+        <!-- Department context banner -->
+        <v-alert
+          v-if="currentDeptName"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mx-4 mt-2"
+          icon="mdi-office-building"
+        >
+          Creating shift for: <strong>{{ currentDeptName }}</strong>
+        </v-alert>
+        
         <v-divider></v-divider>
 
         <v-card-text>
           <v-form ref="createFormRef" v-model="createFormValid">
             <v-row>
-              <v-col cols="12" md="6">
-                <v-select
-                  v-model="newShift.department_id"
-                  :items="departments"
-                  item-title="department_name"
-                  item-value="department_id"
-                  label="Department"
-                  variant="outlined"
-                  :rules="[v => !!v || 'Department is required']"
-                ></v-select>
-              </v-col>
               <v-col cols="12" md="6">
                 <v-select
                   v-model="newShift.position_id"
@@ -140,6 +183,35 @@
                   variant="outlined"
                   :rules="[v => !!v || 'End time is required']"
                 ></v-text-field>
+              </v-col>
+              <!-- Optional: Assign Worker -->
+              <v-col cols="12">
+                <v-select
+                  v-model="newShift.assigned_user_id"
+                  :items="departmentWorkers"
+                  :item-title="w => `${w.fName} ${w.lName}`"
+                  item-value="userId"
+                  label="Assign Worker (optional)"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  prepend-inner-icon="mdi-account-outline"
+                ></v-select>
+              </v-col>
+              <!-- Optional: Tasks -->
+              <v-col cols="12">
+                <v-combobox
+                  v-model="newShift.tasks"
+                  label="Add Tasks (optional)"
+                  variant="outlined"
+                  multiple
+                  chips
+                  closable-chips
+                  hide-details
+                  prepend-inner-icon="mdi-format-list-checks"
+                  hint="Type a task name and press Enter to add"
+                  persistent-hint
+                ></v-combobox>
               </v-col>
               <v-col cols="12">
                 <v-checkbox v-model="newShift.is_published" label="Publish immediately" hide-details></v-checkbox>
@@ -190,11 +262,22 @@ import { ref, computed, onMounted } from 'vue'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import Utils from '../config/utils.js'
+
+// Department context (auto-determined from stored context)
+const deptContext = Utils.getStore('currentDepartmentContext') || {}
+const currentDeptId = deptContext.department_id || null
+const currentDeptName = deptContext.department_name || ''
 
 const currentDate = ref(new Date())
 const shifts = ref([])
 const departments = ref([])
 const positions = ref([])
+const departmentWorkers = ref([])
+const filters = ref({
+  position_id: null,
+  shift_date: null
+})
 
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
@@ -202,11 +285,13 @@ const showAssignDialog = ref(false)
 const createFormRef = ref(null)
 const createFormValid = ref(false)
 const newShift = ref({
-  department_id: null,
+  department_id: currentDeptId,
   position_id: null,
   shift_date: '',
   start_time: '',
   end_time: '',
+  assigned_user_id: null,
+  tasks: [],
   is_published: false
 })
 
@@ -220,47 +305,25 @@ const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
-const timeSlots = Array.from({ length: 19 }, (_, i) => i + 6)
+// Data table
+const headers = [
+  { title: 'Date', key: 'shift_date', sortable: true },
+  { title: 'Time', key: 'time', sortable: false },
+  { title: 'Position', key: 'position', sortable: false },
+  { title: 'Assigned To', key: 'assigned_user', sortable: false },
+  { title: 'Status', key: 'status', sortable: false },
+  { title: 'Actions', key: 'actions', sortable: false, width: 120 }
+]
 
-const currentMonthYear = computed(() => {
-  return currentDate.value.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric'
-  })
-})
+// Computed
+const filteredShifts = computed(() => {
+  let filtered = shifts.value
 
-const currentGreetingDate = computed(() => {
-  const formattedDate = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  }).format(new Date())
-
-  return `It's ${formattedDate}`
-})
-
-const weekDays = computed(() => {
-  const days = []
-  const startOfWeek = new Date(currentDate.value)
-  const day = startOfWeek.getDay()
-  const diff = startOfWeek.getDate() - day
-  startOfWeek.setDate(diff)
-
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(startOfWeek)
-    date.setDate(startOfWeek.getDate() + i)
-
-    const today = new Date()
-    const isToday = date.toDateString() === today.toDateString()
-    const isoDate = date.toISOString().split('T')[0]
-
-    days.push({
-      name: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i],
-      date: date.getDate(),
-      isToday,
-      isoDate
-    })
+  if (filters.value.position_id) {
+    filtered = filtered.filter(shift => shift.position_id === filters.value.position_id)
+  }
+  if (filters.value.shift_date) {
+    filtered = filtered.filter(shift => shift.shift_date === filters.value.shift_date)
   }
 
   return days
@@ -353,7 +416,9 @@ const openAddToSchedule = () => {
 const loadShifts = async () => {
   try {
     shiftsLoading.value = true
-    const response = await shiftService.listShifts({})
+    const params = { ...filters.value }
+    if (currentDeptId) params.department_id = currentDeptId
+    const response = await shiftService.listShifts(params)
     shifts.value = response.data || []
   } catch (error) {
     console.error('Error loading shifts:', error)
@@ -361,6 +426,19 @@ const loadShifts = async () => {
     showError.value = true
   } finally {
     shiftsLoading.value = false
+  }
+}
+
+const loadDepartmentWorkers = async () => {
+  if (!currentDeptId) return
+  try {
+    const response = await apiClient.get(`/user-departments?departmentId=${currentDeptId}&status=approved`)
+    const assignments = response?.data?.data || response?.data || []
+    departmentWorkers.value = assignments
+      .map(a => a.user || a)
+      .filter(u => u && u.userId)
+  } catch (error) {
+    console.error('Error loading department workers:', error)
   }
 }
 
@@ -387,17 +465,43 @@ const createShift = async () => {
 
   try {
     creating.value = true
-    await shiftService.createShift(newShift.value)
 
+    const shiftPayload = {
+      department_id: currentDeptId,
+      position_id: newShift.value.position_id,
+      shift_date: newShift.value.shift_date,
+      start_time: newShift.value.start_time,
+      end_time: newShift.value.end_time,
+      assigned_user_id: newShift.value.assigned_user_id || null,
+      is_published: newShift.value.is_published
+    }
+    
+    const response = await shiftService.createShift(shiftPayload)
+    const createdShift = response.data
+
+    // Create tasks if any were specified
+    if (newShift.value.tasks && newShift.value.tasks.length > 0) {
+      const shiftId = createdShift?.shift_id || createdShift?.data?.shift_id
+      if (shiftId) {
+        await Promise.all(
+          newShift.value.tasks.map(taskName =>
+            apiClient.post('/shift-tasks', { shiftId, taskName })
+          )
+        )
+      }
+    }
+    
     successMessage.value = 'Shift created successfully!'
     showSuccess.value = true
 
     newShift.value = {
-      department_id: null,
+      department_id: currentDeptId,
       position_id: null,
       shift_date: '',
       start_time: '',
       end_time: '',
+      assigned_user_id: null,
+      tasks: [],
       is_published: false
     }
     showCreateDialog.value = false
@@ -420,7 +524,11 @@ const onShiftAssigned = (assignmentData) => {
 }
 
 onMounted(() => {
-  Promise.all([loadShifts(), loadDepartments(), loadPositions()])
+  Promise.all([
+    loadShifts(),
+    loadPositions(),
+    loadDepartmentWorkers()
+  ])
 })
 </script>
 

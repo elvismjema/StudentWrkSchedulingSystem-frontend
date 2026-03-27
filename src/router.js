@@ -138,6 +138,11 @@ const router = createRouter({
           component: ShiftManagement,
         },
         {
+          path: "templates",
+          name: "manager-templates",
+          component: () => import("./views/ScheduleTemplates.vue"),
+        },
+        {
           path: "create-shift",
           name: "manager-create-shift",
           redirect: { name: "manager-schedule" },
@@ -151,7 +156,7 @@ const router = createRouter({
         {
           path: "approvals",
           name: "manager-approvals",
-          component: () => import("./views/ManagerJoinRequests.vue")
+          component: () => import("./views/ManagerApprovals.vue")
         },
         {
           path: "time-attendance",

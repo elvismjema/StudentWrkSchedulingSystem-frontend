@@ -147,43 +147,29 @@ defineExpose({
   font-size: 19px;
   font-weight: 700;
   color: #1f2328;
-  line-height: 1.05;
 }
 
 .brand-subtitle {
-  margin-top: 4px;
-  font-size: 15px;
+  font-size: 14px;
   color: #667085;
-  line-height: 1.1;
 }
 
 .manager-nav {
-  padding: 12px 0;
+  padding: 8px 12px;
 }
 
 .manager-nav-item {
-  margin: 3px 12px;
   border-radius: 12px;
-  min-height: 48px;
-}
-
-.manager-nav-item:hover {
-  background: #f7f7f8;
+  min-height: 66px;
 }
 
 .manager-active-nav-item {
-  background: #f8ecef !important;
-  color: #930033 !important;
-}
-
-.manager-active-nav-item .v-icon,
-.manager-active-nav-item .v-list-item-title {
-  color: #930033 !important;
-  font-weight: 600;
+  background: #f0f6ff;
+  color: #0969da;
 }
 
 .manager-user-wrap {
-  padding: 10px;
+  padding: 8px 12px;
 }
 
 .manager-user-item {

@@ -11,8 +11,8 @@
       <div class="brand-row">
         <div class="oc-badge">OC</div>
         <div v-if="!rail" class="brand-text">
-          <div class="brand-title">Oklahoma Christian</div>
-          <div class="brand-subtitle">Student Worker Scheduling</div>
+          <div class="brand-title">{{ displayDepartment }}</div>
+          <div class="brand-subtitle">{{ displayRole }}</div>
         </div>
       </div>
     </div>
@@ -77,8 +77,13 @@ const displayName = computed(() => {
 });
 
 const displayRole = computed(() => {
-  const role = (user.value?.role || "student").toLowerCase();
-  return role === "manager" ? "Manager" : "Student";
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.role_name || "Manager";
+});
+
+const displayDepartment = computed(() => {
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.department_name || "Student Worker Scheduling";
 });
 
 const displayInitial = computed(() => {

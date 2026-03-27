@@ -11,8 +11,8 @@
       <div class="brand-row">
         <div class="oc-badge">OC</div>
         <div v-if="!rail" class="brand-text">
-          <div class="brand-title">Oklahoma Christian</div>
-          <div class="brand-subtitle">System Administration</div>
+          <div class="brand-title">{{ displayDepartment }}</div>
+          <div class="brand-subtitle">{{ displayRole }}</div>
         </div>
       </div>
     </div>
@@ -79,6 +79,11 @@ const displayName = computed(() => {
 const displayRole = computed(() => {
   const context = Utils.getStore("currentDepartmentContext");
   return context?.role_name || "Administrator";
+});
+
+const displayDepartment = computed(() => {
+  const context = Utils.getStore("currentDepartmentContext");
+  return context?.department_name || "System Administration";
 });
 
 const displayInitial = computed(() => {

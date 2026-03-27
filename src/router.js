@@ -9,11 +9,9 @@ import ViewTutorial from "./views/ViewTutorial.vue";
 import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
-
-import StudentQualifications from "./views/StudentQualifications.vue";
-import ShiftManagement from "./views/ShiftManagement.vue";
-
 import Manager from "./views/Manager.vue";
+import Admin from "./views/Admin.vue";
+import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {
   const user = Utils.getStore("user");
@@ -21,11 +19,11 @@ const getStoredRole = () => {
 };
 
 const getDefaultDashboardRoute = () => {
-  return getStoredRole() === "manager"
-    ? { name: "manager-dashboard" }
-    : { name: "student-schedule" };
+  const role = getStoredRole();
+  if (role === "admin") return { name: "admin-dashboard" };
+  if (role === "manager") return { name: "manager-dashboard" };
+  return { name: "student-schedule" };
 };
-
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -88,7 +86,7 @@ const router = createRouter({
         },
         {
           path: "availability",
-          name: "student-availability", 
+          name: "student-availability",
           component: () => import("./views/StudentAvailability.vue")
         },
         {
@@ -100,6 +98,11 @@ const router = createRouter({
           path: "clock",
           name: "student-clock",
           component: () => import("./views/StudentClock.vue")
+        },
+        {
+          path: "tasks",
+          name: "student-tasks",
+          component: () => import("./views/StudentTasks.vue")
         },
         {
           path: "notifications",
@@ -124,6 +127,7 @@ const router = createRouter({
       component: Manager,
       redirect: { name: "manager-dashboard" },
       children: [
+
         {
           path: "qualifications",
           name: "manager-qualifications",
@@ -134,6 +138,7 @@ const router = createRouter({
           name: "manager-shifts",
           component: ShiftManagement
         },
+
         {
           path: "dashboard",
           name: "manager-dashboard",
@@ -142,14 +147,17 @@ const router = createRouter({
         {
           path: "schedule",
           name: "manager-schedule",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Schedule", description: "Build and manage worker schedules in this view." }
+          component: ShiftManagement,
+        },
+        {
+          path: "templates",
+          name: "manager-templates",
+          component: () => import("./views/ScheduleTemplates.vue"),
         },
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Create Shift", description: "Create and assign new shifts for workers." }
+          redirect: { name: "manager-schedule" },
         },
         {
           path: "availability",
@@ -160,8 +168,7 @@ const router = createRouter({
         {
           path: "approvals",
           name: "manager-approvals",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Approvals", description: "Approve or reject pending requests." }
+          component: () => import("./views/ManagerApprovals.vue")
         },
         {
           path: "time-attendance",
@@ -172,8 +179,7 @@ const router = createRouter({
         {
           path: "workers",
           name: "manager-workers",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Workers", description: "View and manage worker profiles." }
+          component: () => import("./views/UserManagement.vue"),
         },
         {
           path: "tasks",
@@ -194,74 +200,101 @@ const router = createRouter({
           props: { title: "Notifications", description: "Review manager alerts and notifications." }
         },
         {
+          path: "profile",
+          name: "manager-profile",
+          component: () => import("./views/ManagerProfile.vue"),
+        },
+        {
           path: "settings",
           name: "manager-settings",
-          component: () => import("./views/DepartmentSettings.vue")
-        }
+          component: () => import("./views/DepartmentSettings.vue"),
+        },
+        // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "admin/users",
+          name: "manager-admin-users",
+          component: () => import("./views/AdminUsers.vue"),
+        },
+        {
+          path: "admin/departments",
+          name: "manager-admin-departments",
+          component: () => import("./views/DepartmentSettings.vue"),
+        },
       ]
     },
     {
       path: "/admin",
       name: "admin",
-      component: () => import("./views/Manager.vue"),
+      component: Admin,
+      redirect: { name: "admin-dashboard" },
       children: [
         {
-          path: "",
+          path: "dashboard",
           name: "admin-dashboard",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Admin Dashboard", description: "System-wide administration and oversight." }
+          component: () => import("./views/ManagerDashboard.vue"),
         },
         {
           path: "users",
           name: "admin-users",
-          component: () => import("./views/UserManagement.vue")
+          component: () => import("./views/AdminUsers.vue"),
         },
         {
           path: "departments",
           name: "admin-departments",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Departments", description: "Manage departments and organizational structure." }
+          component: () => import("./views/DepartmentSettings.vue"),
         },
         {
           path: "reports",
           name: "admin-reports",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "System Reports", description: "Generate system-wide reports and analytics." }
+          props: { title: "Reports", description: "View system-wide staffing and operations reports." }
+        },
+        {
+          path: "profile",
+          name: "admin-profile",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "Profile", description: "Review your admin account profile and access details." }
         },
         {
           path: "settings",
           name: "admin-settings",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
+          props: { title: "System Settings", description: "Manage global system configuration." }
         }
       ]
     },
+
+    }
 
   ],
 });
 
 router.beforeEach((to) => {
   const role = getStoredRole();
-  const user = Utils.getStore("user");
-  const departmentContext = Utils.getStore("currentDepartmentContext");
 
   if (!role || to.name === "login") {
     return true;
   }
 
-  // Check for admin role - can be based on permission level
-  const isAdmin = departmentContext?.permission_level >= 90;
-
-  if (to.path.startsWith("/admin") && !isAdmin) {
-    return role === "manager" ? { name: "manager-dashboard" } : { name: "student-schedule" };
-  }
-
-  if (to.path.startsWith("/manager") && role !== "manager" && !isAdmin) {
+  if (to.path.startsWith("/manager") && role !== "manager" && role !== "admin") {
     return { name: "student-schedule" };
   }
 
-  if (to.path.startsWith("/student") && (role === "manager" || isAdmin)) {
-    return isAdmin ? { name: "admin-dashboard" } : { name: "manager-dashboard" };
+  // Admin-only routes under manager path — managers without admin role are redirected.
+  if (to.path.startsWith("/manager/admin") && role !== "admin") {
+    return { name: "manager-dashboard" };
+  }
+
+  if (to.path.startsWith("/admin") && role !== "admin") {
+    return role === "manager" ? { name: "manager-dashboard" } : { name: "student-schedule" };
+  }
+
+  if (to.path.startsWith("/manager") && role === "admin" && !to.path.startsWith("/manager/admin")) {
+    return { name: "admin-dashboard" };
+  }
+
+  if (to.path.startsWith("/student") && (role === "manager" || role === "admin")) {
+    return role === "admin" ? { name: "admin-dashboard" } : { name: "manager-dashboard" };
   }
 
   return true;

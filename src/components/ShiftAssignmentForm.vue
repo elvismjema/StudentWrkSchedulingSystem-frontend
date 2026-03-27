@@ -43,7 +43,6 @@
             :rules="[v => !!v || 'Please select a student']"
             :loading="usersLoading"
             :disabled="usersLoading"
-            return-object
             clearable
           >
             <template v-slot:item="{ props, item }">
@@ -63,13 +62,6 @@
           </v-select>
         </div>
 
-        <!-- Qualification Validation -->
-        <ShiftAssignmentValidator
-          v-if="selectedUserId && shiftInfo.position_id"
-          :user-id="selectedUserId"
-          :position-id="shiftInfo.position_id"
-          @validation-complete="onValidationComplete"
-        />
       </v-form>
     </v-card-text>
     
@@ -112,9 +104,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import ShiftAssignmentValidator from './ShiftAssignmentValidator.vue'
-import qualificationService from '@/services/qualificationService'
-import shiftService from '@/services/shiftService.js'
+import shiftService from '../services/shiftService.js'
+import UserRoleServices from '../services/userRoleServices.js'
 
 const props = defineProps({
   shiftInfo: {
@@ -134,7 +125,7 @@ const usersLoading = ref(false)
 const assigning = ref(false)
 
 // Validation state
-const canAssign = ref(false)
+const canAssign = computed(() => Boolean(selectedUserId.value))
 
 // UI state
 const showSuccess = ref(false)
@@ -164,13 +155,37 @@ const formatDate = (dateString) => {
 const loadAvailableUsers = async () => {
   try {
     usersLoading.value = true
-    // This would typically call a service to get available users for the shift
-    // For now, we'll use the qualification service to get students
-    const response = await qualificationService.getStudentsWithQualifications()
-    availableUsers.value = (response.data || []).map(student => ({
-      ...student,
-      display_name: `${student.first_name} ${student.last_name}`
-    }))
+    const response = await UserRoleServices.getAllUsersWithRoles(true)
+    const users = response?.data || []
+
+    const departmentMembers = users.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) =>
+          Number(membership.department_id) === Number(props.shiftInfo.department_id),
+      ),
+    )
+
+    const studentMembers = departmentMembers.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) =>
+          Number(membership.department_id) === Number(props.shiftInfo.department_id) &&
+          String(membership?.role?.role_name || "").toLowerCase().includes("student"),
+      ),
+    )
+
+    const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers
+
+    availableUsers.value = candidateUsers
+      .filter((user) =>
+        Number(user.id) !== Number(props.shiftInfo.created_by),
+      )
+      .map((user) => ({
+        user_id: user.id,
+        first_name: user.fName,
+        last_name: user.lName,
+        email: user.email,
+        display_name: `${user.fName || ""} ${user.lName || ""}`.trim(),
+      }))
   } catch (error) {
     console.error('Error loading available users:', error)
     errorMessage.value = 'Failed to load available students'
@@ -180,23 +195,15 @@ const loadAvailableUsers = async () => {
   }
 }
 
-const onValidationComplete = (result) => {
-  canAssign.value = result.isValid
-}
-
 const assignShift = async () => {
   if (!formValid.value || !canAssign.value) return
 
   try {
     assigning.value = true
     
-    // Call the shift service to assign the user
-    const shiftData = {
-      ...props.shiftInfo,
+    await shiftService.updateShift(props.shiftInfo.shift_id, {
       assigned_user_id: selectedUserId.value
-    }
-
-    await shiftService.updateShift(props.shiftInfo.shift_id, shiftData)
+    })
     
     successMessage.value = `Shift assigned to ${selectedUser.value.display_name} successfully!`
     showSuccess.value = true
@@ -215,13 +222,8 @@ const assignShift = async () => {
     
   } catch (error) {
     console.error('Error assigning shift:', error)
-    
-    if (error.response?.status === 400 && error.response?.data?.missingQualifications) {
-      // Handle qualification validation error from backend
-      errorMessage.value = error.response.data.message || 'Student does not meet qualification requirements.'
-    } else {
-      errorMessage.value = 'Failed to assign shift. Please try again.'
-    }
+
+    errorMessage.value = error?.response?.data?.message || 'Failed to assign shift. Please try again.'
     showError.value = true
   } finally {
     assigning.value = false

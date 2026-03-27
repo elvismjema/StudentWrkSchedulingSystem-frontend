@@ -3,7 +3,7 @@
     <v-card class="management-card" elevation="2">
       <v-card-title class="text-h4 mb-4">
         <v-icon left>mdi-account-multiple</v-icon>
-        User Management
+        Student Workers
       </v-card-title>
 
       <v-card-text>
@@ -22,27 +22,15 @@
 
         <!-- Search and Filter -->
         <v-row class="mb-4">
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="12">
             <v-text-field
               v-model="searchQuery"
-              label="Search users..."
+              label="Search"
               prepend-inner-icon="mdi-magnify"
               outlined
               dense
               clearable
             ></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6">
-            <v-select
-              v-model="filterDepartment"
-              :items="departments"
-              item-title="department_name"
-              item-value="department_id"
-              label="Filter by Department"
-              outlined
-              dense
-              clearable
-            ></v-select>
           </v-col>
         </v-row>
 
@@ -292,7 +280,6 @@ const availableRoles = ref([]);
 const availablePositions = ref([]);
 
 const searchQuery = ref('');
-const filterDepartment = ref(null);
 
 const assignRoleDialog = ref(false);
 const selectedUser = ref(null);
@@ -322,17 +309,7 @@ const headers = [
 
 // Computed
 const filteredUsers = computed(() => {
-  let filtered = users.value;
-
-  if (filterDepartment.value) {
-    filtered = filtered.filter(user => 
-      user.userDepartments?.some(ud => 
-        ud.department_id === filterDepartment.value
-      )
-    );
-  }
-
-  return filtered;
+  return users.value;
 });
 
 // Methods

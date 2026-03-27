@@ -145,7 +145,7 @@ const router = createRouter({
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: ShiftManagement,
+          redirect: { name: "manager-schedule" },
         },
         {
           path: "availability",
@@ -190,8 +190,7 @@ const router = createRouter({
         {
           path: "profile",
           name: "manager-profile",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Profile", description: "Review your account profile and role details." }
+          component: () => import("./views/ManagerProfile.vue"),
         },
         {
           path: "settings",

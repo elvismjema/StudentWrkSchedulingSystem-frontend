@@ -22,20 +22,7 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="3">
-            <v-select
-              v-model="filters.department_id"
-              :items="departments"
-              item-title="department_name"
-              item-value="department_id"
-              label="Department"
-              variant="outlined"
-              density="compact"
-              clearable
-              hide-details
-            ></v-select>
-          </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="4">
             <v-select
               v-model="filters.position_id"
               :items="positions"
@@ -48,7 +35,7 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="4">
             <v-text-field
               v-model="filters.shift_date"
               type="date"
@@ -59,7 +46,7 @@
               hide-details
             ></v-text-field>
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="4">
             <v-btn
               @click="loadShifts"
               color="primary"
@@ -198,29 +185,30 @@
     </v-card>
 
     <!-- Create/Edit Shift Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="600px">
+    <v-dialog v-model="showCreateDialog" max-width="640px">
       <v-card>
         <v-card-title>
           <v-icon class="mr-2">mdi-plus</v-icon>
           Create New Shift
         </v-card-title>
+
+        <!-- Department context banner -->
+        <v-alert
+          v-if="currentDeptName"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mx-4 mt-2"
+          icon="mdi-office-building"
+        >
+          Creating shift for: <strong>{{ currentDeptName }}</strong>
+        </v-alert>
         
         <v-divider></v-divider>
         
         <v-card-text>
           <v-form ref="createFormRef" v-model="createFormValid">
             <v-row>
-              <v-col cols="12" md="6">
-                <v-select
-                  v-model="newShift.department_id"
-                  :items="departments"
-                  item-title="department_name"
-                  item-value="department_id"
-                  label="Department"
-                  variant="outlined"
-                  :rules="[v => !!v || 'Department is required']"
-                ></v-select>
-              </v-col>
               <v-col cols="12" md="6">
                 <v-select
                   v-model="newShift.position_id"
@@ -258,6 +246,35 @@
                   variant="outlined"
                   :rules="[v => !!v || 'End time is required']"
                 ></v-text-field>
+              </v-col>
+              <!-- Optional: Assign Worker -->
+              <v-col cols="12">
+                <v-select
+                  v-model="newShift.assigned_user_id"
+                  :items="departmentWorkers"
+                  :item-title="w => `${w.fName} ${w.lName}`"
+                  item-value="userId"
+                  label="Assign Worker (optional)"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  prepend-inner-icon="mdi-account-outline"
+                ></v-select>
+              </v-col>
+              <!-- Optional: Tasks -->
+              <v-col cols="12">
+                <v-combobox
+                  v-model="newShift.tasks"
+                  label="Add Tasks (optional)"
+                  variant="outlined"
+                  multiple
+                  chips
+                  closable-chips
+                  hide-details
+                  prepend-inner-icon="mdi-format-list-checks"
+                  hint="Type a task name and press Enter to add"
+                  persistent-hint
+                ></v-combobox>
               </v-col>
               <v-col cols="12">
                 <v-checkbox
@@ -322,13 +339,19 @@ import { ref, computed, onMounted } from 'vue'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import Utils from '../config/utils.js'
+
+// Department context (auto-determined from stored context)
+const deptContext = Utils.getStore('currentDepartmentContext') || {}
+const currentDeptId = deptContext.department_id || null
+const currentDeptName = deptContext.department_name || ''
 
 // State
 const shifts = ref([])
 const departments = ref([])
 const positions = ref([])
+const departmentWorkers = ref([])
 const filters = ref({
-  department_id: null,
   position_id: null,
   shift_date: null
 })
@@ -341,11 +364,13 @@ const showAssignDialog = ref(false)
 const createFormRef = ref(null)
 const createFormValid = ref(false)
 const newShift = ref({
-  department_id: null,
+  department_id: currentDeptId,
   position_id: null,
   shift_date: '',
   start_time: '',
   end_time: '',
+  assigned_user_id: null,
+  tasks: [],
   is_published: false
 })
 
@@ -376,9 +401,6 @@ const headers = [
 const filteredShifts = computed(() => {
   let filtered = shifts.value
 
-  if (filters.value.department_id) {
-    filtered = filtered.filter(shift => shift.department_id === filters.value.department_id)
-  }
   if (filters.value.position_id) {
     filtered = filtered.filter(shift => shift.position_id === filters.value.position_id)
   }
@@ -415,7 +437,9 @@ const getStatusColor = (isPublished) => {
 const loadShifts = async () => {
   try {
     shiftsLoading.value = true
-    const response = await shiftService.listShifts(filters.value)
+    const params = { ...filters.value }
+    if (currentDeptId) params.department_id = currentDeptId
+    const response = await shiftService.listShifts(params)
     shifts.value = response.data || []
   } catch (error) {
     console.error('Error loading shifts:', error)
@@ -423,6 +447,19 @@ const loadShifts = async () => {
     showError.value = true
   } finally {
     shiftsLoading.value = false
+  }
+}
+
+const loadDepartmentWorkers = async () => {
+  if (!currentDeptId) return
+  try {
+    const response = await apiClient.get(`/user-departments?departmentId=${currentDeptId}&status=approved`)
+    const assignments = response?.data?.data || response?.data || []
+    departmentWorkers.value = assignments
+      .map(a => a.user || a)
+      .filter(u => u && u.userId)
+  } catch (error) {
+    console.error('Error loading department workers:', error)
   }
 }
 
@@ -449,19 +486,44 @@ const createShift = async () => {
 
   try {
     creating.value = true
+
+    const shiftPayload = {
+      department_id: currentDeptId,
+      position_id: newShift.value.position_id,
+      shift_date: newShift.value.shift_date,
+      start_time: newShift.value.start_time,
+      end_time: newShift.value.end_time,
+      assigned_user_id: newShift.value.assigned_user_id || null,
+      is_published: newShift.value.is_published
+    }
     
-    const response = await shiftService.createShift(newShift.value)
+    const response = await shiftService.createShift(shiftPayload)
+    const createdShift = response.data
+
+    // Create tasks if any were specified
+    if (newShift.value.tasks && newShift.value.tasks.length > 0) {
+      const shiftId = createdShift?.shift_id || createdShift?.data?.shift_id
+      if (shiftId) {
+        await Promise.all(
+          newShift.value.tasks.map(taskName =>
+            apiClient.post('/shift-tasks', { shiftId, taskName })
+          )
+        )
+      }
+    }
     
     successMessage.value = 'Shift created successfully!'
     showSuccess.value = true
     
     // Reset form and close dialog
     newShift.value = {
-      department_id: null,
+      department_id: currentDeptId,
       position_id: null,
       shift_date: '',
       start_time: '',
       end_time: '',
+      assigned_user_id: null,
+      tasks: [],
       is_published: false
     }
     showCreateDialog.value = false
@@ -516,8 +578,8 @@ const onShiftAssigned = (assignmentData) => {
 onMounted(() => {
   Promise.all([
     loadShifts(),
-    loadDepartments(),
-    loadPositions()
+    loadPositions(),
+    loadDepartmentWorkers()
   ])
 })
 </script>

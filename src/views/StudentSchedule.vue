@@ -1,8 +1,34 @@
 <template>
   <div class="schedule-container">
     <div class="greeting-banner">
-      <h2 class="greeting-title">Hi There</h2>
-      <p class="greeting-date">{{ currentGreetingDate }}</p>
+      <div>
+        <h2 class="greeting-title">Hi There</h2>
+        <p class="greeting-date">{{ currentGreetingDate }}</p>
+      </div>
+
+      <!-- Clock In/Out Widget -->
+      <v-card class="clock-widget" elevation="0" rounded="lg">
+        <div class="clock-widget-inner">
+          <div class="clock-widget-info">
+            <div class="clock-widget-label">Today's Status</div>
+            <div v-if="isClockedIn" class="clock-widget-time">
+              <v-icon size="14" color="success" class="mr-1">mdi-circle</v-icon>
+              Clocked in · {{ activeDurationLabel }}
+            </div>
+            <div v-else class="clock-widget-time text-medium-emphasis">Not clocked in</div>
+          </div>
+          <v-btn
+            :color="isClockedIn ? 'error' : 'success'"
+            variant="flat"
+            rounded="lg"
+            size="small"
+            :prepend-icon="isClockedIn ? 'mdi-clock-out' : 'mdi-clock-in'"
+            @click="toggleClock"
+          >
+            {{ isClockedIn ? 'Clock Out' : 'Clock In' }}
+          </v-btn>
+        </div>
+      </v-card>
     </div>
 
     <!-- Header with Month/Year Navigation -->
@@ -81,9 +107,34 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 
 const currentDate = ref(new Date())
+
+// --- Clock In/Out ---
+const isClockedIn = ref(false)
+const clockInTime = ref(null)
+const clockNow = ref(new Date())
+let clockTimer = null
+
+const activeDurationLabel = computed(() => {
+  if (!clockInTime.value) return ''
+  const diffMs = clockNow.value.getTime() - clockInTime.value.getTime()
+  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+})
+
+const toggleClock = () => {
+  if (!isClockedIn.value) {
+    clockInTime.value = new Date()
+    isClockedIn.value = true
+  } else {
+    isClockedIn.value = false
+    clockInTime.value = null
+  }
+}
 
 const currentMonthYear = computed(() => {
   return currentDate.value.toLocaleDateString('en-US', { 
@@ -152,6 +203,14 @@ const goToToday = () => {
   currentDate.value = new Date()
 }
 
+onMounted(() => {
+  clockTimer = setInterval(() => { clockNow.value = new Date() }, 1000)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(clockTimer)
+})
+
 </script>
 
 <style scoped>
@@ -210,6 +269,37 @@ const goToToday = () => {
   align-items: center;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.clock-widget {
+  border: 1px solid #e3e5e8;
+  background: white;
+  min-width: 220px;
+}
+
+.clock-widget-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.clock-widget-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8B1538;
+  margin-bottom: 2px;
+}
+
+.clock-widget-time {
+  font-size: 13px;
+  color: #555;
+  display: flex;
+  align-items: center;
 }
 
 .greeting-title {

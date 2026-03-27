@@ -4,12 +4,21 @@
     <div class="page-header">
       <h1 class="page-title">My Availability</h1>
       <p class="page-subtitle">
-        Click on time slots to mark when you're available to work. Green slots indicate availability.
+        Click on time slots to mark when you're available or unavailable to work.
       </p>
     </div>
 
-    <!-- Action Buttons -->
+    <!-- Mode Toggle + Action Buttons -->
     <div class="action-buttons">
+      <v-btn-toggle v-model="gridMode" mandatory color="#0D9488" rounded="lg" density="comfortable">
+        <v-btn value="available" prepend-icon="mdi-calendar-check">
+          Mark Available
+        </v-btn>
+        <v-btn value="unavailable" prepend-icon="mdi-calendar-remove" color="error">
+          Mark Unavailable
+        </v-btn>
+      </v-btn-toggle>
+      <v-spacer />
       <v-btn
         color="#0D9488"
         variant="flat"
@@ -41,7 +50,11 @@
               v-for="day in days"
               :key="`${day.value}-${hour.value}`"
               class="slot-cell"
-              :class="{ selected: isSelected(day.value, hour.value), disabled: hour.disabled }"
+              :class="{
+                'available': isAvailable(day.value, hour.value),
+                'unavailable-slot': isUnavailable(day.value, hour.value),
+                disabled: hour.disabled
+              }"
               @click="hour.disabled ? null : openTimeRangeDialog(day, hour.value)"
             />
           </tr>
@@ -54,11 +67,13 @@
       <v-card>
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-clock-outline" class="mr-2" />
-          Set Availability — {{ timeRangeForm.dayLabel }}
+          {{ gridMode === 'available' ? 'Set Availability' : 'Set Unavailability' }} — {{ timeRangeForm.dayLabel }}
         </v-card-title>
         <v-card-text>
           <p class="text-body-2 text-grey mb-4">
-            Choose the time range you are available on <strong>{{ timeRangeForm.dayLabel }}</strong>.
+            Choose the time range you are
+            <strong>{{ gridMode === 'available' ? 'available' : 'unavailable' }}</strong>
+            on <strong>{{ timeRangeForm.dayLabel }}</strong>.
           </p>
           <v-row>
             <v-col cols="6">
@@ -94,11 +109,11 @@
       </v-card>
     </v-dialog>
 
-    <!-- Availability Exceptions -->
+    <!-- Time Off Requests (formerly Availability Exceptions) -->
     <div class="exceptions-section">
-      <h2 class="exceptions-title">Availability Exceptions</h2>
+      <h2 class="exceptions-title">Time Off Requests</h2>
       <p class="exceptions-subtitle">
-        Mark specific dates when your availability differs from the regular schedule.
+        Request specific dates when you are unavailable — your manager will review and approve.
       </p>
 
       <!-- Existing exceptions list -->
@@ -124,15 +139,15 @@
         </v-card>
       </div>
 
-      <v-btn variant="outlined" size="small" class="mt-3" @click="showExceptionDialog = true">
-        Add Exception
+      <v-btn variant="outlined" size="small" class="mt-3" prepend-icon="mdi-calendar-plus" @click="showExceptionDialog = true">
+        Request Time Off
       </v-btn>
     </div>
 
     <!-- Exception Dialog -->
     <v-dialog v-model="showExceptionDialog" max-width="480">
       <v-card>
-        <v-card-title>Add Exception</v-card-title>
+        <v-card-title>Request Time Off</v-card-title>
         <v-card-text>
           <v-form ref="exceptionFormRef" v-model="exceptionFormValid">
             <v-text-field
@@ -202,8 +217,11 @@ const userId = currentUser.userId;
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
-const selectedSlots = ref(new Set());
+const gridMode = ref('available'); // 'available' | 'unavailable'
+const selectedSlots = ref(new Set()); // available (green)
+const unavailableSlots = ref(new Set()); // unavailable (red)
 const initialSlots = ref(new Set());
+const initialUnavailableSlots = ref(new Set());
 const existingRecords = ref([]);
 const showExceptionDialog = ref(false);
 const exceptionFormRef = ref(null);
@@ -247,6 +265,10 @@ const hasChanges = computed(() => {
   for (const key of selectedSlots.value) {
     if (!initialSlots.value.has(key)) return true;
   }
+  if (unavailableSlots.value.size !== initialUnavailableSlots.value.size) return true;
+  for (const key of unavailableSlots.value) {
+    if (!initialUnavailableSlots.value.has(key)) return true;
+  }
   return false;
 });
 
@@ -257,7 +279,10 @@ const exceptions = computed(() =>
 // --- Helpers ---
 const slotKey = (day, hour) => `${day}-${hour}`;
 
-const isSelected = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
+const isAvailable = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
+const isUnavailable = (day, hour) => unavailableSlots.value.has(slotKey(day, hour));
+// Keep isSelected as alias for backward compat
+const isSelected = isAvailable;
 
 const notify = (text, color = "success") => {
   snackbar.value = { show: true, text, color };
@@ -323,33 +348,50 @@ const applyTimeRange = () => {
     return;
   }
 
-  const updated = new Set(selectedSlots.value);
-  // Clear existing slots for this day
+  const targetSet = gridMode.value === 'available' ? selectedSlots : unavailableSlots;
+  const otherSet = gridMode.value === 'available' ? unavailableSlots : selectedSlots;
+
+  const updated = new Set(targetSet.value);
+  const updatedOther = new Set(otherSet.value);
+
+  // Clear existing slots for this day in both sets
   for (const key of [...updated]) {
     if (key.startsWith(`${dayValue}-`)) updated.delete(key);
   }
+  for (const key of [...updatedOther]) {
+    if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
+  }
+
   // Fill slots for the range (round to full hours)
-  const effectiveStart = startM > 0 ? startH : startH;
+  const effectiveStart = startH;
   const effectiveEnd = endM > 0 ? endH + 1 : endH;
   for (let h = effectiveStart; h < effectiveEnd && h <= 24; h++) {
     if (h >= 6) updated.add(slotKey(dayValue, h));
   }
-  selectedSlots.value = updated;
+
+  targetSet.value = updated;
+  otherSet.value = updatedOther;
   showTimeRangeDialog.value = false;
 };
 
 const clearDaySlots = () => {
   const { dayValue } = timeRangeForm.value;
-  const updated = new Set(selectedSlots.value);
-  for (const key of [...updated]) {
-    if (key.startsWith(`${dayValue}-`)) updated.delete(key);
+  const updatedAvail = new Set(selectedSlots.value);
+  const updatedUnavail = new Set(unavailableSlots.value);
+  for (const key of [...updatedAvail]) {
+    if (key.startsWith(`${dayValue}-`)) updatedAvail.delete(key);
   }
-  selectedSlots.value = updated;
+  for (const key of [...updatedUnavail]) {
+    if (key.startsWith(`${dayValue}-`)) updatedUnavail.delete(key);
+  }
+  selectedSlots.value = updatedAvail;
+  unavailableSlots.value = updatedUnavail;
   showTimeRangeDialog.value = false;
 };
 
 const clearAll = () => {
   selectedSlots.value = new Set();
+  unavailableSlots.value = new Set();
 };
 
 // --- API ---
@@ -361,18 +403,22 @@ const loadAvailabilities = async () => {
     const records = response.data || [];
     existingRecords.value = records;
 
-    const slots = new Set();
+    const availSlots = new Set();
+    const unavailSlots = new Set();
     for (const rec of records) {
       if (rec.specificDate && !rec.isRecurring) continue;
       if (rec.dayOfWeek == null) continue;
       const startHour = parseInt(String(rec.startTime).split(":")[0], 10);
       const endHour = parseInt(String(rec.endTime).split(":")[0], 10);
+      const targetSet = rec.availabilityType === 'unavailable' ? unavailSlots : availSlots;
       for (let h = startHour; h < endHour; h++) {
-        slots.add(slotKey(rec.dayOfWeek, h));
+        targetSet.add(slotKey(rec.dayOfWeek, h));
       }
     }
-    selectedSlots.value = new Set(slots);
-    initialSlots.value = new Set(slots);
+    selectedSlots.value = new Set(availSlots);
+    unavailableSlots.value = new Set(unavailSlots);
+    initialSlots.value = new Set(availSlots);
+    initialUnavailableSlots.value = new Set(unavailSlots);
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
@@ -391,41 +437,45 @@ const saveChanges = async () => {
       await availabilityService.remove(rec.id);
     }
 
-    const slotsByDay = {};
-    for (const key of selectedSlots.value) {
-      const [day, hour] = key.split("-").map(Number);
-      if (!slotsByDay[day]) slotsByDay[day] = [];
-      slotsByDay[day].push(hour);
-    }
-
-    for (const [day, hours] of Object.entries(slotsByDay)) {
-      hours.sort((a, b) => a - b);
-      const ranges = [];
-      let start = hours[0];
-      let end = hours[0];
-
-      for (let i = 1; i < hours.length; i++) {
-        if (hours[i] === end + 1) {
-          end = hours[i];
-        } else {
-          ranges.push({ start, end: end + 1 });
-          start = hours[i];
-          end = hours[i];
-        }
+    const buildRanges = (slotsSet, type) => {
+      const slotsByDay = {};
+      for (const key of slotsSet) {
+        const [day, hour] = key.split("-").map(Number);
+        if (!slotsByDay[day]) slotsByDay[day] = [];
+        slotsByDay[day].push(hour);
       }
-      ranges.push({ start, end: end + 1 });
-
-      for (const range of ranges) {
-        await availabilityService.create({
+      const payloads = [];
+      for (const [day, hours] of Object.entries(slotsByDay)) {
+        hours.sort((a, b) => a - b);
+        let start = hours[0];
+        let end = hours[0];
+        for (let i = 1; i < hours.length; i++) {
+          if (hours[i] === end + 1) {
+            end = hours[i];
+          } else {
+            payloads.push({ day, start, end: end + 1 });
+            start = hours[i];
+            end = hours[i];
+          }
+        }
+        payloads.push({ day, start, end: end + 1 });
+      }
+      return payloads.map(({ day, start, end }) =>
+        availabilityService.create({
           userId,
           dayOfWeek: parseInt(day, 10),
-          startTime: `${pad(range.start)}:00`,
-          endTime: `${pad(range.end)}:00`,
-          availabilityType: "available",
+          startTime: `${pad(start)}:00`,
+          endTime: `${pad(end)}:00`,
+          availabilityType: type,
           isRecurring: true,
-        });
-      }
-    }
+        })
+      );
+    };
+
+    await Promise.all([
+      ...buildRanges(selectedSlots.value, 'available'),
+      ...buildRanges(unavailableSlots.value, 'unavailable'),
+    ]);
 
     notify("Availability saved successfully.");
     await loadAvailabilities();
@@ -502,6 +552,8 @@ onMounted(loadAvailabilities);
   display: flex;
   gap: 12px;
   margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .grid-card {
@@ -572,12 +624,20 @@ onMounted(loadAvailabilities);
   background-color: #fafafa;
 }
 
-.slot-cell.selected {
+.slot-cell.available {
   background-color: #0D9488;
 }
 
-.slot-cell.selected:hover {
+.slot-cell.available:hover {
   background-color: #0f766e;
+}
+
+.slot-cell.unavailable-slot {
+  background-color: #ef5350;
+}
+
+.slot-cell.unavailable-slot:hover {
+  background-color: #c62828;
 }
 
 /* Exceptions Section */

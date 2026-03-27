@@ -48,13 +48,8 @@
             </v-avatar>
           </template>
           <div v-if="!rail" class="user-info">
-
-            <div class="user-name">User</div>
-            <div class="user-role">{{ isManagerRoute ? 'Manager' : 'Student' }}</div>
-
             <div class="user-name">{{ displayName }}</div>
             <div class="user-role">{{ displayRole }}</div>
-
           </div>
         </v-list-item>
       </div>
@@ -63,14 +58,6 @@
 </template>
 
 <script setup>
-
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-
-const drawer = ref(true)
-const rail = ref(false)
-const route = useRoute()
-
 import { computed, ref } from 'vue'
 import Utils from '../config/utils'
 
@@ -96,29 +83,15 @@ const displayInitial = computed(() => {
   return `${first}${last}`.toUpperCase() || 'U'
 })
 
-
-// Check if we're on a manager route
-const isManagerRoute = computed(() => route.path.startsWith('/manager'))
-
-const studentNavItems = [
+const navItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
   { title: 'Departments', icon: 'mdi-domain', route: '/student/departments' },
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
   { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
+  { title: 'My Tasks', icon: 'mdi-clipboard-text-outline', route: '/student/tasks' },
   { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
 ]
-
-const managerNavItems = [
-  { title: 'Dashboard', icon: 'mdi-view-dashboard', route: '/manager' },
-  { title: 'Student Qualifications', icon: 'mdi-account-check', route: '/manager/qualifications' },
-  { title: 'Shift Management', icon: 'mdi-calendar-clock', route: '/manager/shifts' },
-  { title: 'Reports', icon: 'mdi-chart-bar', route: '/manager/reports' }
-]
-
-const navItems = computed(() => {
-  return isManagerRoute.value ? managerNavItems : studentNavItems
-})
 
 defineExpose({
   rail,

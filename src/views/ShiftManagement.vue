@@ -138,7 +138,7 @@
           class="mx-4 mt-2"
           icon="mdi-office-building"
         >
-          Creating shift for: <strong>{{ currentDeptName }}</strong>
+          Creating shift for: <span class="font-weight-bold">{{ currentDeptName }}</span>
         </v-alert>
         
         <v-divider></v-divider>

@@ -63,19 +63,13 @@
 </template>
 
 <script setup>
-
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-
-const drawer = ref(true)
-const rail = ref(false)
-const route = useRoute()
-
-import { computed, ref } from 'vue'
 import Utils from '../config/utils'
 
 const drawer = ref(true)
 const rail = ref(false)
+const route = useRoute()
 const user = ref(Utils.getStore("user") || {})
 
 const displayName = computed(() => {

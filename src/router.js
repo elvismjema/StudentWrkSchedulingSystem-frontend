@@ -121,8 +121,8 @@ const router = createRouter({
     {
       path: "/manager",
       name: "manager",
-
-      component: () => import("./views/Manager.vue"),
+      component: Manager,
+      redirect: { name: "manager-dashboard" },
       children: [
         {
           path: "qualifications",
@@ -133,13 +133,7 @@ const router = createRouter({
           path: "shifts",
           name: "manager-shifts",
           component: ShiftManagement
-        }
-      ]
-    },
-
-      component: Manager,
-      redirect: { name: "manager-dashboard" },
-      children: [
+        },
         {
           path: "dashboard",
           name: "manager-dashboard",
@@ -241,7 +235,7 @@ const router = createRouter({
           props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
         }
       ]
-    }
+    },
 
   ],
 });

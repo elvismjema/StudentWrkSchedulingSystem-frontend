@@ -141,78 +141,60 @@ defineExpose({
   font-size: 19px;
   font-weight: 700;
   color: #1f2328;
-  line-height: 1.05;
 }
 
 .brand-subtitle {
-  margin-top: 4px;
-  font-size: 15px;
+  font-size: 14px;
   color: #667085;
-  line-height: 1.1;
 }
 
 .admin-nav {
-  padding: 12px 0;
+  padding: 8px 12px;
 }
 
 .admin-nav-item {
-  border-radius: 10px;
-  margin: 2px 8px;
-  padding: 0 12px;
-  min-height: 46px;
-  color: #475467;
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.admin-nav-item:hover {
-  background: #f9fafb;
+  border-radius: 12px;
+  min-height: 66px;
 }
 
 .admin-active-nav-item {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
-  color: #ffffff !important;
-}
-
-.admin-active-nav-item :deep(.v-icon) {
-  color: #ffffff !important;
+  background: #f0f6ff;
+  color: #0969da;
 }
 
 .admin-user-wrap {
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 
 .admin-user-item {
-  padding: 0;
-  min-height: auto;
+  border-radius: 12px;
+  min-height: 66px;
 }
 
 .admin-user-avatar {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
+  background: #b71c1c;
 }
 
 .admin-user-initial {
+  color: #fff;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .admin-user-text {
-  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .admin-user-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: #1f2328;
-  line-height: 1.2;
 }
 
 .admin-user-role {
-  font-size: 13px;
+  font-size: 14px;
   color: #667085;
-  margin-top: 2px;
 }
 </style>

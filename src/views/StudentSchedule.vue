@@ -1,5 +1,36 @@
 <template>
   <div class="schedule-container">
+    <div class="greeting-banner">
+      <div>
+        <h2 class="greeting-title">Hi There</h2>
+        <p class="greeting-date">{{ currentGreetingDate }}</p>
+      </div>
+
+      <!-- Clock In/Out Widget -->
+      <v-card class="clock-widget" elevation="0" rounded="lg">
+        <div class="clock-widget-inner">
+          <div class="clock-widget-info">
+            <div class="clock-widget-label">Today's Status</div>
+            <div v-if="isClockedIn" class="clock-widget-time">
+              <v-icon size="14" color="success" class="mr-1">mdi-circle</v-icon>
+              Clocked in · {{ activeDurationLabel }}
+            </div>
+            <div v-else class="clock-widget-time text-medium-emphasis">Not clocked in</div>
+          </div>
+          <v-btn
+            :color="isClockedIn ? 'error' : 'success'"
+            variant="flat"
+            rounded="lg"
+            size="small"
+            :prepend-icon="isClockedIn ? 'mdi-clock-out' : 'mdi-clock-in'"
+            @click="toggleClock"
+          >
+            {{ isClockedIn ? 'Clock Out' : 'Clock In' }}
+          </v-btn>
+        </div>
+      </v-card>
+    </div>
+
     <!-- Header with Month/Year Navigation -->
     <div class="calendar-header">
       <div class="header-left">
@@ -9,7 +40,7 @@
         <v-btn
           variant="outlined"
           prepend-icon="mdi-chevron-left"
-          @click="previousMonth"
+          @click="previousWeek"
           class="nav-btn"
         >
           Previous
@@ -25,60 +56,13 @@
         <v-btn
           variant="outlined"
           append-icon="mdi-chevron-right"
-          @click="nextMonth"
+          @click="nextWeek"
           class="nav-btn"
         >
           Next
         </v-btn>
       </div>
     </div>
-
-    <!-- Next Shift Card -->
-    <v-card class="next-shift-card" elevation="2">
-      <div class="shift-header">
-        <div class="shift-badges">
-          <v-chip size="small" color="success" class="shift-badge">Open</v-chip>
-          <v-chip size="small" color="warning" class="shift-badge">Needs Acknowledgement</v-chip>
-        </div>
-        <v-btn icon="mdi-dots-vertical" variant="text" size="small"></v-btn>
-      </div>
-      
-      <div class="shift-content">
-        <h3 class="shift-title">Barista</h3>
-        <div class="shift-details">
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-calendar</v-icon>
-            <span>Tomorrow, Feb 11, 2026</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-clock</v-icon>
-            <span>8:00 AM - 12:00 PM</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-map-marker</v-icon>
-            <span>Campus Coffee Shop</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="shift-actions">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-calendar-plus"
-          class="action-btn"
-        >
-          Add to Calendar
-        </v-btn>
-        <v-btn
-          variant="flat"
-          color="#8B1538"
-          @click="acknowledgeShift"
-          class="action-btn"
-        >
-          Acknowledge
-        </v-btn>
-      </div>
-    </v-card>
 
     <!-- Calendar Grid -->
     <div class="calendar-scroll-container">
@@ -110,7 +94,7 @@
                     class="shift-block"
                   >
                     <div class="shift-block-title">Barista</div>
-                    <div class="shift-block-time">8 AM - 12 PM</div>
+                    <div class="shift-block-time">8:00 AM - 12:00 PM</div>
                   </div>
                 </div>
               </div>
@@ -123,9 +107,34 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 
 const currentDate = ref(new Date())
+
+// --- Clock In/Out ---
+const isClockedIn = ref(false)
+const clockInTime = ref(null)
+const clockNow = ref(new Date())
+let clockTimer = null
+
+const activeDurationLabel = computed(() => {
+  if (!clockInTime.value) return ''
+  const diffMs = clockNow.value.getTime() - clockInTime.value.getTime()
+  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+})
+
+const toggleClock = () => {
+  if (!isClockedIn.value) {
+    clockInTime.value = new Date()
+    isClockedIn.value = true
+  } else {
+    isClockedIn.value = false
+    clockInTime.value = null
+  }
+}
 
 const currentMonthYear = computed(() => {
   return currentDate.value.toLocaleDateString('en-US', { 
@@ -134,7 +143,18 @@ const currentMonthYear = computed(() => {
   })
 })
 
-const timeSlots = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM to 8 PM
+const currentGreetingDate = computed(() => {
+  const formattedDate = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date())
+
+  return `It's ${formattedDate}`
+})
+
+const timeSlots = Array.from({ length: 19 }, (_, i) => i + 6) // 6 AM to 12 AM
 
 const weekDays = computed(() => {
   const days = []
@@ -161,30 +181,49 @@ const weekDays = computed(() => {
 })
 
 const formatTime = (hour) => {
-  const period = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-  return `${displayHour} ${period}`
+  const normalizedHour = hour === 24 ? 0 : hour
+  const period = normalizedHour >= 12 ? 'PM' : 'AM'
+  const displayHour = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour
+  return `${displayHour}:00 ${period}`
 }
 
-const previousMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1)
+const previousWeek = () => {
+  const nextDate = new Date(currentDate.value)
+  nextDate.setDate(nextDate.getDate() - 7)
+  currentDate.value = nextDate
 }
 
-const nextMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1)
+const nextWeek = () => {
+  const nextDate = new Date(currentDate.value)
+  nextDate.setDate(nextDate.getDate() + 7)
+  currentDate.value = nextDate
 }
 
 const goToToday = () => {
   currentDate.value = new Date()
 }
 
-const acknowledgeShift = () => {
-  console.log('Shift acknowledged')
-}
+onMounted(() => {
+  clockTimer = setInterval(() => { clockNow.value = new Date() }, 1000)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(clockTimer)
+})
+
 </script>
 
 <style scoped>
+.schedule-container,
+.schedule-container * {
+  box-sizing: border-box;
+}
+
 .schedule-container {
+  --calendar-time-column-width: 88px;
+  --calendar-header-height: 80px;
+  --calendar-hour-height: 60px;
+  --calendar-row-count: 19;
   padding: 20px;
   background-color: #fafafa;
   height: 100%;
@@ -198,7 +237,7 @@ const acknowledgeShift = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .month-year {
@@ -224,68 +263,58 @@ const acknowledgeShift = () => {
   color: white;
 }
 
-/* Next Shift Card */
-.next-shift-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1px solid #e0e0e0;
-}
-
-.shift-header {
+.greeting-banner {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.shift-badges {
-  display: flex;
-  gap: 8px;
-}
-
-.shift-badge {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.shift-content {
+  align-items: center;
+  gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
-.shift-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 12px 0;
+.clock-widget {
+  border: 1px solid #e3e5e8;
+  background: white;
+  min-width: 220px;
 }
 
-.shift-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detail-item {
+.clock-widget-inner {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #666;
-  font-size: 13px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
 }
 
-.detail-icon {
+.clock-widget-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: #8B1538;
+  margin-bottom: 2px;
 }
 
-.shift-actions {
+.clock-widget-time {
+  font-size: 13px;
+  color: #555;
   display: flex;
-  gap: 12px;
+  align-items: center;
 }
 
-.action-btn {
-  flex: 1;
+.greeting-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.greeting-date {
+  font-size: 18px;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0;
+  text-align: right;
 }
 
 /* Calendar Scroll Container */
@@ -301,22 +330,30 @@ const acknowledgeShift = () => {
   border-radius: 12px;
   border: 1px solid #e0e0e0;
   overflow: hidden;
-  min-height: 600px;
 }
 
 .calendar-grid {
   display: flex;
-  min-height: 600px;
+  align-items: flex-start;
+  background: white;
 }
 
 .time-column {
-  width: 80px;
+  width: var(--calendar-time-column-width);
+  flex: 0 0 var(--calendar-time-column-width);
   border-right: 1px solid #e0e0e0;
   background-color: #fafafa;
 }
 
+.time-column::before {
+  content: "";
+  display: block;
+  height: var(--calendar-header-height);
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .time-slot {
-  height: 40px;
+  height: var(--calendar-hour-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -327,12 +364,15 @@ const acknowledgeShift = () => {
 
 .days-container {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .day-column {
-  flex: 1;
+  min-width: 0;
   border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
 }
 
 .day-column:last-child {
@@ -340,11 +380,15 @@ const acknowledgeShift = () => {
 }
 
 .day-header {
-  height: 80px;
+  height: var(--calendar-header-height);
   padding: 16px 8px;
   text-align: center;
   border-bottom: 1px solid #e0e0e0;
   background-color: #fafafa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .day-name {
@@ -375,11 +419,11 @@ const acknowledgeShift = () => {
 }
 
 .hour-slots {
-  height: calc(100% - 80px);
+  display: grid;
+  grid-template-rows: repeat(var(--calendar-row-count), var(--calendar-hour-height));
 }
 
 .hour-slot {
-  height: 40px;
   border-bottom: 1px solid #f0f0f0;
   position: relative;
 }
@@ -389,7 +433,7 @@ const acknowledgeShift = () => {
   left: 4px;
   right: 4px;
   top: 0;
-  height: 160px; /* 4 hours * 40px per hour */
+  height: calc(var(--calendar-hour-height) * 4);
   background-color: #8B1538;
   color: white;
   border-radius: 6px;
@@ -406,5 +450,16 @@ const acknowledgeShift = () => {
 .shift-block-time {
   opacity: 0.9;
   font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .greeting-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .greeting-date {
+    text-align: left;
+  }
 }
 </style>

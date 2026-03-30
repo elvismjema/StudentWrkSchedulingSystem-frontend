@@ -8,13 +8,6 @@
     rail-width="60"
   >
 
-    <div class="brand-wrap">
-      <div class="brand-row">
-        <div class="oc-badge">OC</div>
-        <div v-if="!rail" class="brand-text">
-          <div class="brand-title">{{ displayDepartment }}</div>
-          <div class="brand-subtitle">{{ displayRole }}</div>
-
     <div class="logo-section">
       <div class="logo-container">
         <div class="oc-logo">OC</div>

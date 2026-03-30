@@ -99,11 +99,6 @@ const displayRole = computed(() => {
 const displayDepartment = computed(() => {
   const context = Utils.getStore("currentDepartmentContext");
   return context?.department_name || "Student Worker Scheduling";
-
-  const role = (user.value?.role || "student").toLowerCase();
-  if (role === "admin") return "Admin";
-  return role === "manager" ? "Manager" : "Student";
-
 });
 
 const displayInitial = computed(() => {
@@ -199,6 +194,7 @@ defineExpose({
 
 .manager-user-wrap {
   padding: 8px 12px;
+}
 
 .logo-text {
   flex: 1;

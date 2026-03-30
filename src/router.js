@@ -285,4 +285,18 @@ router.beforeEach((to) => {
   return true;
 });
 
+// If a lazy-loaded route chunk fails to load (e.g. stale deployment or 404),
+// navigate to the target URL directly so the browser fetches a fresh page
+// rather than silently doing nothing.
+router.onError((error, to) => {
+  const chunkFailure =
+    error?.message?.includes("Failed to fetch dynamically imported module") ||
+    error?.message?.includes("Unable to preload") ||
+    error?.name === "ChunkLoadError";
+
+  if (chunkFailure && to?.fullPath) {
+    window.location.assign(to.fullPath);
+  }
+});
+
 export default router;

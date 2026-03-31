@@ -62,7 +62,7 @@ import Utils from '../config/utils'
 import UserRoleServices from '../services/userRoleServices.js'
 
 const drawer = ref(true)
-const rail = ref(false)
+const rail = ref(true)
 const user = ref(Utils.getStore("user") || {})
 const resolvedDepartmentName = ref('')
 

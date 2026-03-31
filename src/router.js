@@ -10,7 +10,7 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
-import Admin from "./views/Admin.vue";
+import Admin from "./views/AdminDashboard.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {

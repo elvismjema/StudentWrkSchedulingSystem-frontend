@@ -37,6 +37,16 @@
           class="ml-2"
         />
       </v-tab>
+      <v-tab value="shift-acknowledgments">
+        Shift Acknowledgments
+        <v-badge
+          v-if="unacknowledgedCount > 0"
+          :content="unacknowledgedCount"
+          color="warning"
+          inline
+          class="ml-2"
+        />
+      </v-tab>
     </v-tabs>
 
     <v-tabs-window v-model="activeTab">
@@ -207,23 +217,17 @@
               <v-chip
                 v-else
                 size="small"
-                :color="statusColor(swap.status)"
-                variant="flat"
-              >
-                {{ swap.status }}
-              </v-chip>
             </div>
-          </v-card-text>
-        </v-card>
-      </v-tabs-window-item>
-    </v-tabs-window>
 
-    <!-- Snackbar -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
-      <v-icon start>{{ snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
-      {{ snackbar.text }}
-    </v-snackbar>
-  </v-container>
+            <div v-if="!ack.acknowledged" class="text-caption text-warning">
+              <v-icon size="16" class="mr-1">mdi-alert</v-icon>
+              Awaiting acknowledgment
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-tabs-window-item>
+  </v-tabs-window>
 </template>
 
 <script setup>
@@ -239,11 +243,15 @@ const currentUser = Utils.getStore('user') || {}
 const activeTab = ref('time-off')
 const loading = ref(false)
 const swapsLoading = ref(false)
+const ackLoading = ref(false)
 const actioning = ref(null)
 const timeOffError = ref('')
+const ackError = ref('')
 const timeOffFilter = ref('pending')
+const ackFilter = ref('all')
 const timeOffRequests = ref([])
 const swapRequests = ref([])
+const acknowledgments = ref([])
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
 const statusOptions = [
@@ -253,12 +261,22 @@ const statusOptions = [
   { label: 'All', value: '' }
 ]
 
+const ackStatusOptions = [
+  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Acknowledged', value: 'acknowledged' }
+]
+
 const pendingTimeOffCount = computed(() =>
   timeOffRequests.value.filter(r => r.requestStatus === 'pending').length
 )
 
 const pendingSwapCount = computed(() =>
   swapRequests.value.filter(s => s.status === 'pending').length
+)
+
+const unacknowledgedCount = computed(() =>
+  acknowledgments.value.filter(a => !a.acknowledged).length
 )
 
 const loadTimeOffRequests = async () => {
@@ -292,6 +310,26 @@ const loadSwapRequests = async () => {
     console.warn('Swap requests endpoint not available:', err.message)
   } finally {
     swapsLoading.value = false
+  }
+}
+
+const loadAcknowledgments = async () => {
+  ackLoading.value = true
+  ackError.value = ''
+  try {
+    const params = new URLSearchParams()
+    if (currentDeptId) params.append('departmentId', currentDeptId)
+    if (ackFilter.value && ackFilter.value !== 'all') {
+      params.append('acknowledged', ackFilter.value === 'acknowledged' ? 'true' : 'false')
+    }
+
+    const response = await apiClient.get(`/shift-acknowledgements/unacknowledged?${params.toString()}`)
+    acknowledgments.value = response?.data?.data || response?.data || []
+  } catch (err) {
+    ackError.value = 'Failed to load shift acknowledgments.'
+    console.error(err)
+  } finally {
+    ackLoading.value = false
   }
 }
 
@@ -349,9 +387,18 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
 
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit'
+  })
+}
+
 const loadAll = () => {
   loadTimeOffRequests()
   loadSwapRequests()
+  loadAcknowledgments()
 }
 
 onMounted(loadAll)

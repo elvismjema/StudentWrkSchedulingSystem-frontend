@@ -172,10 +172,14 @@ defineExpose({
 }
 
 .main-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
+  font-size: 42px;
+  font-weight: 700;
+  color: #2f343b;
   line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sub-title {

@@ -15,18 +15,6 @@
       <v-icon size="24">mdi-menu</v-icon>
     </v-btn>
 
-    <!-- Department chip - centered -->
-    <v-chip
-      v-if="currentDepartmentName"
-      color="#8B1538"
-      variant="tonal"
-      size="small"
-      prepend-icon="mdi-office-building"
-      class="dept-chip"
-    >
-      {{ currentDepartmentName }}
-    </v-chip>
-
     <v-spacer></v-spacer>
 
     <!-- Right side - Notifications and User -->
@@ -129,11 +117,6 @@ const router = useRouter()
 const menuOpen = ref(false)
 const user = ref(Utils.getStore("user") || {})
 
-const currentDepartmentName = computed(() => {
-  const ctx = Utils.getStore('currentDepartmentContext')
-  return ctx?.department_name || ''
-})
-
 const displayName = computed(() => {
   const first = user.value?.fName || ''
   const last = user.value?.lName || ''
@@ -195,11 +178,6 @@ const handleNotificationClick = (notification) => {
 
 .tasks-btn {
   color: #4b5563;
-}
-
-.dept-chip {
-  font-weight: 500;
-  letter-spacing: 0.01em;
 }
 
 .nav-user-avatar {

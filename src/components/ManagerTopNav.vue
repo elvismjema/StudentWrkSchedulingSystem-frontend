@@ -4,18 +4,6 @@
       <v-icon size="24">mdi-menu</v-icon>
     </v-btn>
 
-    <!-- Department chip - centered -->
-    <v-chip
-      v-if="currentDepartmentName"
-      color="#8B1538"
-      variant="tonal"
-      size="small"
-      prepend-icon="mdi-office-building"
-      class="dept-chip"
-    >
-      {{ currentDepartmentName }}
-    </v-chip>
-
     <v-spacer />
 
     <div class="top-actions">
@@ -119,11 +107,6 @@ const menuItems = computed(() => {
   return [{ title: "Profile", icon: "mdi-account", route: "/manager/profile" }];
 });
 
-const currentDepartmentName = computed(() => {
-  const ctx = Utils.getStore('currentDepartmentContext')
-  return ctx?.department_name || ''
-})
-
 const handleSignOut = () => {
   menuOpen.value = false;
   Utils.removeItem("user");
@@ -150,11 +133,6 @@ const handleNotificationClick = (notification) => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.dept-chip {
-  font-weight: 500;
-  letter-spacing: 0.01em;
 }
 
 .profile-avatar {

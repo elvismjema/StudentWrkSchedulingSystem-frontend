@@ -94,16 +94,6 @@ const router = createRouter({
           component: () => import("./views/StudentTradeBoard.vue")
         },
         {
-          path: "clock",
-          name: "student-clock",
-          component: () => import("./views/StudentClock.vue")
-        },
-        {
-          path: "tasks",
-          name: "student-tasks",
-          component: () => import("./views/StudentTasks.vue")
-        },
-        {
           path: "notifications",
           name: "student-notifications",
           component: () => import("./views/StudentNotifications.vue")

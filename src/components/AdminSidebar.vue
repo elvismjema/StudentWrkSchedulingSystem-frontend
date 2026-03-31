@@ -87,8 +87,7 @@ const displayInitial = computed(() => {
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-dashboard", route: "/admin/dashboard" },
   { title: "User Management", icon: "mdi-account-multiple", route: "/admin/users" },
-  { title: "Departments", icon: "mdi-office-building", route: "/admin/departments" },
-  { title: "System Settings", icon: "mdi-cog", route: "/admin/settings" }
+  { title: "Departments", icon: "mdi-office-building", route: "/admin/departments" }
 ];
 
 defineExpose({

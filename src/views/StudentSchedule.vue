@@ -88,13 +88,37 @@
               <!-- Hour slots for this day -->
               <div class="hour-slots">
                 <div v-for="hour in timeSlots" :key="`${day.date}-${hour}`" class="hour-slot">
-                  <!-- Mock shift for Tuesday 8AM-12PM -->
+                  <!-- Real shifts with acknowledgment status -->
                   <div
-                    v-if="day.name === 'Tue' && hour === 8"
+                    v-for="shift in getShiftsForDayAndHour(day.date, hour)"
+                    :key="shift.shift_id"
                     class="shift-block"
+                    :class="{ 'acknowledged': getAcknowledgmentStatus(shift.shift_id), 'unacknowledged': !getAcknowledgmentStatus(shift.shift_id) }"
                   >
-                    <div class="shift-block-title">Barista</div>
-                    <div class="shift-block-time">8:00 AM - 12:00 PM</div>
+                    <div class="shift-block-title">{{ shift.position?.position_name || 'Shift' }}</div>
+                    <div class="shift-block-time">{{ formatShiftTime(shift.start_time) }} - {{ formatShiftTime(shift.end_time) }}</div>
+                    <div class="shift-acknowledgment">
+                      <v-chip
+                        v-if="getAcknowledgmentStatus(shift.shift_id)"
+                        size="x-small"
+                        color="success"
+                        variant="tonal"
+                      >
+                        <v-icon start size="12">mdi-check-circle</v-icon>
+                        Acknowledged
+                      </v-chip>
+                      <v-btn
+                        v-else
+                        size="x-small"
+                        color="primary"
+                        variant="tonal"
+                        @click="acknowledgeShift(shift.shift_id)"
+                        :loading="acknowledgingShifts.has(shift.shift_id)"
+                      >
+                        <v-icon start size="12">mdi-thumb-up</v-icon>
+                        Acknowledge
+                      </v-btn>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -108,8 +132,15 @@
 
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
+import Utils from '../config/utils.js'
+import shiftService from '../services/shiftService.js'
+import shiftAcknowledgementService from '../services/shiftAcknowledgementService.js'
 
 const currentDate = ref(new Date())
+const storedUser = Utils.getStore('user') || {}
+const shifts = ref([])
+const acknowledgements = ref([])
+const loading = ref(false)
 
 // --- Clock In/Out ---
 const isClockedIn = ref(false)
@@ -203,8 +234,94 @@ const goToToday = () => {
   currentDate.value = new Date()
 }
 
-onMounted(() => {
+// --- Shift Data Loading ---
+const loadShifts = async () => {
+  if (!storedUser.id) return
+  
+  loading.value = true
+  try {
+    const response = await shiftService.listShifts({
+      assigned_user_id: storedUser.id,
+      is_published: true
+    })
+    shifts.value = Array.isArray(response.data) ? response.data : []
+  } catch (err) {
+    console.error('Failed to load shifts:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadAcknowledgements = async () => {
+  if (!storedUser.id) return
+  
+  try {
+    const response = await shiftAcknowledgementService.listForUser(storedUser.id)
+    acknowledgements.value = Array.isArray(response.data) ? response.data : []
+  } catch (err) {
+    console.error('Failed to load acknowledgements:', err)
+  }
+}
+
+// --- Acknowledgment Actions ---
+const acknowledgingShifts = ref(new Set())
+
+const acknowledgeShift = async (shiftId) => {
+  if (acknowledgingShifts.value.has(shiftId)) return
+  
+  acknowledgingShifts.value.add(shiftId)
+  try {
+    // Find the acknowledgment record for this shift
+    const acknowledgement = acknowledgements.value.find(a => a.shiftId === shiftId)
+    if (acknowledgement) {
+      await shiftAcknowledgementService.acknowledge(acknowledgement.id)
+      // Update local state
+      acknowledgement.acknowledged = true
+      acknowledgement.acknowledgedAt = new Date().toISOString()
+    }
+  } catch (err) {
+    console.error('Failed to acknowledge shift:', err)
+  } finally {
+    acknowledgingShifts.value.delete(shiftId)
+  }
+}
+
+// --- Helper Functions ---
+const getShiftsForDayAndHour = (dayDate, hour) => {
+  return shifts.value.filter(shift => {
+    const shiftDate = new Date(shift.shift_date)
+    const shiftStartHour = parseInt(shift.start_time.split(':')[0])
+    const shiftEndHour = parseInt(shift.end_time.split(':')[0])
+    
+    return (
+      shiftDate.getDate() === dayDate &&
+      shiftDate.getMonth() === new Date().getMonth() &&
+      shiftDate.getFullYear() === new Date().getFullYear() &&
+      hour >= shiftStartHour &&
+      hour < shiftEndHour
+    )
+  })
+}
+
+const getAcknowledgmentStatus = (shiftId) => {
+  const acknowledgement = acknowledgements.value.find(a => a.shiftId === shiftId)
+  return acknowledgement?.acknowledged || false
+}
+
+const formatShiftTime = (time) => {
+  const [hours, minutes] = time.split(':')
+  const hour = parseInt(hours)
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  return `${displayHour}:${minutes} ${period}`
+}
+
+onMounted(async () => {
   clockTimer = setInterval(() => { clockNow.value = new Date() }, 1000)
+  await Promise.all([
+    loadShifts(),
+    loadAcknowledgements()
+  ])
 })
 
 onBeforeUnmount(() => {
@@ -450,6 +567,23 @@ onBeforeUnmount(() => {
 .shift-block-time {
   opacity: 0.9;
   font-size: 11px;
+}
+
+.shift-acknowledgment {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shift-block.acknowledged {
+  background-color: #2e7d32;
+  border-left: 3px solid #1b5e20;
+}
+
+.shift-block.unacknowledged {
+  background-color: #1976d2;
+  border-left: 3px solid #0d47a1;
 }
 
 @media (max-width: 768px) {

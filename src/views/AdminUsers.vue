@@ -67,6 +67,17 @@
           hide-details
           style="max-width: 220px"
         />
+        <v-select
+          v-model="filterRole"
+          :items="roleFilterOptions"
+          item-title="label"
+          item-value="value"
+          label="Filter Role"
+          variant="outlined"
+          density="compact"
+          hide-details
+          style="max-width: 220px"
+        />
       </v-card-title>
 
       <v-card-text class="pa-5">
@@ -508,11 +519,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import AdminServices from '../services/adminServices.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
 import apiClient from '../services/services.js';
+
+const route = useRoute();
 
 // ─── State ─────────────────────────────────────────────────────────────────
 const loading = ref(false);
@@ -536,6 +550,14 @@ const pendingDataSource = ref('');
 
 const searchQuery = ref('');
 const filterDepartment = ref(null);
+const filterRole = ref('all');
+
+const roleFilterOptions = [
+  { label: 'All Roles', value: 'all' },
+  { label: 'Student Workers', value: 'student' },
+  { label: 'Managers', value: 'manager' },
+  { label: 'Admins', value: 'admin' },
+];
 
 // Dialogs
 const inviteDialog = ref(false);
@@ -579,6 +601,10 @@ const filteredUsers = computed(() => {
     );
   }
 
+  if (filterRole.value !== 'all') {
+    filtered = filtered.filter((u) => userMatchesRoleFilter(u, filterRole.value));
+  }
+
   const query = searchQuery.value.trim().toLowerCase();
   if (!query) return filtered;
 
@@ -609,6 +635,38 @@ const getRoleColor = (permissionLevel) => {
   if (permissionLevel >= 90) return 'red';
   if (permissionLevel >= 50) return 'deep-orange';
   return 'blue';
+};
+
+const userMatchesRoleFilter = (user, roleFilter) => {
+  const memberships = user.userDepartments || [];
+
+  return memberships.some((membership) => {
+    const permission = Number(membership?.role?.permission_level || 0);
+    const roleName = String(membership?.role?.role_name || '').toLowerCase();
+
+    if (roleFilter === 'student') {
+      return (permission > 0 && permission < 50) || roleName.includes('student');
+    }
+
+    if (roleFilter === 'manager') {
+      return (permission >= 50 && permission < 90) || roleName.includes('manager');
+    }
+
+    if (roleFilter === 'admin') {
+      return permission >= 90 || roleName.includes('admin');
+    }
+
+    return true;
+  });
+};
+
+const applyRoleFilterFromRoute = () => {
+  const role = String(route.query.role || '').toLowerCase();
+  if (role === 'student' || role === 'manager' || role === 'admin') {
+    filterRole.value = role;
+    return;
+  }
+  filterRole.value = 'all';
 };
 
 const getHighestRole = (user) => {
@@ -905,10 +963,18 @@ const confirmDelete = async () => {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
+  applyRoleFilterFromRoute();
   loadUsers();
   loadDepartments();
   loadPendingAssignments();
 });
+
+watch(
+  () => route.query.role,
+  () => {
+    applyRoleFilterFromRoute();
+  },
+);
 </script>
 
 <style scoped>

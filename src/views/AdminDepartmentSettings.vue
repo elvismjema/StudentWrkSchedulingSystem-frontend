@@ -51,26 +51,47 @@
         <section class="settings-section">
           <div class="section-title-row">
             <h2 class="section-title">General Settings</h2>
-            <v-btn
-              icon
-              variant="text"
-              size="small"
-              color="grey-darken-1"
-              @click="deleteDepartmentDialog = true"
-            >
-              <v-icon size="22">mdi-trash-can-outline</v-icon>
-            </v-btn>
+            <div class="section-actions">
+              <v-btn
+                icon
+                variant="text"
+                size="small"
+                color="grey-darken-1"
+                @click="toggleEditMode"
+              >
+                <v-icon size="22">{{ editMode ? "mdi-pencil-off" : "mdi-pencil-outline" }}</v-icon>
+              </v-btn>
+              <v-btn
+                icon
+                variant="text"
+                size="small"
+                color="grey-darken-1"
+                @click="deleteDepartmentDialog = true"
+              >
+                <v-icon size="22">mdi-trash-can-outline</v-icon>
+              </v-btn>
+            </div>
           </div>
 
           <v-text-field
-            :model-value="selectedDepartment.department_name"
+            v-model="editableDepartmentName"
             label="Department Name"
             variant="outlined"
             density="comfortable"
-            readonly
+            :readonly="!editMode"
             hide-details
             class="mt-4"
           />
+          <div class="mt-3 d-flex justify-end">
+            <v-btn
+              color="primary"
+              :disabled="!editMode || !editableDepartmentName.trim() || editableDepartmentName.trim() === selectedDepartment.department_name"
+              :loading="savingDepartment"
+              @click="saveDepartmentName"
+            >
+              Save
+            </v-btn>
+          </div>
         </section>
 
         <section class="settings-section">
@@ -81,8 +102,9 @@
               v-for="position in positions"
               :key="position.position_id"
               variant="outlined"
+              rounded="pill"
               class="mr-2 mb-2"
-              closable
+              :closable="editMode"
               @click:close="removePosition(position)"
             >
               {{ position.position_name }}
@@ -98,6 +120,7 @@
                 variant="outlined"
                 density="comfortable"
                 hide-details
+                :disabled="!editMode"
               />
             </v-col>
             <v-col cols="12" md="3">
@@ -105,7 +128,7 @@
                 block
                 prepend-icon="mdi-plus"
                 variant="outlined"
-                :disabled="!newPositionName.trim()"
+                :disabled="!editMode || !newPositionName.trim()"
                 :loading="savingPosition"
                 @click="addPosition"
               >
@@ -228,6 +251,7 @@ const successMessage = ref("");
 
 const creatingDepartment = ref(false);
 const deletingDepartment = ref(false);
+const savingDepartment = ref(false);
 const savingPosition = ref(false);
 const assigningManager = ref(false);
 
@@ -241,7 +265,9 @@ const departmentRoles = ref([]);
 
 const newDepartmentDialog = ref(false);
 const deleteDepartmentDialog = ref(false);
+const editMode = ref(false);
 const newDepartmentName = ref("");
+const editableDepartmentName = ref("");
 const newPositionName = ref("");
 const managerToAssignUserId = ref(null);
 
@@ -322,6 +348,7 @@ const loadDepartmentDetails = async () => {
     ]);
 
     selectedDepartment.value = departmentRes?.data?.data || departmentRes?.data || null;
+    editableDepartmentName.value = selectedDepartment.value?.department_name || "";
     positions.value = positionsRes?.data?.data || [];
     departmentMembers.value = membersRes?.data?.data || [];
     departmentRoles.value = rolesRes?.data?.data || [];
@@ -330,6 +357,47 @@ const loadDepartmentDetails = async () => {
     error.value = err?.response?.data?.message || "Failed to load department details.";
   } finally {
     loading.value = false;
+  }
+};
+
+const toggleEditMode = () => {
+  editMode.value = !editMode.value;
+  if (selectedDepartment.value) {
+    editableDepartmentName.value = selectedDepartment.value.department_name || "";
+  }
+};
+
+const saveDepartmentName = async () => {
+  if (!selectedDepartment.value || !editableDepartmentName.value.trim()) return;
+
+  savingDepartment.value = true;
+  error.value = "";
+  successMessage.value = "";
+  try {
+    await DepartmentServices.updateDepartment(selectedDepartment.value.department_id, {
+      department_name: editableDepartmentName.value.trim(),
+    });
+    selectedDepartment.value = {
+      ...selectedDepartment.value,
+      department_name: editableDepartmentName.value.trim(),
+    };
+
+    const foundIndex = departments.value.findIndex(
+      (department) => department.department_id === selectedDepartment.value.department_id,
+    );
+    if (foundIndex >= 0) {
+      departments.value[foundIndex] = {
+        ...departments.value[foundIndex],
+        department_name: editableDepartmentName.value.trim(),
+      };
+    }
+
+    successMessage.value = "Department name updated.";
+    editMode.value = false;
+  } catch (err) {
+    error.value = err?.response?.data?.message || "Failed to update department name.";
+  } finally {
+    savingDepartment.value = false;
   }
 };
 
@@ -410,6 +478,7 @@ const addPosition = async () => {
 };
 
 const removePosition = async (position) => {
+  if (!editMode.value) return;
   error.value = "";
   successMessage.value = "";
   try {
@@ -504,6 +573,12 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-title-with-icon {

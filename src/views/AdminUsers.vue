@@ -145,7 +145,7 @@
                     <template #activator="{ props }">
                       <v-btn v-bind="props" icon size="small" color="primary" variant="text"
                         @click="openAssignRoleDialog(item)">
-                        <v-icon>mdi-account-edit</v-icon>
+                        <v-icon>mdi-pencil</v-icon>
                       </v-btn>
                     </template>
                   </v-tooltip>
@@ -387,10 +387,9 @@
               :items="departments"
               item-title="department_name"
               item-value="department_id"
-              label="Department"
+              label="Department (Optional)"
               variant="outlined"
               density="comfortable"
-              :rules="[rules.required]"
               @update:modelValue="loadDepartmentRoles"
               class="mb-3"
             />
@@ -399,32 +398,10 @@
               :items="availableRoles"
               item-title="role_name"
               item-value="role_id"
-              label="Role"
+              label="Role (Optional)"
               variant="outlined"
               density="comfortable"
-              :rules="[rules.required]"
-              :disabled="!roleFormData.department_id"
               class="mb-3"
-            />
-            <v-switch
-              v-model="roleFormData.apply_to_all_departments"
-              color="primary"
-              inset
-              label="Apply this role to all departments"
-              hint="Admin role assignments are always applied across all departments."
-              persistent-hint
-              class="mb-2"
-            />
-            <v-select
-              v-model="roleFormData.position_id"
-              :items="availablePositions"
-              item-title="position_name"
-              item-value="position_id"
-              label="Position (Optional)"
-              variant="outlined"
-              density="comfortable"
-              clearable
-              :disabled="!roleFormData.department_id || roleFormData.apply_to_all_departments || selectedRoleIsAdmin"
             />
           </v-form>
         </v-card-text>
@@ -435,10 +412,9 @@
           <v-btn
             color="primary"
             :loading="saving"
-            :disabled="!roleFormValid"
             @click="assignRole"
           >
-            Assign Role
+            Assign
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -542,7 +518,6 @@ const users = ref([]);
 const pendingAssignments = ref([]);
 const departments = ref([]);
 const availableRoles = ref([]);
-const availablePositions = ref([]);
 const inviteRoles = ref([]);
 const invitePositions = ref([]);
 const usersDataSource = ref('');
@@ -573,7 +548,6 @@ const roleFormData = ref({
   department_id: null,
   role_id: null,
   position_id: null,
-  apply_to_all_departments: false,
 });
 
 const deactivateDialog = ref(false);
@@ -617,16 +591,6 @@ const filteredUsers = computed(() => {
       .toLowerCase();
     return fullName.includes(query) || email.includes(query) || roleBlob.includes(query);
   });
-});
-
-const selectedRole = computed(() =>
-  availableRoles.value.find((role) => role.role_id === roleFormData.value.role_id),
-);
-
-const selectedRoleIsAdmin = computed(() => {
-  const permission = Number(selectedRole.value?.permission_level || 0);
-  const roleName = String(selectedRole.value?.role_name || '').toLowerCase();
-  return permission >= 90 || roleName.includes('admin');
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -770,14 +734,10 @@ const loadDepartments = async () => {
 };
 
 const loadDepartmentRoles = async () => {
-  if (!roleFormData.value.department_id) return;
+  const departmentId = roleFormData.value.department_id;
   try {
-    const [rolesRes, posRes] = await Promise.all([
-      UserRoleServices.getAllRoles(roleFormData.value.department_id),
-      apiClient.get(`/positions?department_id=${roleFormData.value.department_id}`),
-    ]);
+    const rolesRes = await UserRoleServices.getAllRoles(departmentId || null);
     availableRoles.value = rolesRes?.data?.data || [];
-    availablePositions.value = posRes?.data?.data || [];
   } catch (err) {
     error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
   }
@@ -845,10 +805,8 @@ const openAssignRoleDialog = (user) => {
     department_id: null,
     role_id: null,
     position_id: null,
-    apply_to_all_departments: false,
   };
-  availableRoles.value = [];
-  availablePositions.value = [];
+  loadDepartmentRoles();
   assignRoleDialog.value = true;
 };
 
@@ -858,19 +816,42 @@ const closeAssignRoleDialog = () => {
 };
 
 const assignRole = async () => {
-  if (!roleForm.value || !roleFormValid.value) return;
+  if (!selectedUser.value) return;
+
+  if (!roleFormData.value.department_id && !roleFormData.value.role_id) {
+    error.value = 'Select at least a department or a role before assigning.';
+    return;
+  }
+
   try {
     saving.value = true;
     error.value = null;
+
+    let departmentId = roleFormData.value.department_id;
+    if (!departmentId) {
+      departmentId =
+        selectedUser.value?.userDepartments?.[0]?.department_id ||
+        departments.value?.[0]?.department_id ||
+        null;
+    }
+
+    let roleId = roleFormData.value.role_id;
+    if (!roleId) {
+      const rolesResponse = await UserRoleServices.getAllRoles(departmentId || null);
+      const roles = rolesResponse?.data?.data || [];
+      roleId = roles[0]?.role_id || null;
+    }
+
+    if (!departmentId || !roleId) {
+      error.value = 'Unable to assign role. Please select a department or role with available options.';
+      return;
+    }
+
     await UserRoleServices.assignUserRole({
       user_id: selectedUser.value.id,
-      ...roleFormData.value,
-      apply_to_all_departments:
-        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value,
-      position_id:
-        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value
-          ? null
-          : roleFormData.value.position_id,
+      department_id: departmentId,
+      role_id: roleId,
+      position_id: null,
     });
     successMessage.value = 'Role assigned successfully!';
     await loadUsers();

@@ -206,7 +206,7 @@ const router = createRouter({
         {
           path: "admin/departments",
           name: "manager-admin-departments",
-          component: () => import("./views/DepartmentSettings.vue"),
+          component: () => import("./views/AdminDepartmentSettings.vue"),
         },
       ]
     },
@@ -219,7 +219,7 @@ const router = createRouter({
         {
           path: "dashboard",
           name: "admin-dashboard",
-          component: () => import("./views/ManagerDashboard.vue"),
+          component: () => import("./views/AdminDashboard.vue"),
         },
         {
           path: "users",
@@ -229,7 +229,7 @@ const router = createRouter({
         {
           path: "departments",
           name: "admin-departments",
-          component: () => import("./views/DepartmentSettings.vue"),
+          component: () => import("./views/AdminDepartmentSettings.vue"),
         },
         {
           path: "reports",

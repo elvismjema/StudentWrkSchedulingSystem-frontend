@@ -78,7 +78,7 @@ import { computed, ref } from "vue";
 import Utils from "../config/utils";
 
 const drawer = ref(true);
-const rail = ref(false);
+const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
 
 const displayName = computed(() => {

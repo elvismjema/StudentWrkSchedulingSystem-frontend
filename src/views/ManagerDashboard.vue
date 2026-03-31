@@ -113,7 +113,7 @@
       <v-col cols="12" sm="6">
         <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
           <div class="quick-content">
-            <v-icon size="32">mdi-clock-outline</v-icon>
+            <v-icon size="24">mdi-clock-outline</v-icon>
             <span>Time &amp; Attendance</span>
           </div>
         </v-btn>
@@ -121,7 +121,7 @@
       <v-col cols="12" sm="6">
         <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/availability')">
           <div class="quick-content">
-            <v-icon size="32">mdi-calendar-month-outline</v-icon>
+            <v-icon size="24">mdi-calendar-month-outline</v-icon>
             <span>Availability</span>
           </div>
         </v-btn>
@@ -414,7 +414,8 @@ onMounted(loadDashboardData);
 }
 
 .quick-btn {
-  height: 140px;
+  height: 104px;
+  min-height: 104px;
   border-color: #d9dde3;
 }
 
@@ -422,9 +423,9 @@ onMounted(loadDashboardData);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   color: #1f2937;
-  font-size: 20px;
+  font-size: 17px;
 }
 
 @media (max-width: 960px) {

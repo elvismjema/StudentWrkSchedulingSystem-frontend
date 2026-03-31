@@ -19,65 +19,131 @@
       {{ error }}
     </v-alert>
 
-    <v-card elevation="0" class="overview-card">
-      <v-card-title class="overview-title">Who's Working Now &amp; Coming Up</v-card-title>
-      <v-card-subtitle class="overview-subtitle">Quick operational snapshot for your departments.</v-card-subtitle>
-      <v-card-text>
-        <v-row>
-          <v-col cols="12" md="6">
-            <div class="activity-block">
-              <div class="activity-heading">Who's Working Now</div>
-              <div class="activity-value">{{ overview.summary.shifts.published }}</div>
-              <div class="activity-caption">Published shifts in progress today</div>
-            </div>
-          </v-col>
-          <v-col cols="12" md="6">
-            <div class="activity-block">
-              <div class="activity-heading">Coming Up</div>
-              <div class="activity-value">{{ overview.summary.shifts.draft }}</div>
-              <div class="activity-caption">Draft shifts queued for review</div>
-            </div>
-          </v-col>
-        </v-row>
+    <v-row class="mb-4">
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="summary-card">
+          <v-card-text>
+            <div class="summary-label">Working Now</div>
+            <div class="summary-value">{{ workingNowCount }}</div>
+            <div class="summary-caption">Currently clocked-in workers</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="summary-card">
+          <v-card-text>
+            <div class="summary-label">Coming Up</div>
+            <div class="summary-value">{{ comingUpCount }}</div>
+            <div class="summary-caption">Upcoming shifts today</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
 
-        <div class="department-wrap mt-4">
-          <div class="activity-heading mb-2">Managed Departments</div>
-          <div v-if="overview.departments.length === 0" class="text-medium-emphasis">
-            No departments in scope.
+    <v-row class="mb-4">
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="content-card">
+          <v-card-text>
+            <div class="card-head">
+              <div>
+                <h2 class="card-title">Pending Approvals</h2>
+                <div class="card-subtitle">{{ pendingApprovals.length }} waiting</div>
+              </div>
+              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/approvals')">
+                View All
+                <v-icon end>mdi-arrow-right</v-icon>
+              </v-btn>
+            </div>
+
+            <div v-if="pendingPreview.length === 0" class="empty-state">
+              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
+              <span>All caught up!</span>
+            </div>
+
+            <div v-else class="list-wrap">
+              <div v-for="item in pendingPreview" :key="item.id" class="pending-item">
+                <div class="pending-top-row">
+                  <v-chip size="small" variant="outlined">{{ item.type }}</v-chip>
+                  <v-chip size="small" color="warning" variant="outlined">{{ item.status }}</v-chip>
+                </div>
+                <div class="worker-name">{{ item.workerName }}</div>
+                <div class="meta-line">{{ item.dateLabel }} · {{ item.timeRange }}</div>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="content-card">
+          <v-card-text>
+            <div class="card-head">
+              <div>
+                <h2 class="card-title">Unfilled Shifts</h2>
+                <div class="card-subtitle">Shifts needing coverage</div>
+              </div>
+              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/schedule')">
+                View All
+                <v-icon end>mdi-arrow-right</v-icon>
+              </v-btn>
+            </div>
+
+            <div v-if="unfilledPreview.length === 0" class="empty-state">
+              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
+              <span>All shifts are filled!</span>
+            </div>
+
+            <div v-else class="list-wrap">
+              <div v-for="shift in unfilledPreview" :key="shift.shift_id" class="unfilled-item">
+                <div class="unfilled-top-row">
+                  <v-chip size="small" color="warning" variant="outlined">{{ shift.departmentName }}</v-chip>
+                  <div class="position-name">{{ shift.positionName }}</div>
+                  <v-spacer />
+                  <v-chip size="small" color="warning" variant="outlined">Open</v-chip>
+                </div>
+                <div class="meta-line">{{ shift.dateLabel }} · {{ shift.timeRange }}</div>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row>
+      <v-col cols="12" sm="6">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
+          <div class="quick-content">
+            <v-icon size="32">mdi-clock-outline</v-icon>
+            <span>Time &amp; Attendance</span>
           </div>
-          <v-chip
-            v-for="department in overview.departments"
-            :key="department.department_id"
-            class="ma-1"
-            color="#8B1538"
-            variant="outlined"
-          >
-            {{ department.department_name }}
-          </v-chip>
-        </div>
-      </v-card-text>
-    </v-card>
+        </v-btn>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/availability')">
+          <div class="quick-content">
+            <v-icon size="32">mdi-calendar-month-outline</v-icon>
+            <span>Availability</span>
+          </div>
+        </v-btn>
+      </v-col>
+    </v-row>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
-const router = useRouter();
+import shiftService from "../services/shiftService.js";
+import Utils from "../config/utils.js";
 
-const loading = ref(false);
+const router = useRouter();
 const error = ref("");
-const overview = reactive({
-  departments: [],
-  summary: {
-    shifts: { draft: 0, published: 0, changed: 0, cancelled: 0 },
-    open_gap_alerts: 0,
-    unresolved_attendance_issues: 0,
-    unacknowledged_shift_assignments: 0,
-    pending_availability_requests: 0,
-  },
-});
+const allShifts = ref([]);
+const swapRequests = ref([]);
+
+const deptContext = Utils.getStore("currentDepartmentContext") || {};
+const currentDeptId = deptContext.department_id || null;
 
 const todayLabel = computed(() =>
   new Date().toLocaleDateString("en-US", {
@@ -88,29 +154,120 @@ const todayLabel = computed(() =>
   }),
 );
 
-const loadOverview = async () => {
-  loading.value = true;
+const toDateTime = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return null;
+  const [year, month, day] = String(dateValue).split("-").map(Number);
+  const [hour, minute] = String(timeValue).split(":").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0, 0);
+};
+
+const formatDateShort = (dateValue) => {
+  if (!dateValue) return "—";
+  const date = new Date(`${dateValue}T00:00:00`);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const formatTime = (timeValue) => {
+  if (!timeValue) return "—";
+  const [hour, minute] = String(timeValue).split(":");
+  const date = new Date();
+  date.setHours(Number(hour || 0), Number(minute || 0), 0, 0);
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
+const formatRange = (startTime, endTime) => `${formatTime(startTime)} – ${formatTime(endTime)}`;
+
+const sameDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const workingNowCount = computed(() => {
+  const now = new Date();
+  return allShifts.value.filter((shift) => {
+    const start = toDateTime(shift.shift_date, shift.start_time);
+    const end = toDateTime(shift.shift_date, shift.end_time);
+    if (!start || !end) return false;
+    return !!shift.assigned_user_id && now >= start && now <= end;
+  }).length;
+});
+
+const comingUpCount = computed(() => {
+  const now = new Date();
+  return allShifts.value.filter((shift) => {
+    const start = toDateTime(shift.shift_date, shift.start_time);
+    if (!start) return false;
+    return !!shift.assigned_user_id && sameDay(start, now) && start > now;
+  }).length;
+});
+
+const pendingApprovals = computed(() =>
+  (swapRequests.value || [])
+    .filter((item) => String(item.status || "").toLowerCase() === "pending")
+    .map((item) => {
+      const userName =
+        item.requestedBy ||
+        `${item.user?.fName || ""} ${item.user?.lName || ""}`.trim() ||
+        "Unknown Worker";
+
+      const shiftDate = item.shift?.shift_date || item.shift_date || item.date || null;
+      const startTime = item.shift?.start_time || item.start_time || null;
+      const endTime = item.shift?.end_time || item.end_time || null;
+
+      return {
+        id: item.id || `${userName}-${shiftDate || ""}-${startTime || ""}`,
+        type: item.requestType || item.type || "Swap",
+        status: "Pending",
+        workerName: userName,
+        dateLabel: shiftDate ? formatDateShort(shiftDate) : "—",
+        timeRange: startTime && endTime ? formatRange(startTime, endTime) : "—",
+      };
+    }),
+);
+
+const pendingPreview = computed(() => pendingApprovals.value.slice(0, 3));
+
+const unfilledShifts = computed(() => {
+  const today = new Date();
+  const sorted = (allShifts.value || [])
+    .filter((shift) => !shift.assigned_user_id)
+    .filter((shift) => {
+      const shiftStart = toDateTime(shift.shift_date, shift.start_time);
+      return shiftStart ? shiftStart >= new Date(today.getFullYear(), today.getMonth(), today.getDate()) : false;
+    })
+    .sort((a, b) => {
+      const aStart = toDateTime(a.shift_date, a.start_time)?.getTime() || 0;
+      const bStart = toDateTime(b.shift_date, b.start_time)?.getTime() || 0;
+      return aStart - bStart;
+    });
+
+  return sorted.map((shift) => ({
+    ...shift,
+    departmentName: shift.department?.department_name || deptContext.department_name || "Department",
+    positionName: shift.position?.position_name || "Position",
+    dateLabel: formatDateShort(shift.shift_date),
+    timeRange: formatRange(shift.start_time, shift.end_time),
+  }));
+});
+
+const unfilledPreview = computed(() => unfilledShifts.value.slice(0, 3));
+
+const loadDashboardData = async () => {
   error.value = "";
   try {
-    const response = await apiClient.get("/manager/overview");
-    const payload = response?.data || {};
-    overview.departments = payload.departments || [];
-    overview.summary = {
-      ...overview.summary,
-      ...(payload.summary || {}),
-      shifts: {
-        ...overview.summary.shifts,
-        ...((payload.summary || {}).shifts || {}),
-      },
-    };
+    const [shiftsRes, swapsRes] = await Promise.all([
+      shiftService.listShifts({ department_id: currentDeptId, is_published: true }),
+      apiClient.get(`/shift-acknowledgements?type=swap&departmentId=${currentDeptId || ""}`),
+    ]);
+
+    allShifts.value = shiftsRes?.data || [];
+    swapRequests.value = swapsRes?.data?.data || swapsRes?.data || [];
   } catch (err) {
-    error.value = err?.response?.data?.message || "Failed to load manager overview.";
-  } finally {
-    loading.value = false;
+    error.value = err?.response?.data?.message || "Failed to load dashboard data.";
   }
 };
 
-onMounted(loadOverview);
+onMounted(loadDashboardData);
 </script>
 
 <style scoped>
@@ -120,7 +277,7 @@ onMounted(loadOverview);
 
 .page-header {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
@@ -133,65 +290,146 @@ onMounted(loadOverview);
 .header-actions {
   margin-left: auto;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .page-title {
   margin: 0;
-  font-size: 48px;
+  font-size: 52px;
   line-height: 1.05;
+  font-weight: 700;
+  color: #101828;
 }
 
 .page-subtitle {
   margin: 6px 0 0;
   color: #667085;
-  font-size: 17px;
+  font-size: 16px;
 }
 
-.overview-card {
+.summary-card,
+.content-card {
   border: 1px solid #e3e5e8;
   border-radius: 14px;
 }
 
-.overview-title {
-  font-size: 36px;
-  font-weight: 700;
-}
-
-.overview-subtitle {
+.summary-label {
   color: #667085;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.activity-block {
-  border: 1px solid #e3e5e8;
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.activity-heading {
-  font-size: 15px;
-  font-weight: 600;
-  color: #101828;
-}
-
-.activity-value {
-  font-size: 38px;
+.summary-value {
+  margin-top: 2px;
+  font-size: 34px;
   line-height: 1.1;
-  font-weight: 700;
   color: #101828;
-  margin-top: 4px;
+  font-weight: 700;
 }
 
-.activity-caption {
+.summary-caption {
   margin-top: 4px;
   color: #667085;
   font-size: 13px;
 }
 
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 24px;
+  color: #101828;
+  font-weight: 700;
+}
+
+.card-subtitle {
+  color: #667085;
+  font-size: 15px;
+  margin-top: 2px;
+}
+
+.ghost-btn {
+  color: #1f2937;
+}
+
+.list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending-item {
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.pending-top-row,
+.unfilled-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worker-name {
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.15;
+  color: #101828;
+  font-weight: 500;
+}
+
+.meta-line {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 16px;
+}
+
+.unfilled-item {
+  border: 1px solid #f2c48a;
+  background: #fff9f2;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.position-name {
+  color: #101828;
+  font-weight: 500;
+  font-size: 18px;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #667085;
+  min-height: 64px;
+}
+
+.quick-btn {
+  height: 140px;
+  border-color: #d9dde3;
+}
+
+.quick-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #1f2937;
+  font-size: 20px;
+}
+
 @media (max-width: 960px) {
   .page-title {
-    font-size: 38px;
+    font-size: 40px;
   }
 }
 </style>

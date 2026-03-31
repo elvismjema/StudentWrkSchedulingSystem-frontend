@@ -81,8 +81,7 @@ const router = createRouter({
         },
         {
           path: "departments",
-          name: "student-departments",
-          component: () => import("./views/StudentDepartments.vue")
+          redirect: { name: "student-schedule" }
         },
         {
           path: "availability",

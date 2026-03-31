@@ -12,9 +12,7 @@
       <div class="logo-container">
         <div class="oc-logo">OC</div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">System Administration</div>
-
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -73,10 +71,7 @@ const displayRole = computed(() => {
   return context?.role_name || "Administrator";
 });
 
-const displayDepartment = computed(() => {
-  const context = Utils.getStore("currentDepartmentContext");
-  return context?.department_name || "System Administration";
-});
+const bannerTitle = computed(() => "Admin");
 
 const displayInitial = computed(() => {
   const first = user.value?.fName?.[0] || "";

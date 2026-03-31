@@ -144,7 +144,7 @@ const router = createRouter({
         {
           path: "create-shift",
           name: "manager-create-shift",
-          redirect: { name: "manager-schedule" },
+          component: () => import("./views/ManagerCreateShift.vue"),
         },
         {
           path: "availability",

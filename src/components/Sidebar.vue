@@ -14,8 +14,7 @@
           OC
         </div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">Student Worker Scheduling</div>
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -75,6 +74,14 @@ const displayName = computed(() => {
 const displayRole = computed(() => {
   const role = (user.value?.role || 'student').toLowerCase()
   return role === 'manager' ? 'Manager' : 'Student'
+})
+
+const bannerTitle = computed(() => {
+  const context = Utils.getStore('currentDepartmentContext')
+  if (context?.department_name) return context.department_name
+
+  const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name
+  return membershipDepartment || user.value?.department_name || 'Department'
 })
 
 const displayInitial = computed(() => {

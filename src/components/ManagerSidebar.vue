@@ -12,9 +12,7 @@
       <div class="logo-container">
         <div class="oc-logo">OC</div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">Student Worker Scheduling</div>
-
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -98,8 +96,12 @@ const displayRole = computed(() => {
 
 const displayDepartment = computed(() => {
   const context = Utils.getStore("currentDepartmentContext");
-  return context?.department_name || "Student Worker Scheduling";
+  if (context?.department_name) return context.department_name;
+  const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name;
+  return membershipDepartment || user.value?.department_name || "Department";
 });
+
+const bannerTitle = computed(() => displayDepartment.value);
 
 const displayInitial = computed(() => {
   const first = user.value?.fName?.[0] || "";

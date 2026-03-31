@@ -87,9 +87,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
+import Utils from '../config/utils'
 
 const emit = defineEmits(['notification-click'])
 const router = useRouter()
+const currentUser = Utils.getStore("user") || {}
 
 const isOpen = ref(false)
 const notifications = ref([])
@@ -120,7 +122,11 @@ const handleNotificationClick = async (notification) => {
 }
 
 const handleViewAll = () => {
-  router.push('/student/notifications')
+  const role = String(currentUser.role || "").toLowerCase()
+  const destination = role === "manager" || role === "admin"
+    ? "/manager/notifications"
+    : "/student/notifications"
+  router.push(destination)
   isOpen.value = false
 }
 

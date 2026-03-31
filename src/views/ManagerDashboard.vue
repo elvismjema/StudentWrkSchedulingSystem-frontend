@@ -1,75 +1,70 @@
 <template>
   <div class="dashboard-page">
     <section class="page-header">
-      <h1 class="page-title">Manager Dashboard</h1>
-      <p class="page-subtitle">Live operational overview for managed departments.</p>
-      <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="loadOverview">
-        Refresh
-      </v-btn>
+      <div class="header-text">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">{{ todayLabel }}</p>
+      </div>
+      <div class="header-actions">
+        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="router.push('/manager/create-shift')">
+          Create Shift
+        </v-btn>
+        <v-btn variant="outlined" prepend-icon="mdi-calendar-month-outline" @click="router.push('/manager/schedule')">
+          View Schedule
+        </v-btn>
+      </div>
     </section>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
       {{ error }}
     </v-alert>
 
-    <v-row>
-      <v-col cols="12" sm="6" md="3">
-        <metric-card title="Draft Shifts" :value="overview.summary.shifts.draft" />
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <metric-card title="Published Shifts" :value="overview.summary.shifts.published" />
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <metric-card title="Changed Shifts" :value="overview.summary.shifts.changed" />
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <metric-card title="Cancelled Shifts" :value="overview.summary.shifts.cancelled" />
-      </v-col>
-    </v-row>
-
-    <v-row class="mt-1">
-      <v-col cols="12" sm="6" md="4">
-        <metric-card title="Coverage Gaps" :value="overview.summary.open_gap_alerts" />
-      </v-col>
-      <v-col cols="12" sm="6" md="4">
-        <metric-card title="Attendance Issues" :value="overview.summary.unresolved_attendance_issues" />
-      </v-col>
-      <v-col cols="12" sm="6" md="4">
-        <metric-card title="Unacknowledged Shifts" :value="overview.summary.unacknowledged_shift_assignments" />
-      </v-col>
-    </v-row>
-
-    <v-row class="mt-1">
-      <v-col cols="12" md="6">
-        <metric-card title="Pending Availability Requests" :value="overview.summary.pending_availability_requests" />
-      </v-col>
-      <v-col cols="12" md="6">
-        <v-card elevation="0" class="metric-card">
-          <v-card-title class="text-subtitle-1">Managed Departments</v-card-title>
-          <v-card-text>
-            <div v-if="overview.departments.length === 0" class="text-medium-emphasis">
-              No departments in scope.
+    <v-card elevation="0" class="overview-card">
+      <v-card-title class="overview-title">Who's Working Now &amp; Coming Up</v-card-title>
+      <v-card-subtitle class="overview-subtitle">Quick operational snapshot for your departments.</v-card-subtitle>
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" md="6">
+            <div class="activity-block">
+              <div class="activity-heading">Who's Working Now</div>
+              <div class="activity-value">{{ overview.summary.shifts.published }}</div>
+              <div class="activity-caption">Published shifts in progress today</div>
             </div>
-            <v-chip
-              v-for="department in overview.departments"
-              :key="department.department_id"
-              class="ma-1"
-              color="primary"
-              variant="outlined"
-            >
-              {{ department.department_name }}
-            </v-chip>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+          </v-col>
+          <v-col cols="12" md="6">
+            <div class="activity-block">
+              <div class="activity-heading">Coming Up</div>
+              <div class="activity-value">{{ overview.summary.shifts.draft }}</div>
+              <div class="activity-caption">Draft shifts queued for review</div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <div class="department-wrap mt-4">
+          <div class="activity-heading mb-2">Managed Departments</div>
+          <div v-if="overview.departments.length === 0" class="text-medium-emphasis">
+            No departments in scope.
+          </div>
+          <v-chip
+            v-for="department in overview.departments"
+            :key="department.department_id"
+            class="ma-1"
+            color="#8B1538"
+            variant="outlined"
+          >
+            {{ department.department_name }}
+          </v-chip>
+        </div>
+      </v-card-text>
+    </v-card>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
-import MetricCard from "../components/MetricCard.vue";
+const router = useRouter();
 
 const loading = ref(false);
 const error = ref("");
@@ -83,6 +78,15 @@ const overview = reactive({
     pending_availability_requests: 0,
   },
 });
+
+const todayLabel = computed(() =>
+  new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }),
+);
 
 const loadOverview = async () => {
   loading.value = true;
@@ -116,25 +120,78 @@ onMounted(loadOverview);
 
 .page-header {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
+.header-text {
+  min-width: 260px;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .page-title {
   margin: 0;
+  font-size: 48px;
+  line-height: 1.05;
 }
 
 .page-subtitle {
-  margin: 0;
+  margin: 6px 0 0;
   color: #667085;
-  flex: 1;
-  min-width: 280px;
+  font-size: 17px;
 }
 
-.metric-card {
+.overview-card {
   border: 1px solid #e3e5e8;
+  border-radius: 14px;
+}
+
+.overview-title {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.overview-subtitle {
+  color: #667085;
+}
+
+.activity-block {
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.activity-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.activity-value {
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #101828;
+  margin-top: 4px;
+}
+
+.activity-caption {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 13px;
+}
+
+@media (max-width: 960px) {
+  .page-title {
+    font-size: 38px;
+  }
 }
 </style>
-

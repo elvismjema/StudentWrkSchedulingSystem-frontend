@@ -89,9 +89,10 @@ const displayName = computed(() => {
 });
 
 const displayRole = computed(() => {
-
-  const context = Utils.getStore("currentDepartmentContext");
-  return context?.role_name || "Manager";
+  const role = (user.value?.role || "").toLowerCase();
+  if (role === "admin") return "Admin";
+  if (role === "manager") return "Manager";
+  return "Student";
 });
 
 const displayDepartment = computed(() => {
@@ -116,15 +117,11 @@ const isAdmin = computed(() => {
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
-  { title: "Create Shift", icon: "mdi-plus-circle-outline", route: "/manager/create-shift" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
   { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
   { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
-  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" },
-  { title: "Tasks", icon: "mdi-format-list-checks", route: "/manager/tasks" },
-  { title: "Notifications", icon: "mdi-bell-outline", route: "/manager/notifications" },
-  { title: "Settings", icon: "mdi-cog-outline", route: "/manager/settings" }
+  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 
 const adminNavItems = [

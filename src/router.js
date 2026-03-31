@@ -183,8 +183,7 @@ const router = createRouter({
         {
           path: "notifications",
           name: "manager-notifications",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Notifications", description: "Review manager alerts and notifications." }
+          component: () => import("./views/StudentNotifications.vue")
         },
         {
           path: "profile",

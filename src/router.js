@@ -319,7 +319,7 @@ router.onError((error, to) => {
     error?.name === "ChunkLoadError";
 
   if (chunkFailure && to?.fullPath) {
-    window.location.assign(to.fullPath);
+    window.location.assign(Utils.resolveAppUrl(to.fullPath));
   }
 });
 

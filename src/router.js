@@ -110,11 +110,6 @@ const router = createRouter({
           redirect: { name: "student-schedule" },
         },
         {
-          path: "clock",
-          name: "student-clock",
-          component: () => import("./views/StudentClock.vue")
-        },
-        {
           path: "tasks",
           name: "student-tasks",
           component: () => import("./views/StudentTasks.vue")

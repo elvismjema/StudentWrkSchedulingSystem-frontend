@@ -10,6 +10,8 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
+import Admin from "./views/AdminDashboard.vue";
+import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {
   const user = Utils.getStore("user");
@@ -17,9 +19,10 @@ const getStoredRole = () => {
 };
 
 const getDefaultDashboardRoute = () => {
-  return getStoredRole() === "manager"
-    ? { name: "manager-dashboard" }
-    : { name: "student-schedule" };
+  const role = getStoredRole();
+  if (role === "admin") return { name: "admin-dashboard" };
+  if (role === "manager") return { name: "manager-dashboard" };
+  return { name: "student-dashboard" };
 };
 
 const router = createRouter({
@@ -69,27 +72,42 @@ const router = createRouter({
       path: "/student",
       name: "student",
       component: Student,
-      redirect: { name: "student-schedule" },
+      redirect: { name: "student-dashboard" },
       children: [
+        {
+          path: "dashboard",
+          name: "student-dashboard",
+          component: () => import("./views/StudentDashboard.vue"),
+        },
         {
           path: "schedule",
           name: "student-schedule",
-          component: () => import("./views/StudentSchedule.vue")
+          component: () => import("./views/StudentSchedule.vue"),
         },
         {
+          path: "clock",
+          name: "student-clock",
+          component: () => import("./views/StudentClock.vue"),
+        },
+        {
+          path: "more",
+          name: "student-more",
+          component: () => import("./views/StudentMore.vue"),
+        },
+        // Legacy routes — redirect to new structure
+        {
           path: "departments",
-          name: "student-departments",
-          component: () => import("./views/StudentDepartments.vue")
+          redirect: { name: "student-dashboard" },
         },
         {
           path: "availability",
           name: "student-availability",
-          component: () => import("./views/StudentAvailability.vue")
+          redirect: { name: "student-more" },
         },
         {
           path: "trade-board",
           name: "student-trade-board",
-          component: () => import("./views/StudentTradeBoard.vue")
+          redirect: { name: "student-schedule" },
         },
         {
           path: "clock",
@@ -97,21 +115,26 @@ const router = createRouter({
           component: () => import("./views/StudentClock.vue")
         },
         {
+          path: "tasks",
+          name: "student-tasks",
+          component: () => import("./views/StudentTasks.vue")
+        },
+        {
           path: "notifications",
           name: "student-notifications",
-          component: () => import("./views/StudentNotifications.vue")
+          component: () => import("./views/StudentNotifications.vue"),
         },
         {
           path: "profile",
           name: "student-profile",
-          component: () => import("./views/StudentProfile.vue")
+          redirect: { name: "student-more" },
         },
         {
           path: "settings",
           name: "student-settings",
-          component: () => import("./views/StudentSettings.vue")
-        }
-      ]
+          redirect: { name: "student-more" },
+        },
+      ],
     },
     {
       path: "/manager",
@@ -122,89 +145,187 @@ const router = createRouter({
         {
           path: "dashboard",
           name: "manager-dashboard",
-          component: () => import("./views/ManagerDashboard.vue")
+          component: () => import("./views/ManagerDashboard.vue"),
         },
         {
           path: "schedule",
           name: "manager-schedule",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Schedule", description: "Build and manage worker schedules in this view." }
+          component: ShiftManagement,
+        },
+        {
+          path: "templates",
+          name: "manager-templates",
+          component: () => import("./views/ScheduleTemplates.vue"),
         },
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Create Shift", description: "Create and assign new shifts for workers." }
+          component: ShiftManagement,
         },
         {
           path: "availability",
           name: "manager-availability",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Availability", description: "Review worker availability and constraints." }
+          props: {
+            title: "Availability",
+            description: "Review worker availability and constraints.",
+          },
         },
         {
           path: "approvals",
           name: "manager-approvals",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Approvals", description: "Approve or reject pending requests." }
+          component: () => import("./views/ManagerApprovals.vue"),
         },
         {
           path: "time-attendance",
           name: "manager-time-attendance",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Time & Attendance", description: "Track clock-in activity and attendance records." }
+          props: {
+            title: "Time & Attendance",
+            description: "Track clock-in activity and attendance records.",
+          },
         },
         {
           path: "workers",
           name: "manager-workers",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Workers", description: "View and manage worker profiles." }
+          component: () => import("./views/UserManagement.vue"),
         },
         {
           path: "tasks",
           name: "manager-tasks",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Tasks", description: "Assign and monitor worker tasks." }
+          props: {
+            title: "Tasks",
+            description: "Assign and monitor worker tasks.",
+          },
         },
         {
           path: "reports",
           name: "manager-reports",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Reports", description: "Generate operational and staffing reports." }
+          props: {
+            title: "Reports",
+            description: "Generate operational and staffing reports.",
+          },
         },
         {
           path: "notifications",
           name: "manager-notifications",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Notifications", description: "Review manager alerts and notifications." }
+          component: () => import("./views/StudentNotifications.vue"),
+        },
+        {
+          path: "profile",
+          name: "manager-profile",
+          component: () => import("./views/ManagerProfile.vue"),
         },
         {
           path: "settings",
           name: "manager-settings",
+          component: () => import("./views/DepartmentSettings.vue"),
+        },
+        // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "admin/users",
+          name: "manager-admin-users",
+          component: () => import("./views/AdminUsers.vue"),
+        },
+        {
+          path: "admin/departments",
+          name: "manager-admin-departments",
+          component: () => import("./views/AdminDepartmentSettings.vue"),
+        },
+      ],
+    },
+    {
+      path: "/admin",
+      name: "admin",
+      component: Admin,
+      redirect: { name: "admin-dashboard" },
+      children: [
+        {
+          path: "dashboard",
+          name: "admin-dashboard",
+          component: () => import("./views/AdminDashboard.vue"),
+        },
+        {
+          path: "users",
+          name: "admin-users",
+          component: () => import("./views/AdminUsers.vue"),
+        },
+        {
+          path: "departments",
+          name: "admin-departments",
+          component: () => import("./views/AdminDepartmentSettings.vue"),
+        },
+        {
+          path: "reports",
+          name: "admin-reports",
           component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "Settings", description: "Manage manager and department preferences." }
-        }
-      ]
-    }
+          props: {
+            title: "Reports",
+            description:
+              "View system-wide staffing and operations reports.",
+          },
+        },
+      ],
+    },
   ],
 });
 
+// ─── Auth guard ───────────────────────────────────────────────────────────────
 router.beforeEach((to) => {
-  const role = getStoredRole();
+  const user = Utils.getStore("user");
+  const role = (user?.role || "").toLowerCase();
+  const token = user?.token;
 
-  if (!role || to.name === "login") {
+  // Allow login page for everyone
+  if (to.name === "login") {
+    // If already logged in, redirect to dashboard
+    if (role && token) return getDefaultDashboardRoute();
     return true;
   }
 
-  if (to.path.startsWith("/manager") && role !== "manager") {
-    return { name: "student-schedule" };
+  // Require authentication for all other routes
+  if (!role || !token) {
+    return { name: "login" };
   }
 
-  if (to.path.startsWith("/student") && role === "manager") {
+  // Role-based access control
+  if (to.path.startsWith("/manager/admin") && role !== "admin") {
     return { name: "manager-dashboard" };
   }
 
+  if (to.path.startsWith("/manager") && role !== "manager" && role !== "admin") {
+    return { name: "student-dashboard" };
+  }
+
+  if (to.path.startsWith("/admin") && role !== "admin") {
+    return role === "manager"
+      ? { name: "manager-dashboard" }
+      : { name: "student-dashboard" };
+  }
+
+  if (to.path.startsWith("/student") && (role === "manager" || role === "admin")) {
+    return role === "admin"
+      ? { name: "admin-dashboard" }
+      : { name: "manager-dashboard" };
+  }
+
   return true;
+});
+
+// If a lazy-loaded route chunk fails to load (e.g. stale deployment or 404),
+// navigate to the target URL directly so the browser fetches a fresh page
+// rather than silently doing nothing.
+router.onError((error, to) => {
+  const chunkFailure =
+    error?.message?.includes("Failed to fetch dynamically imported module") ||
+    error?.message?.includes("Unable to preload") ||
+    error?.name === "ChunkLoadError";
+
+  if (chunkFailure && to?.fullPath) {
+    window.location.assign(to.fullPath);
+  }
 });
 
 export default router;

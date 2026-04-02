@@ -87,9 +87,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
+import Utils from '../config/utils'
 
 const emit = defineEmits(['notification-click'])
 const router = useRouter()
+const currentUser = Utils.getStore("user") || {}
 
 const isOpen = ref(false)
 const notifications = ref([])
@@ -106,17 +108,25 @@ const loadNotifications = async () => {
   }
 }
 
-const handleNotificationClick = (notification) => {
+const handleNotificationClick = async (notification) => {
   if (notification.unread) {
-    NotificationService.markAsRead(notification.id)
-    notification.unread = false
+    try {
+      await NotificationService.markAsRead(notification.id)
+      notification.unread = false
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
   }
   emit('notification-click', notification)
   isOpen.value = false
 }
 
 const handleViewAll = () => {
-  router.push('/student/notifications')
+  const role = String(currentUser.role || "").toLowerCase()
+  const destination = role === "manager" || role === "admin"
+    ? "/manager/notifications"
+    : "/student/notifications"
+  router.push(destination)
   isOpen.value = false
 }
 

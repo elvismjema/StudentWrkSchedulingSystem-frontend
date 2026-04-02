@@ -1,555 +1,501 @@
 <template>
-  <div class="clock-page">
-    <section class="page-header">
-      <h1 class="page-title">Clock In/Out</h1>
-      <p class="page-subtitle">Track your work time</p>
-    </section>
+  <div class="student-clock pa-4" role="main" aria-label="Time and Attendance">
+    <h1 class="text-h5 font-weight-bold mb-4">Time & Attendance</h1>
 
-    <v-card class="clock-card" elevation="0">
-      <div class="status-panel">
-        <div class="status-icon-wrap">
-          <v-icon size="72" class="status-icon">
-            {{ isClockedIn ? "mdi-timer-play-outline" : "mdi-clock-outline" }}
-          </v-icon>
-        </div>
-        <p class="status-label">{{ currentStatusLabel }}</p>
-      </div>
+    <!-- Loading -->
+    <template v-if="loading">
+      <v-skeleton-loader type="card" class="mb-4" />
+      <v-skeleton-loader type="button" class="mb-4" />
+      <v-skeleton-loader type="table" />
+    </template>
 
-      <v-divider />
+    <template v-else>
+      <!-- Clock Status Banner -->
+      <ClockStatusBanner
+        :clocked-in="clockedIn"
+        :clock-in-time="clockInTime"
+        :on-break="onBreak"
+        :shift-name="currentShiftName"
+        class="mb-4"
+      />
 
-      <div class="shift-panel">
-        <div class="shift-panel-top">
-          <div>
-            <p class="section-label">Today's Shift</p>
-            <div class="role-row">
-              <v-chip class="location-chip" size="large" variant="outlined">
-                <span class="chip-dot" />
-                {{ currentShift.location }}
-              </v-chip>
-              <span class="role-title">{{ currentShift.role }}</span>
-            </div>
+      <!-- Current/Next Shift Info -->
+      <v-card
+        v-if="activeShift"
+        elevation="0"
+        rounded="lg"
+        class="mb-4"
+        style="border: 1px solid #e0e0e0"
+      >
+        <v-card-text class="pa-4">
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-1">
+            {{ clockedIn ? 'CURRENT SHIFT' : 'NEXT SHIFT' }}
           </div>
-
-          <div class="attendance-pill" :class="attendanceClass">
-            <v-icon size="20">{{ attendanceIcon }}</v-icon>
-            <span>{{ attendanceLabel }}</span>
+          <div class="text-body-1 font-weight-medium">
+            {{ activeShift.department_name || activeShift.departmentName }}
           </div>
-        </div>
-
-        <div class="detail-row">
-          <div class="detail-item">
-            <v-icon size="22" class="detail-icon">mdi-clock-outline</v-icon>
-            <span>{{ currentShift.scheduledWindow }}</span>
+          <div class="text-body-2">
+            <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+            {{ formatShiftTime(activeShift) }}
           </div>
-          <div class="detail-item">
-            <v-icon size="22" class="detail-icon">mdi-map-marker-outline</v-icon>
-            <span>{{ currentShift.campusLocation }}</span>
+          <div v-if="activeShift.location" class="text-body-2 text-medium-emphasis">
+            <v-icon size="14" class="mr-1">mdi-map-marker-outline</v-icon>
+            {{ activeShift.location }}
           </div>
-        </div>
+        </v-card-text>
+      </v-card>
 
-        <div v-if="isClockedIn" class="active-session">
-          Started at {{ formatTime(clockInTime) }} • {{ activeDurationLabel }}
-        </div>
-
+      <!-- Clock In/Out Button -->
+      <div class="text-center mb-6">
         <v-btn
-          block
+          v-if="!clockedIn"
           size="x-large"
-          class="clock-action"
-          :class="isClockedIn ? 'clock-out' : 'clock-in'"
-          @click="toggleClock"
+          color="success"
+          variant="flat"
+          rounded="pill"
+          :disabled="!canClockIn"
+          :loading="clockingIn"
+          class="clock-btn"
+          aria-label="Clock in"
+          @click="confirmClockIn"
         >
-          {{ isClockedIn ? "Clock Out" : "Clock In" }}
+          <v-icon start size="28">mdi-login</v-icon>
+          Clock In
         </v-btn>
-      </div>
-    </v-card>
 
-    <v-card class="history-shell" elevation="0">
-      <h2 class="history-title">Recent History</h2>
-      <p class="history-subtitle">Your recent clock records</p>
-
-      <div class="history-list">
-        <v-card
-          v-for="entry in history"
-          :key="entry.id"
-          class="history-card"
-          elevation="0"
-        >
-          <div class="history-card-content">
-            <div>
-              <p class="history-date">{{ entry.dateLabel }}</p>
-              <p class="history-time">
-                {{ entry.actualWindow }} <span class="history-dot">•</span> Scheduled: {{ entry.scheduledWindow }}
-              </p>
-            </div>
-            <div class="history-status" :class="entry.statusClass">
-              {{ entry.status }}
-            </div>
+        <div v-else class="d-flex flex-column align-center gap-3">
+          <!-- Break controls -->
+          <div v-if="!onBreak" class="d-flex gap-2">
+            <v-btn
+              color="warning"
+              variant="flat"
+              rounded="pill"
+              :loading="breakLoading"
+              aria-label="Start break"
+              @click="startBreak"
+            >
+              <v-icon start>mdi-coffee-outline</v-icon>
+              Start Break
+            </v-btn>
+            <v-btn
+              color="error"
+              variant="flat"
+              rounded="pill"
+              :loading="clockingOut"
+              aria-label="Clock out"
+              @click="confirmClockOut"
+            >
+              <v-icon start>mdi-logout</v-icon>
+              Clock Out
+            </v-btn>
           </div>
-        </v-card>
+
+          <v-btn
+            v-else
+            color="success"
+            variant="flat"
+            rounded="pill"
+            :loading="breakLoading"
+            aria-label="End break"
+            @click="endBreakAction"
+          >
+            <v-icon start>mdi-coffee-off-outline</v-icon>
+            End Break
+          </v-btn>
+        </div>
+
+        <p v-if="!canClockIn && !clockedIn" class="text-caption text-medium-emphasis mt-2">
+          Clock in is available within 15 minutes of your shift start.
+        </p>
       </div>
-    </v-card>
+
+      <!-- Weekly Timesheet -->
+      <v-card elevation="0" rounded="lg" style="border: 1px solid #e0e0e0">
+        <v-card-title class="pa-4 pb-2">
+          <v-icon class="mr-2" size="20">mdi-table-clock</v-icon>
+          Weekly Timesheet
+        </v-card-title>
+
+        <v-card-text class="pa-0">
+          <v-table density="comfortable">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Scheduled</th>
+                <th>Actual</th>
+                <th>Break</th>
+                <th class="text-right">Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="day in timesheetRows" :key="day.date">
+                <td>
+                  <span :class="{ 'font-weight-bold': day.isToday }">{{ day.label }}</span>
+                </td>
+                <td class="text-body-2">{{ day.scheduled || '—' }}</td>
+                <td class="text-body-2">
+                  <span :class="day.actualClass">{{ day.actual || '—' }}</span>
+                </td>
+                <td class="text-body-2">{{ day.breakDuration || '—' }}</td>
+                <td class="text-right text-body-2 font-weight-medium">{{ day.hours || '—' }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="font-weight-bold">Weekly Total</td>
+                <td class="text-right font-weight-bold">{{ weeklyTotal }}h</td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-body-2 text-medium-emphasis">Est. Earnings</td>
+                <td class="text-right text-body-2 font-weight-bold" style="color: #2E7D32">${{ weeklyEarnings }}</td>
+              </tr>
+            </tfoot>
+          </v-table>
+        </v-card-text>
+      </v-card>
+    </template>
+
+    <!-- Clock In Confirmation Dialog -->
+    <v-dialog v-model="clockInDialog" max-width="400">
+      <v-card rounded="lg">
+        <v-card-title class="pa-4">Confirm Clock In</v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          <p v-if="activeShift">
+            Clocking in for <strong>{{ activeShift.department_name || activeShift.departmentName }}</strong>
+            at {{ formatShiftTime(activeShift) }}.
+          </p>
+          <p v-if="activeShift && activeShift.location">
+            Location: {{ activeShift.location }}
+          </p>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="clockInDialog = false">Cancel</v-btn>
+          <v-btn color="success" variant="flat" :loading="clockingIn" @click="doClockIn">
+            Clock In
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Clock Out Confirmation Dialog -->
+    <v-dialog v-model="clockOutDialog" max-width="400">
+      <v-card rounded="lg">
+        <v-card-title class="pa-4">Confirm Clock Out</v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          <p>Are you sure you want to clock out?</p>
+          <p v-if="clockInTime" class="text-body-2 text-medium-emphasis">
+            Clocked in since {{ new Date(clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) }}
+          </p>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="clockOutDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="flat" :loading="clockingOut" @click="doClockOut">
+            Clock Out
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
+      {{ snackbar.text }}
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { ref, computed, onMounted } from 'vue';
+import Utils from '../config/utils.js';
+import studentService from '../services/studentService.js';
+import ClockStatusBanner from '../components/student/ClockStatusBanner.vue';
 
-const currentShift = {
-  role: "Barista",
-  location: "The Brew",
-  campusLocation: "The Brew - Main Campus",
-  scheduledWindow: "14:00 - 18:00",
-  scheduledStartHour: 14,
-  scheduledStartMinute: 0,
-};
+const user = Utils.getStore('user');
 
-const createDemoNow = () => {
-  const date = new Date();
-  date.setHours(15, 12, 0, 0);
-  return date;
-};
-
-const now = ref(createDemoNow());
-const isClockedIn = ref(false);
+const loading = ref(true);
+const clockedIn = ref(false);
 const clockInTime = ref(null);
-const history = ref([
-  {
-    id: 1,
-    dateLabel: "Saturday, Feb 28",
-    actualWindow: "1:43 PM - 5:43 PM",
-    scheduledWindow: "14:00 - 18:00",
-    status: "On Time",
-    statusClass: "on-time",
-  },
-]);
+const onBreak = ref(false);
+const currentRecordId = ref(null);
+const activeShift = ref(null);
+const currentShiftName = ref('');
 
-let timerId;
+const clockingIn = ref(false);
+const clockingOut = ref(false);
+const breakLoading = ref(false);
+const clockInDialog = ref(false);
+const clockOutDialog = ref(false);
 
-const scheduledStart = computed(() => {
-  const date = new Date(now.value);
-  date.setHours(currentShift.scheduledStartHour, currentShift.scheduledStartMinute, 0, 0);
-  return date;
+const timesheetData = ref([]);
+const snackbar = ref({ show: false, text: '', color: 'success' });
+
+const canClockIn = computed(() => {
+  if (clockedIn.value) return false;
+  if (!activeShift.value) return false;
+  const start = new Date(activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start).getTime();
+  const diff = start - Date.now();
+  return diff <= 15 * 60 * 1000 && diff >= -60 * 60 * 1000;
 });
 
-const lateMinutes = computed(() => {
-  const diffMs = now.value.getTime() - scheduledStart.value.getTime();
-  return Math.max(0, Math.floor(diffMs / 60000));
-});
-
-const attendanceState = computed(() => {
-  if (isClockedIn.value && clockInTime.value) {
-    return clockInTime.value <= scheduledStart.value ? "on-time" : "late";
-  }
-
-  if (now.value > scheduledStart.value) {
-    return "late";
-  }
-
-  return "upcoming";
-});
-
-const attendanceLabel = computed(() => {
-  if (attendanceState.value === "late") {
-    return `${lateMinutes.value} minutes late`;
-  }
-
-  if (attendanceState.value === "upcoming") {
-    return "Upcoming";
-  }
-
-  return "On Time";
-});
-
-const attendanceClass = computed(() => attendanceState.value);
-
-const attendanceIcon = computed(() => {
-  if (attendanceState.value === "late") {
-    return "mdi-alert-outline";
-  }
-
-  return "mdi-check-circle-outline";
-});
-
-const currentStatusLabel = computed(() =>
-  isClockedIn.value ? "Currently clocked in" : "Ready to clock in"
-);
-
-const activeDurationLabel = computed(() => {
-  if (!clockInTime.value) {
-    return "0m";
-  }
-
-  const diffMs = now.value.getTime() - clockInTime.value.getTime();
-  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours === 0) {
-    return `${minutes}m`;
-  }
-
-  return `${hours}h ${minutes}m`;
-});
-
-const toggleClock = () => {
-  if (!isClockedIn.value) {
-    clockInTime.value = new Date(now.value);
-    isClockedIn.value = true;
-    return;
-  }
-
-  const clockOutTime = new Date(now.value);
-  history.value.unshift({
-    id: Date.now(),
-    dateLabel: formatHistoryDate(clockOutTime),
-    actualWindow: `${formatTime(clockInTime.value)} - ${formatTime(clockOutTime)}`,
-    scheduledWindow: currentShift.scheduledWindow,
-    status: clockInTime.value <= scheduledStart.value ? "On Time" : "Late",
-    statusClass: clockInTime.value <= scheduledStart.value ? "on-time" : "late",
-  });
-
-  isClockedIn.value = false;
-  clockInTime.value = null;
+const formatShiftTime = (s) => {
+  if (!s) return '';
+  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return fmt(s.start_time || s.startTime || s.shift_start) + ' – ' + fmt(s.end_time || s.endTime || s.shift_end);
 };
 
-const formatTime = (value) =>
-  new Date(value).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const formatHistoryDate = (value) =>
-  new Date(value).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+const getMonday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
-onMounted(() => {
-  timerId = window.setInterval(() => {
-    now.value = new Date(now.value.getTime() + 1000);
-  }, 1000);
+const toDateStr = (d) => {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+
+const todayStr = toDateStr(new Date());
+
+const timesheetRows = computed(() => {
+  const monday = getMonday(new Date());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    const dateStr = toDateStr(d);
+    const entry = timesheetData.value.find(t => {
+      const td = new Date(t.date || t.shift_date);
+      return toDateStr(td) === dateStr;
+    });
+
+    const fmtTime = (v) => {
+      if (!v) return null;
+      return new Date(v).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    };
+
+    let scheduled = null;
+    let actual = null;
+    let hours = null;
+    let breakDuration = null;
+    let actualClass = '';
+
+    if (entry) {
+      scheduled = (fmtTime(entry.scheduled_start) || '') + (entry.scheduled_start && entry.scheduled_end ? ' – ' : '') + (fmtTime(entry.scheduled_end) || '');
+      if (!scheduled.trim() || scheduled === ' – ') scheduled = null;
+
+      actual = (fmtTime(entry.actual_start || entry.clock_in_time) || '') +
+        ((entry.actual_start || entry.clock_in_time) && (entry.actual_end || entry.clock_out_time) ? ' – ' : '') +
+        (fmtTime(entry.actual_end || entry.clock_out_time) || '');
+      if (!actual.trim() || actual === ' – ') actual = null;
+
+      hours = entry.total_hours != null ? Number(entry.total_hours).toFixed(1) : null;
+      breakDuration = entry.break_minutes ? entry.break_minutes + 'm' : null;
+
+      // Highlight late clock-ins
+      if (entry.actual_start && entry.scheduled_start) {
+        const late = new Date(entry.actual_start).getTime() - new Date(entry.scheduled_start).getTime();
+        if (late > 5 * 60 * 1000) actualClass = 'text-error';
+      }
+    }
+
+    return {
+      date: dateStr,
+      label: DAY_LABELS[d.getDay()] + ' ' + d.getDate(),
+      isToday: dateStr === todayStr,
+      scheduled,
+      actual,
+      hours,
+      breakDuration,
+      actualClass,
+    };
+  });
 });
 
-onBeforeUnmount(() => {
-  window.clearInterval(timerId);
+const weeklyTotal = computed(() => {
+  let sum = 0;
+  timesheetRows.value.forEach(r => {
+    if (r.hours) sum += parseFloat(r.hours);
+  });
+  return sum.toFixed(1);
 });
+
+const weeklyEarnings = computed(() => {
+  return (parseFloat(weeklyTotal.value) * 10).toFixed(2);
+});
+
+const fetchAll = async () => {
+  loading.value = true;
+  try {
+    await Promise.allSettled([fetchClockStatus(), fetchActiveShift(), fetchTimesheet()]);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const fetchClockStatus = async () => {
+  try {
+    const res = await studentService.getOpenClockRecord();
+    const record = res?.data?.data || res?.data;
+    if (record && record.id && !record.clock_out_time && !record.clockOutTime) {
+      clockedIn.value = true;
+      currentRecordId.value = record.id;
+      clockInTime.value = record.clock_in_time || record.clockInTime || record.createdAt;
+      onBreak.value = !!record.on_break || !!record.onBreak;
+    } else {
+      clockedIn.value = false;
+      currentRecordId.value = null;
+      clockInTime.value = null;
+      onBreak.value = false;
+    }
+  } catch {
+    clockedIn.value = false;
+  }
+};
+
+const fetchActiveShift = async () => {
+  try {
+    const userId = user?.userId || user?.id;
+    const today = toDateStr(new Date());
+    const res = await studentService.getShifts({ assigned_user_id: userId, start_date: today, end_date: today });
+    const shifts = res?.data?.data || res?.data || [];
+    const now = Date.now();
+
+    // Find current or next upcoming shift today
+    const sorted = shifts.sort((a, b) =>
+      new Date(a.start_time || a.startTime || a.shift_start) - new Date(b.start_time || b.startTime || b.shift_start)
+    );
+
+    activeShift.value = sorted.find(s => {
+      const end = new Date(s.end_time || s.endTime || s.shift_end).getTime();
+      return end > now;
+    }) || sorted[0] || null;
+
+    if (activeShift.value) {
+      currentShiftName.value = activeShift.value.department_name || activeShift.value.departmentName || '';
+    }
+  } catch {
+    activeShift.value = null;
+  }
+};
+
+const fetchTimesheet = async () => {
+  try {
+    const monday = getMonday(new Date());
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+
+    const res = await studentService.getTimesheet({
+      startDate: toDateStr(monday),
+      endDate: toDateStr(sunday),
+    });
+    timesheetData.value = res?.data?.data || res?.data || [];
+  } catch {
+    timesheetData.value = [];
+  }
+};
+
+const confirmClockIn = () => {
+  clockInDialog.value = true;
+};
+
+const doClockIn = async () => {
+  clockingIn.value = true;
+  try {
+    const payload = {};
+    if (activeShift.value) {
+      payload.shiftId = activeShift.value.id;
+      payload.shift_id = activeShift.value.id;
+    }
+    await studentService.clockIn(payload);
+    showSnackbar('Clocked in!', 'success');
+    clockInDialog.value = false;
+    await fetchClockStatus();
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to clock in.', 'error');
+  } finally {
+    clockingIn.value = false;
+  }
+};
+
+const confirmClockOut = () => {
+  clockOutDialog.value = true;
+};
+
+const doClockOut = async () => {
+  clockingOut.value = true;
+  try {
+    await studentService.clockOut(currentRecordId.value);
+    showSnackbar('Clocked out!', 'success');
+    clockOutDialog.value = false;
+    await fetchAll();
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to clock out.', 'error');
+  } finally {
+    clockingOut.value = false;
+  }
+};
+
+const startBreak = async () => {
+  breakLoading.value = true;
+  try {
+    await studentService.startBreak(currentRecordId.value);
+    onBreak.value = true;
+    showSnackbar('Break started.', 'info');
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to start break.', 'error');
+  } finally {
+    breakLoading.value = false;
+  }
+};
+
+const endBreakAction = async () => {
+  breakLoading.value = true;
+  try {
+    await studentService.endBreak(currentRecordId.value);
+    onBreak.value = false;
+    showSnackbar('Break ended.', 'success');
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to end break.', 'error');
+  } finally {
+    breakLoading.value = false;
+  }
+};
+
+const showSnackbar = (text, color = 'success') => {
+  snackbar.value = { show: true, text, color };
+};
+
+onMounted(fetchAll);
 </script>
 
 <style scoped>
-.clock-page {
-  min-height: 100%;
-  padding: 24px;
-  background: #f3f3f4;
-  overflow-y: auto;
+.student-clock {
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: 24px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
+.clock-btn {
+  min-width: 200px;
+  height: 56px !important;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 32px;
-  color: #222328;
+  letter-spacing: 0.5px;
 }
 
-.page-subtitle,
-.history-subtitle,
-.section-label,
-.history-time,
-.detail-item,
-.active-session {
-  color: #6e7584;
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+
+.text-error {
+  color: #EE5044;
 }
 
-.page-subtitle {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-.clock-card,
-.history-shell,
-.history-card {
-  border: 1px solid #d4d7dd;
-  border-radius: 18px;
-  background: #f7f7f8;
-  box-shadow: 0 2px 8px rgba(26, 33, 46, 0.08);
-}
-
-.clock-card {
-  overflow: hidden;
-}
-
-.status-panel {
-  min-height: 360px;
-  padding: 40px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.status-icon-wrap {
-  width: 124px;
-  height: 124px;
-  margin-bottom: 24px;
-  border: 10px solid #b0b5bd;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.status-icon {
-  color: #afb4bc;
-}
-
-.status-label {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-  color: #6b7281;
-}
-
-.shift-panel {
-  padding: 24px;
-}
-
-.shift-panel-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.section-label {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.role-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.location-chip {
-  background: #fbefe6;
-  border-color: #f1b38e;
-  color: #f27a21;
-  font-weight: 500;
-}
-
-.location-chip :deep(.v-chip__content) {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chip-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #f27a21;
-}
-
-.role-title {
-  color: #232428;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-}
-
-.attendance-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.attendance-pill.late {
-  color: #f1453d;
-}
-
-.attendance-pill.on-time,
-.attendance-pill.upcoming {
-  color: #22a44e;
-}
-
-.detail-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin-top: 24px;
-}
-
-.detail-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-.detail-icon {
-  color: #747b88;
-}
-
-.active-session {
-  margin-top: 16px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.clock-action {
-  margin-top: 24px;
-  min-height: 64px;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  text-transform: none;
-}
-
-.clock-action.clock-in {
-  background: #28c45a;
-  color: #ffffff;
-}
-
-.clock-action.clock-out {
-  background: #8b1538;
-  color: #ffffff;
-}
-
-.history-shell {
-  margin-top: 24px;
-  padding: 24px;
-}
-
-.history-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 32px;
-  color: #222328;
-}
-
-.history-subtitle {
-  margin: 8px 0 24px;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-.history-list {
-  display: grid;
-  gap: 12px;
-}
-
-.history-card {
-  padding: 20px 24px;
-  background: #f6f6f7;
-}
-
-.history-card-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.history-date {
-  margin: 0;
-  color: #24252a;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-}
-
-.history-time {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-.history-dot {
-  margin: 0 8px;
-}
-
-.history-status {
-  padding: 8px 16px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.history-status.on-time {
-  color: #20b24e;
-  background: #ebf7ee;
-  border: 1px solid #b7debf;
-}
-
-.history-status.late {
-  color: #f1453d;
-  background: #fdeeed;
-  border: 1px solid #f1c0bc;
-}
-
-@media (max-width: 900px) {
-  .clock-page {
-    padding: 24px 16px 32px;
-  }
-
-  .status-panel {
-    min-height: 320px;
-  }
-
-  .shift-panel {
-    padding: 24px;
-  }
-
-  .shift-panel-top,
-  .history-card-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-@media (max-width: 640px) {
-  .status-icon-wrap {
-    width: 104px;
-    height: 104px;
-    border-width: 8px;
-  }
-
-  .status-label {
-    font-size: 18px;
-  }
-
-  .role-title {
-    font-size: 18px;
-  }
-
-  .clock-action {
-    min-height: 60px;
-    font-size: 16px;
-  }
-
-  .history-shell {
-    padding: 24px 16px;
+@media (max-width: 600px) {
+  .student-clock {
+    padding: 12px !important;
   }
 }
 </style>

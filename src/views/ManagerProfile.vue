@@ -81,8 +81,8 @@
       <div class="profile-side-column">
         <v-card class="profile-card compact-card" elevation="0">
           <div class="section-header">
-            <h2>Department & Positions</h2>
-            <p>Your work assignments</p>
+          <h2>Department & Positions</h2>
+          <p>Your work assignments</p>
           </div>
 
           <v-progress-linear v-if="loadingDepts" indeterminate color="#8B1538" class="mb-4" />
@@ -115,9 +115,7 @@
             Not assigned to any department yet.
           </div>
 
-          <p class="assignment-note">
-            Contact your manager to update your department or positions.
-          </p>
+          <p class="assignment-note">Contact an admin to update your department or positions.</p>
         </v-card>
 
         <v-card class="profile-card compact-card" elevation="0">
@@ -194,8 +192,8 @@ import Utils from "../config/utils";
 import apiClient from "../services/services.js";
 
 const storedUser = Utils.getStore("user") || {};
-const storedProfile = Utils.getStore("studentProfile") || {};
-const storedPreferences = Utils.getStore("studentProfilePreferences") || {};
+const storedProfile = Utils.getStore("managerProfile") || {};
+const storedPreferences = Utils.getStore("managerProfilePreferences") || {};
 
 const buildFullName = (user) => `${user?.fName || ""} ${user?.lName || ""}`.trim();
 
@@ -249,14 +247,14 @@ const saveProfile = () => {
   };
 
   Utils.setStore("user", nextUser);
-  Utils.setStore("studentProfile", {
+  Utils.setStore("managerProfile", {
     fullName: profile.fullName,
     email: profile.email,
     phone: profile.phone,
     departments: storedProfile.departments || storedUser.departments || [],
     positions: storedProfile.positions || storedUser.positions || [],
   });
-  Utils.setStore("studentProfilePreferences", {
+  Utils.setStore("managerProfilePreferences", {
     emailNotifications: preferences.emailNotifications,
     smsNotifications: preferences.smsNotifications,
     shiftReminderMinutes: Number(preferences.shiftReminderMinutes) || 0,

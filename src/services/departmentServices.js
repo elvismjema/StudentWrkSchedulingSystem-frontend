@@ -33,47 +33,47 @@ const apiClient = axios.create({
 const DepartmentServices = {
   // Get all departments
   getDepartments() {
-    return apiClient.get("/api/departments");
+    return apiClient.get("/departments");
   },
 
   // Get single department by ID
   getDepartment(id) {
-    return apiClient.get(`/api/departments/${id}`);
+    return apiClient.get(`/departments/${id}`);
   },
 
   // Create new department
   createDepartment(data) {
-    return apiClient.post("/api/departments", data);
+    return apiClient.post("/departments", data);
   },
 
   // Update department settings
   updateDepartment(id, data) {
-    return apiClient.put(`/api/departments/${id}`, data);
+    return apiClient.put(`/departments/${id}`, data);
   },
 
   // Delete department
   deleteDepartment(id) {
-    return apiClient.delete(`/api/departments/${id}`);
+    return apiClient.delete(`/departments/${id}`);
   },
 
   // Get department hours
   getDepartmentHours(departmentId) {
-    return apiClient.get(`/api/department-hours?department_id=${departmentId}`);
+    return apiClient.get(`/department-hours?department_id=${departmentId}`);
   },
 
   // Create department hours
   createDepartmentHours(data) {
-    return apiClient.post("/api/department-hours", data);
+    return apiClient.post("/department-hours", data);
   },
 
   // Update department hours
   updateDepartmentHours(id, data) {
-    return apiClient.put(`/api/department-hours/${id}`, data);
+    return apiClient.put(`/department-hours/${id}`, data);
   },
 
   // Delete department hours
   deleteDepartmentHours(id) {
-    return apiClient.delete(`/api/department-hours/${id}`);
+    return apiClient.delete(`/department-hours/${id}`);
   },
 };
 

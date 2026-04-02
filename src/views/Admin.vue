@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <ManagerSidebar ref="sidebarRef" />
+    <AdminSidebar ref="sidebarRef" />
     <ManagerTopNav @toggle-sidebar="toggleSidebar" />
 
     <v-main class="main-content">
@@ -13,7 +13,7 @@
 
 <script setup>
 import { ref } from "vue";
-import ManagerSidebar from "../components/ManagerSidebar.vue";
+import AdminSidebar from "../components/AdminSidebar.vue";
 import ManagerTopNav from "../components/ManagerTopNav.vue";
 
 const sidebarRef = ref(null);

@@ -8,20 +8,11 @@
     rail-width="60"
   >
 
-    <div class="brand-wrap">
-      <div class="brand-row">
-        <div class="oc-badge">OC</div>
-        <div v-if="!rail" class="brand-text">
-          <div class="brand-title">{{ displayDepartment }}</div>
-          <div class="brand-subtitle">{{ displayRole }}</div>
-
     <div class="logo-section">
       <div class="logo-container">
         <div class="oc-logo">OC</div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">Student Worker Scheduling</div>
-
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -87,7 +78,7 @@ import { computed, ref } from "vue";
 import Utils from "../config/utils";
 
 const drawer = ref(true);
-const rail = ref(false);
+const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
 
 const displayName = computed(() => {
@@ -98,20 +89,20 @@ const displayName = computed(() => {
 });
 
 const displayRole = computed(() => {
-
-  const context = Utils.getStore("currentDepartmentContext");
-  return context?.role_name || "Manager";
+  const role = (user.value?.role || "").toLowerCase();
+  if (role === "admin") return "Admin";
+  if (role === "manager") return "Manager";
+  return "Student";
 });
 
 const displayDepartment = computed(() => {
   const context = Utils.getStore("currentDepartmentContext");
-  return context?.department_name || "Student Worker Scheduling";
-
-  const role = (user.value?.role || "student").toLowerCase();
-  if (role === "admin") return "Admin";
-  return role === "manager" ? "Manager" : "Student";
-
+  if (context?.department_name) return context.department_name;
+  const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name;
+  return membershipDepartment || user.value?.department_name || "Department";
 });
+
+const bannerTitle = computed(() => displayDepartment.value);
 
 const displayInitial = computed(() => {
   const first = user.value?.fName?.[0] || "";
@@ -126,15 +117,11 @@ const isAdmin = computed(() => {
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
-  { title: "Create Shift", icon: "mdi-plus-circle-outline", route: "/manager/create-shift" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
   { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
   { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
-  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" },
-  { title: "Tasks", icon: "mdi-format-list-checks", route: "/manager/tasks" },
-  { title: "Notifications", icon: "mdi-bell-outline", route: "/manager/notifications" },
-  { title: "Settings", icon: "mdi-cog-outline", route: "/manager/settings" }
+  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 
 const adminNavItems = [
@@ -206,6 +193,7 @@ defineExpose({
 
 .manager-user-wrap {
   padding: 8px 12px;
+}
 
 .logo-text {
   flex: 1;

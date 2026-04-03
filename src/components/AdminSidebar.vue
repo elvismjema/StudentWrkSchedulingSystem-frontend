@@ -8,20 +8,11 @@
     rail-width="60"
   >
 
-    <div class="brand-wrap">
-      <div class="brand-row">
-        <div class="oc-badge">OC</div>
-        <div v-if="!rail" class="brand-text">
-          <div class="brand-title">{{ displayDepartment }}</div>
-          <div class="brand-subtitle">{{ displayRole }}</div>
-
     <div class="logo-section">
       <div class="logo-container">
         <div class="oc-logo">OC</div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">System Administration</div>
-
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -65,7 +56,7 @@
 import { computed, ref } from "vue";
 import Utils from "../config/utils";
 const drawer = ref(true);
-const rail = ref(false);
+const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
 
 const displayName = computed(() => {
@@ -80,10 +71,7 @@ const displayRole = computed(() => {
   return context?.role_name || "Administrator";
 });
 
-const displayDepartment = computed(() => {
-  const context = Utils.getStore("currentDepartmentContext");
-  return context?.department_name || "System Administration";
-});
+const bannerTitle = computed(() => "Admin");
 
 const displayInitial = computed(() => {
   const first = user.value?.fName?.[0] || "";
@@ -94,8 +82,7 @@ const displayInitial = computed(() => {
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-dashboard", route: "/admin/dashboard" },
   { title: "User Management", icon: "mdi-account-multiple", route: "/admin/users" },
-  { title: "Departments", icon: "mdi-office-building", route: "/admin/departments" },
-  { title: "System Settings", icon: "mdi-cog", route: "/admin/settings" }
+  { title: "Departments", icon: "mdi-office-building", route: "/admin/departments" }
 ];
 
 defineExpose({

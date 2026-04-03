@@ -37,6 +37,16 @@
           class="ml-2"
         />
       </v-tab>
+      <v-tab value="shift-acknowledgments">
+        Shift Acknowledgments
+        <v-badge
+          v-if="unacknowledgedCount > 0"
+          :content="unacknowledgedCount"
+          color="warning"
+          inline
+          class="ml-2"
+        />
+      </v-tab>
     </v-tabs>
 
     <v-tabs-window v-model="activeTab">
@@ -207,7 +217,7 @@
               <v-chip
                 v-else
                 size="small"
-                :color="statusColor(swap.status)"
+                :color="swap.status === 'approved' ? 'success' : swap.status === 'denied' ? 'error' : 'grey'"
                 variant="flat"
               >
                 {{ swap.status }}
@@ -216,13 +226,77 @@
           </v-card-text>
         </v-card>
       </v-tabs-window-item>
-    </v-tabs-window>
 
-    <!-- Snackbar -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
-      <v-icon start>{{ snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
-      {{ snackbar.text }}
-    </v-snackbar>
+      <!-- ─── Shift Acknowledgments Tab ──────────────────────────────── -->
+      <v-tabs-window-item value="shift-acknowledgments">
+        <v-progress-linear v-if="ackLoading" indeterminate color="primary" class="mb-4" />
+
+        <v-alert v-if="ackError" type="error" variant="tonal" class="mb-4">
+          {{ ackError }}
+        </v-alert>
+
+        <div class="d-flex gap-3 mb-4 flex-wrap">
+          <v-select
+            v-model="ackFilter"
+            :items="ackStatusOptions"
+            item-title="label"
+            item-value="value"
+            label="Status Filter"
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="max-width:200px"
+            @update:model-value="loadAcknowledgments"
+          />
+        </div>
+
+        <div v-if="acknowledgments.length === 0 && !ackLoading" class="empty-state">
+          <v-icon size="48" color="grey-lighten-1">mdi-check-decagram</v-icon>
+          <p class="text-body-1 text-medium-emphasis mt-2">No shift acknowledgments found.</p>
+        </div>
+
+        <v-card
+          v-for="ack in acknowledgments"
+          :key="ack.id"
+          elevation="2"
+          class="mb-3"
+        >
+          <v-card-text>
+            <div class="d-flex align-start justify-space-between flex-wrap gap-2">
+              <div>
+                <div class="text-subtitle-1 font-weight-bold">
+                  {{ ack.user?.fName }} {{ ack.user?.lName }}
+                  <span class="text-caption text-medium-emphasis ml-1">{{ ack.user?.email }}</span>
+                </div>
+                <div class="d-flex align-center gap-2 mt-1 flex-wrap">
+                  <v-chip size="x-small" variant="tonal">
+                    {{ ack.shift?.department?.department_name || 'Department' }}
+                  </v-chip>
+                  <v-chip size="x-small" variant="tonal">
+                    {{ formatDate(ack.shift?.shift_date) }}
+                  </v-chip>
+                  <v-chip
+                    size="x-small"
+                    :color="ack.acknowledged ? 'success' : 'warning'"
+                    variant="flat"
+                  >
+                    {{ ack.acknowledged ? 'Acknowledged' : 'Pending' }}
+                  </v-chip>
+                </div>
+                <div v-if="ack.acknowledgedAt" class="text-caption text-medium-emphasis mt-1">
+                  Acknowledged on {{ formatDateTime(ack.acknowledgedAt) }}
+                </div>
+              </div>
+
+              <div v-if="!ack.acknowledged" class="text-caption text-warning">
+                <v-icon size="16" class="mr-1">mdi-alert</v-icon>
+                Awaiting acknowledgment
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-tabs-window-item>
+    </v-tabs-window>
   </v-container>
 </template>
 
@@ -239,11 +313,15 @@ const currentUser = Utils.getStore('user') || {}
 const activeTab = ref('time-off')
 const loading = ref(false)
 const swapsLoading = ref(false)
+const ackLoading = ref(false)
 const actioning = ref(null)
 const timeOffError = ref('')
+const ackError = ref('')
 const timeOffFilter = ref('pending')
+const ackFilter = ref('all')
 const timeOffRequests = ref([])
 const swapRequests = ref([])
+const acknowledgments = ref([])
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
 const statusOptions = [
@@ -253,12 +331,22 @@ const statusOptions = [
   { label: 'All', value: '' }
 ]
 
+const ackStatusOptions = [
+  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Acknowledged', value: 'acknowledged' }
+]
+
 const pendingTimeOffCount = computed(() =>
   timeOffRequests.value.filter(r => r.requestStatus === 'pending').length
 )
 
 const pendingSwapCount = computed(() =>
   swapRequests.value.filter(s => s.status === 'pending').length
+)
+
+const unacknowledgedCount = computed(() =>
+  acknowledgments.value.filter(a => !a.acknowledged).length
 )
 
 const loadTimeOffRequests = async () => {
@@ -292,6 +380,26 @@ const loadSwapRequests = async () => {
     console.warn('Swap requests endpoint not available:', err.message)
   } finally {
     swapsLoading.value = false
+  }
+}
+
+const loadAcknowledgments = async () => {
+  ackLoading.value = true
+  ackError.value = ''
+  try {
+    const params = new URLSearchParams()
+    if (currentDeptId) params.append('departmentId', currentDeptId)
+    if (ackFilter.value && ackFilter.value !== 'all') {
+      params.append('acknowledged', ackFilter.value === 'acknowledged' ? 'true' : 'false')
+    }
+
+    const response = await apiClient.get(`/shift-acknowledgements/unacknowledged?${params.toString()}`)
+    acknowledgments.value = response?.data?.data || response?.data || []
+  } catch (err) {
+    ackError.value = 'Failed to load shift acknowledgments.'
+    console.error(err)
+  } finally {
+    ackLoading.value = false
   }
 }
 
@@ -349,9 +457,18 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
 
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit'
+  })
+}
+
 const loadAll = () => {
   loadTimeOffRequests()
   loadSwapRequests()
+  loadAcknowledgments()
 }
 
 onMounted(loadAll)

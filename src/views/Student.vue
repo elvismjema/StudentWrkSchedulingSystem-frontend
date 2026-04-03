@@ -2,7 +2,7 @@
   <v-app>
     <Sidebar ref="sidebarRef" />
     <TopNav @toggle-sidebar="toggleSidebar" />
-    
+
     <v-main class="main-content">
       <v-container fluid class="student-content pa-0">
         <router-view />
@@ -12,17 +12,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import Sidebar from '../components/Sidebar.vue'
-import TopNav from '../components/TopNav.vue'
+import { ref } from 'vue';
+import Sidebar from '../components/Sidebar.vue';
+import TopNav from '../components/TopNav.vue';
 
-const sidebarRef = ref(null)
+const sidebarRef = ref(null);
 
 const toggleSidebar = () => {
   if (sidebarRef.value) {
-    sidebarRef.value.toggleRail()
+    sidebarRef.value.toggleRail();
   }
-}
+};
 </script>
 
 <style scoped>

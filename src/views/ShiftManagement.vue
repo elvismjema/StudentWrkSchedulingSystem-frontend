@@ -20,7 +20,7 @@
         <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
-        <v-btn color="primary" variant="elevated" @click="showCreateDialog = true" prepend-icon="mdi-plus">
+        <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
           Add to Schedule
         </v-btn>
       </div>
@@ -206,10 +206,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+
+const router = useRouter()
 
 // Department context (auto-determined from stored context)
 const deptContext = Utils.getStore('currentDepartmentContext') || {}
@@ -489,6 +492,13 @@ const onShiftAssigned = (assignmentData) => {
 }
 
 onMounted(() => {
+  const scheduleToast = Utils.getStore('managerScheduleToast')
+  if (scheduleToast?.message) {
+    successMessage.value = scheduleToast.message
+    showSuccess.value = true
+    Utils.removeItem('managerScheduleToast')
+  }
+
   Promise.all([
     loadShifts(),
     loadPositions(),

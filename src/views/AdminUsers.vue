@@ -67,6 +67,17 @@
           hide-details
           style="max-width: 220px"
         />
+        <v-select
+          v-model="filterRole"
+          :items="roleFilterOptions"
+          item-title="label"
+          item-value="value"
+          label="Filter Role"
+          variant="outlined"
+          density="compact"
+          hide-details
+          style="max-width: 220px"
+        />
       </v-card-title>
 
       <v-card-text class="pa-5">
@@ -134,7 +145,7 @@
                     <template #activator="{ props }">
                       <v-btn v-bind="props" icon size="small" color="primary" variant="text"
                         @click="openAssignRoleDialog(item)">
-                        <v-icon>mdi-account-edit</v-icon>
+                        <v-icon>mdi-pencil</v-icon>
                       </v-btn>
                     </template>
                   </v-tooltip>
@@ -376,10 +387,9 @@
               :items="departments"
               item-title="department_name"
               item-value="department_id"
-              label="Department"
+              label="Department (Optional)"
               variant="outlined"
               density="comfortable"
-              :rules="[rules.required]"
               @update:modelValue="loadDepartmentRoles"
               class="mb-3"
             />
@@ -388,32 +398,10 @@
               :items="availableRoles"
               item-title="role_name"
               item-value="role_id"
-              label="Role"
+              label="Role (Optional)"
               variant="outlined"
               density="comfortable"
-              :rules="[rules.required]"
-              :disabled="!roleFormData.department_id"
               class="mb-3"
-            />
-            <v-switch
-              v-model="roleFormData.apply_to_all_departments"
-              color="primary"
-              inset
-              label="Apply this role to all departments"
-              hint="Admin role assignments are always applied across all departments."
-              persistent-hint
-              class="mb-2"
-            />
-            <v-select
-              v-model="roleFormData.position_id"
-              :items="availablePositions"
-              item-title="position_name"
-              item-value="position_id"
-              label="Position (Optional)"
-              variant="outlined"
-              density="comfortable"
-              clearable
-              :disabled="!roleFormData.department_id || roleFormData.apply_to_all_departments || selectedRoleIsAdmin"
             />
           </v-form>
         </v-card-text>
@@ -424,10 +412,9 @@
           <v-btn
             color="primary"
             :loading="saving"
-            :disabled="!roleFormValid"
             @click="assignRole"
           >
-            Assign Role
+            Assign
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -508,11 +495,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import AdminServices from '../services/adminServices.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
 import apiClient from '../services/services.js';
+
+const route = useRoute();
 
 // ─── State ─────────────────────────────────────────────────────────────────
 const loading = ref(false);
@@ -528,7 +518,6 @@ const users = ref([]);
 const pendingAssignments = ref([]);
 const departments = ref([]);
 const availableRoles = ref([]);
-const availablePositions = ref([]);
 const inviteRoles = ref([]);
 const invitePositions = ref([]);
 const usersDataSource = ref('');
@@ -536,6 +525,14 @@ const pendingDataSource = ref('');
 
 const searchQuery = ref('');
 const filterDepartment = ref(null);
+const filterRole = ref('all');
+
+const roleFilterOptions = [
+  { label: 'All Roles', value: 'all' },
+  { label: 'Student Workers', value: 'student' },
+  { label: 'Managers', value: 'manager' },
+  { label: 'Admins', value: 'admin' },
+];
 
 // Dialogs
 const inviteDialog = ref(false);
@@ -551,7 +548,6 @@ const roleFormData = ref({
   department_id: null,
   role_id: null,
   position_id: null,
-  apply_to_all_departments: false,
 });
 
 const deactivateDialog = ref(false);
@@ -579,6 +575,10 @@ const filteredUsers = computed(() => {
     );
   }
 
+  if (filterRole.value !== 'all') {
+    filtered = filtered.filter((u) => userMatchesRoleFilter(u, filterRole.value));
+  }
+
   const query = searchQuery.value.trim().toLowerCase();
   if (!query) return filtered;
 
@@ -593,22 +593,44 @@ const filteredUsers = computed(() => {
   });
 });
 
-const selectedRole = computed(() =>
-  availableRoles.value.find((role) => role.role_id === roleFormData.value.role_id),
-);
-
-const selectedRoleIsAdmin = computed(() => {
-  const permission = Number(selectedRole.value?.permission_level || 0);
-  const roleName = String(selectedRole.value?.role_name || '').toLowerCase();
-  return permission >= 90 || roleName.includes('admin');
-});
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const getRoleColor = (permissionLevel) => {
   if (!permissionLevel) return 'grey';
   if (permissionLevel >= 90) return 'red';
   if (permissionLevel >= 50) return 'deep-orange';
   return 'blue';
+};
+
+const userMatchesRoleFilter = (user, roleFilter) => {
+  const memberships = user.userDepartments || [];
+
+  return memberships.some((membership) => {
+    const permission = Number(membership?.role?.permission_level || 0);
+    const roleName = String(membership?.role?.role_name || '').toLowerCase();
+
+    if (roleFilter === 'student') {
+      return (permission > 0 && permission < 50) || roleName.includes('student');
+    }
+
+    if (roleFilter === 'manager') {
+      return (permission >= 50 && permission < 90) || roleName.includes('manager');
+    }
+
+    if (roleFilter === 'admin') {
+      return permission >= 90 || roleName.includes('admin');
+    }
+
+    return true;
+  });
+};
+
+const applyRoleFilterFromRoute = () => {
+  const role = String(route.query.role || '').toLowerCase();
+  if (role === 'student' || role === 'manager' || role === 'admin') {
+    filterRole.value = role;
+    return;
+  }
+  filterRole.value = 'all';
 };
 
 const getHighestRole = (user) => {
@@ -712,14 +734,10 @@ const loadDepartments = async () => {
 };
 
 const loadDepartmentRoles = async () => {
-  if (!roleFormData.value.department_id) return;
+  const departmentId = roleFormData.value.department_id;
   try {
-    const [rolesRes, posRes] = await Promise.all([
-      UserRoleServices.getAllRoles(roleFormData.value.department_id),
-      apiClient.get(`/positions?department_id=${roleFormData.value.department_id}`),
-    ]);
+    const rolesRes = await UserRoleServices.getAllRoles(departmentId || null);
     availableRoles.value = rolesRes?.data?.data || [];
-    availablePositions.value = posRes?.data?.data || [];
   } catch (err) {
     error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
   }
@@ -787,10 +805,8 @@ const openAssignRoleDialog = (user) => {
     department_id: null,
     role_id: null,
     position_id: null,
-    apply_to_all_departments: false,
   };
-  availableRoles.value = [];
-  availablePositions.value = [];
+  loadDepartmentRoles();
   assignRoleDialog.value = true;
 };
 
@@ -800,19 +816,42 @@ const closeAssignRoleDialog = () => {
 };
 
 const assignRole = async () => {
-  if (!roleForm.value || !roleFormValid.value) return;
+  if (!selectedUser.value) return;
+
+  if (!roleFormData.value.department_id && !roleFormData.value.role_id) {
+    error.value = 'Select at least a department or a role before assigning.';
+    return;
+  }
+
   try {
     saving.value = true;
     error.value = null;
+
+    let departmentId = roleFormData.value.department_id;
+    if (!departmentId) {
+      departmentId =
+        selectedUser.value?.userDepartments?.[0]?.department_id ||
+        departments.value?.[0]?.department_id ||
+        null;
+    }
+
+    let roleId = roleFormData.value.role_id;
+    if (!roleId) {
+      const rolesResponse = await UserRoleServices.getAllRoles(departmentId || null);
+      const roles = rolesResponse?.data?.data || [];
+      roleId = roles[0]?.role_id || null;
+    }
+
+    if (!departmentId || !roleId) {
+      error.value = 'Unable to assign role. Please select a department or role with available options.';
+      return;
+    }
+
     await UserRoleServices.assignUserRole({
       user_id: selectedUser.value.id,
-      ...roleFormData.value,
-      apply_to_all_departments:
-        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value,
-      position_id:
-        roleFormData.value.apply_to_all_departments || selectedRoleIsAdmin.value
-          ? null
-          : roleFormData.value.position_id,
+      department_id: departmentId,
+      role_id: roleId,
+      position_id: null,
     });
     successMessage.value = 'Role assigned successfully!';
     await loadUsers();
@@ -905,10 +944,18 @@ const confirmDelete = async () => {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
+  applyRoleFilterFromRoute();
   loadUsers();
   loadDepartments();
   loadPendingAssignments();
 });
+
+watch(
+  () => route.query.role,
+  () => {
+    applyRoleFilterFromRoute();
+  },
+);
 </script>
 
 <style scoped>

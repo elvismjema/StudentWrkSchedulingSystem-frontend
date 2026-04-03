@@ -4,22 +4,13 @@
       <v-icon size="24">mdi-menu</v-icon>
     </v-btn>
 
-    <!-- Department chip - centered -->
-    <v-chip
-      v-if="currentDepartmentName"
-      color="#8B1538"
-      variant="tonal"
-      size="small"
-      prepend-icon="mdi-office-building"
-      class="dept-chip"
-    >
-      {{ currentDepartmentName }}
-    </v-chip>
-
     <v-spacer />
 
     <div class="top-actions">
-      <NotificationDropdown @notification-click="handleNotificationClick" />
+      <NotificationDropdown
+        v-if="!isAdmin"
+        @notification-click="handleNotificationClick"
+      />
 
       <v-menu
         v-model="menuOpen"
@@ -48,7 +39,7 @@
 
           <v-divider />
 
-          <v-list>
+          <v-list v-if="menuItems.length">
             <v-list-item
               v-for="item in menuItems"
               :key="item.title"
@@ -105,19 +96,16 @@ const displayInitials = computed(() => {
   return `${first}${last}`.toUpperCase() || "U";
 });
 
-const profileRoute = computed(() => {
-  const role = (user.value?.role || "").toLowerCase();
-  return role === "admin" ? "/admin/profile" : "/manager/profile";
+const userRole = computed(() => (user.value?.role || "").toLowerCase());
+const isAdmin = computed(() => userRole.value === "admin");
+
+const menuItems = computed(() => {
+  if (isAdmin.value) {
+    return [];
+  }
+
+  return [{ title: "Profile", icon: "mdi-account", route: "/manager/profile" }];
 });
-
-const menuItems = computed(() => [
-  { title: "Profile", icon: "mdi-account", route: profileRoute.value },
-]);
-
-const currentDepartmentName = computed(() => {
-  const ctx = Utils.getStore('currentDepartmentContext')
-  return ctx?.department_name || ''
-})
 
 const handleSignOut = () => {
   menuOpen.value = false;
@@ -145,11 +133,6 @@ const handleNotificationClick = (notification) => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.dept-chip {
-  font-weight: 500;
-  letter-spacing: 0.01em;
 }
 
 .profile-avatar {

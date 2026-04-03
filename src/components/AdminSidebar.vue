@@ -122,6 +122,67 @@ defineExpose({
   flex-shrink: 0;
 }
 
+
+.brand-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1f2328;
+}
+
+.brand-subtitle {
+  font-size: 14px;
+  color: #667085;
+}
+
+.admin-nav {
+  padding: 8px 12px;
+}
+
+.admin-nav-item {
+  border-radius: 12px;
+  min-height: 66px;
+}
+
+.admin-active-nav-item {
+  background: #f0f6ff;
+  color: #0969da;
+}
+
+.admin-user-wrap {
+  padding: 8px 12px;
+}
+
+.admin-user-item {
+  border-radius: 12px;
+  min-height: 66px;
+}
+
+.admin-user-avatar {
+  background: #b71c1c;
+}
+
+.admin-user-initial {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.admin-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2328;
+}
+
+.admin-user-role {
+  font-size: 14px;
+  color: #667085;
+
 .logo-text {
   flex: 1;
 }
@@ -210,6 +271,7 @@ defineExpose({
   color: #666;
   font-size: 11px;
   margin-top: 2px;
+
 }
 
 .v-navigation-drawer--rail .logo-section {

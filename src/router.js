@@ -110,6 +110,11 @@ const router = createRouter({
           redirect: { name: "student-schedule" },
         },
         {
+          path: "tasks",
+          name: "student-tasks",
+          component: () => import("./views/StudentTasks.vue"),
+        },
+        {
           path: "notifications",
           name: "student-notifications",
           component: () => import("./views/StudentNotifications.vue"),
@@ -314,7 +319,7 @@ router.onError((error, to) => {
     error?.name === "ChunkLoadError";
 
   if (chunkFailure && to?.fullPath) {
-    window.location.assign(to.fullPath);
+    window.location.assign(Utils.resolveAppUrl(to.fullPath));
   }
 });
 

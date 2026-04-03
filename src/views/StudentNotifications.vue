@@ -64,6 +64,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
+import Utils from '../config/utils'
 
 const router = useRouter()
 const notifications = ref([])
@@ -97,7 +98,7 @@ const handleNotificationClick = async (notification) => {
       await router.push(notification.link)
     } catch {
       // Fallback to full page navigation for any router mismatch
-      window.location.href = notification.link
+      window.location.href = Utils.resolveAppUrl(notification.link)
     }
   }
 }

@@ -484,7 +484,8 @@ onMounted(loadDashboard);
 
 <style scoped>
 .student-dashboard {
-  max-width: 600px;
+  width: 100%;
+  max-width: 1120px;
   margin: 0 auto;
 }
 

@@ -92,7 +92,7 @@ const router = createRouter({
         {
           path: "more",
           name: "student-more",
-          component: () => import("./views/StudentMore.vue"),
+          redirect: { name: "student-profile" },
         },
         // Legacy routes — redirect to new structure
         {
@@ -102,7 +102,7 @@ const router = createRouter({
         {
           path: "availability",
           name: "student-availability",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentAvailability.vue"),
         },
         {
           path: "trade-board",
@@ -122,12 +122,12 @@ const router = createRouter({
         {
           path: "profile",
           name: "student-profile",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentProfile.vue"),
         },
         {
           path: "settings",
           name: "student-settings",
-          redirect: { name: "student-more" },
+          redirect: { name: "student-profile" },
         },
       ],
     },

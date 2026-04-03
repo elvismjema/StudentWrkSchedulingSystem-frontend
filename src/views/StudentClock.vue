@@ -327,6 +327,14 @@ const weeklyEarnings = computed(() => {
   return (parseFloat(weeklyTotal.value) * 10).toFixed(2);
 });
 
+const normalizeTimesheetEntries = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object' && Array.isArray(payload.entries)) {
+    return payload.entries;
+  }
+  return [];
+};
+
 const fetchAll = async () => {
   loading.value = true;
   try {
@@ -392,7 +400,7 @@ const fetchTimesheet = async () => {
       startDate: toDateStr(monday),
       endDate: toDateStr(sunday),
     });
-    timesheetData.value = res?.data?.data || res?.data || [];
+    timesheetData.value = normalizeTimesheetEntries(res?.data?.data || res?.data);
   } catch {
     timesheetData.value = [];
   }

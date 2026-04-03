@@ -212,6 +212,15 @@ function showSnack(text, color = "success") {
   snackbar.show = true;
 }
 
+function normalizeOpenShiftPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    if (Array.isArray(payload.shifts)) return payload.shifts;
+    if (Array.isArray(payload.preview)) return payload.preview;
+  }
+  return [];
+}
+
 // Computed
 const shiftDates = computed(() =>
   [...new Set(allShifts.value.map((s) => {
@@ -251,7 +260,7 @@ async function loadShifts() {
       allShifts.value = shiftsRes.value?.data?.data || shiftsRes.value?.data || [];
     }
     if (openRes.status === "fulfilled") {
-      openShifts.value = (openRes.value?.data?.data || openRes.value?.data || []).map((s) => ({
+      openShifts.value = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data).map((s) => ({
         ...s,
         _claiming: false,
         _conflict: null,
@@ -284,7 +293,7 @@ watch(activeTab, (tab) => {
 async function loadOpenShifts() {
   try {
     const res = await studentService.getOpenShifts();
-    openShifts.value = (res?.data?.data || res?.data || []).map((s) => ({
+    openShifts.value = normalizeOpenShiftPayload(res?.data?.data || res?.data).map((s) => ({
       ...s,
       _claiming: false,
       _conflict: null,

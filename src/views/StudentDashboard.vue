@@ -318,6 +318,33 @@ function showSnack(text, color = "success") {
   snackbar.show = true;
 }
 
+function normalizeOpenShiftPayload(payload) {
+  if (Array.isArray(payload)) {
+    return {
+      count: payload.length,
+      shifts: payload,
+    };
+  }
+
+  if (payload && typeof payload === "object") {
+    const shifts = Array.isArray(payload.preview)
+      ? payload.preview
+      : Array.isArray(payload.shifts)
+        ? payload.shifts
+        : [];
+
+    return {
+      count: Number(payload.count ?? shifts.length ?? 0),
+      shifts,
+    };
+  }
+
+  return {
+    count: 0,
+    shifts: [],
+  };
+}
+
 async function loadDashboard() {
   loading.value = true;
   error.value = null;
@@ -326,19 +353,31 @@ async function loadDashboard() {
     // Try the aggregated dashboard endpoint first
     const res = await studentService.getDashboard();
     const data = res?.data?.data || res?.data || {};
+    const openShiftData = normalizeOpenShiftPayload(data.openShifts);
 
     nextShift.value = data.nextShift || null;
     todayShifts.value = data.todayShifts || [];
     weekShifts.value = data.weekShifts || [];
-    openShiftsCount.value = data.openShiftsCount || 0;
-    topOpenShifts.value = (data.openShifts || []).slice(0, 3);
+    openShiftsCount.value = data.openShiftsCount ?? openShiftData.count;
+    topOpenShifts.value = openShiftData.shifts.slice(0, 3);
     unreadCount.value = data.unreadNotifications || 0;
-    weeklyHours.value = data.weeklyHours || 0;
+    weeklyHours.value = data.weeklyHours ?? data.estimatedWeeklyHours ?? 0;
     weeklyShifts.value = data.weeklyShifts || weekShifts.value.length;
     estimatedEarnings.value = data.estimatedEarnings || "0.00";
 
     // Map pending requests
-    const rawRequests = data.pendingRequests || [];
+    const rawRequests = Array.isArray(data.pendingRequests)
+      ? data.pendingRequests
+      : data.pendingCounts && typeof data.pendingCounts === "object"
+        ? Object.entries(data.pendingCounts)
+            .filter(([, count]) => Number(count) > 0)
+            .map(([type, count]) => ({
+              id: type,
+              type,
+              label: `${count} pending ${type.replace(/([A-Z])/g, " $1").toLowerCase()}`,
+              status: "Pending",
+            }))
+        : [];
     pendingRequests.value = rawRequests.map((r) => ({
       id: r.id,
       label: r.type === "time_off" ? `Time off: ${r.startDate} – ${r.endDate}` : r.label || "Request",
@@ -424,9 +463,9 @@ async function loadFromIndividualEndpoints() {
 
   // Open shifts
   if (openRes.status === "fulfilled") {
-    const shifts = openRes.value?.data?.data || openRes.value?.data || [];
-    topOpenShifts.value = shifts.slice(0, 3);
-    openShiftsCount.value = shifts.length;
+    const openShiftData = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data);
+    topOpenShifts.value = openShiftData.shifts.slice(0, 3);
+    openShiftsCount.value = openShiftData.count;
   }
 }
 

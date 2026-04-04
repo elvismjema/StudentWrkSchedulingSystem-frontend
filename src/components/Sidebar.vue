@@ -4,22 +4,22 @@
     :rail="rail"
     permanent
     class="sidebar"
-    width="256"
-    rail-width="60"
+    :width="220"
+    :rail-width="64"
   >
     <!-- Logo Section -->
     <div class="logo-section">
       <div class="logo-container">
-        <div class="oc-logo">
-          OC
-        </div>
-        <div v-if="!rail" class="logo-text">
-          <div class="main-title">{{ bannerTitle }}</div>
-        </div>
+        <div class="oc-logo">OC</div>
+        <Transition name="fade">
+          <div v-if="!rail" class="logo-text">
+            <div class="main-title">{{ bannerTitle }}</div>
+          </div>
+        </Transition>
       </div>
     </div>
 
-    <v-divider></v-divider>
+    <v-divider />
 
     <!-- Navigation Items -->
     <v-list nav class="nav-list">
@@ -31,14 +31,14 @@
         class="nav-item"
       >
         <template v-slot:prepend>
-          <v-icon :icon="item.icon" size="20"></v-icon>
+          <v-icon :icon="item.icon" size="20" />
         </template>
         <v-list-item-title>{{ item.title }}</v-list-item-title>
       </v-list-item>
     </v-list>
 
     <template v-slot:append>
-      <v-divider></v-divider>
+      <v-divider />
       <div class="user-section">
         <v-list-item class="user-item">
           <template v-slot:prepend>
@@ -62,7 +62,7 @@ import Utils from '../config/utils'
 import UserRoleServices from '../services/userRoleServices.js'
 
 const drawer = ref(true)
-const rail = ref(true)
+const rail = ref(false)
 const user = ref(Utils.getStore("user") || {})
 const resolvedDepartmentName = ref('')
 
@@ -80,10 +80,8 @@ const displayRole = computed(() => {
 
 const bannerTitle = computed(() => {
   if (resolvedDepartmentName.value) return resolvedDepartmentName.value
-
   const context = Utils.getStore('currentDepartmentContext')
   if (context?.department_name) return context.department_name
-
   const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name
   return membershipDepartment || user.value?.department_name || 'Department'
 })
@@ -95,10 +93,13 @@ const displayInitial = computed(() => {
 })
 
 const navItems = [
-  { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
-  { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
-  { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
-  { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
+  { title: 'Dashboard', icon: 'mdi-view-dashboard', route: '/student/dashboard' },
+  { title: 'My Schedule', icon: 'mdi-calendar-month', route: '/student/schedule' },
+  { title: 'Clock In/Out', icon: 'mdi-clock-outline', route: '/student/clock' },
+  { title: 'Notifications', icon: 'mdi-bell-outline', route: '/student/notifications' },
+  { title: 'Availability', icon: 'mdi-clipboard-text-outline', route: '/student/more' },
+  { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: { name: 'student-schedule', query: { tab: 'open' } } },
+  { title: 'Settings', icon: 'mdi-cog-outline', route: '/student/more' },
 ]
 
 onMounted(async () => {
@@ -126,19 +127,20 @@ onMounted(async () => {
       role_id: activeMembership.role_id,
     })
   } catch (err) {
-    // Keep existing fallback behavior when department context request fails.
+    // Keep existing fallback behavior
   }
 })
 
 defineExpose({
   rail,
-  toggleRail: () => { rail.value = !rail.value }
+  toggleRail: () => { rail.value = !rail.value },
 })
 </script>
 
 <style scoped>
 .sidebar {
   border-right: 1px solid #e0e0e0;
+  transition: width 0.2s ease;
 }
 
 .logo-section {
@@ -152,35 +154,30 @@ defineExpose({
 }
 
 .oc-logo {
-  background-color: #8B1538; /* OC Maroon */
+  background-color: #8B1538;
   color: white;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 15px;
+  font-size: 14px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
 .logo-text {
   flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .main-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
   line-height: 1.2;
-}
-
-.sub-title {
-  font-size: 11px;
-  color: #666;
-  line-height: 1.2;
-  margin-top: 2px;
 }
 
 .nav-list {
@@ -194,11 +191,11 @@ defineExpose({
 }
 
 .nav-item :deep(.v-list-item__content) {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .nav-item :deep(.v-list-item-title) {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .nav-item:hover {
@@ -206,8 +203,8 @@ defineExpose({
 }
 
 .active-nav-item {
-  background-color: #f8e6ea !important; /* Light maroon/pink background */
-  color: #8B1538 !important; /* OC Maroon */
+  background-color: #f8e6ea !important;
+  color: #8B1538 !important;
 }
 
 .active-nav-item .v-icon {
@@ -270,5 +267,16 @@ defineExpose({
 
 .v-navigation-drawer--rail .user-item {
   margin: 0 4px;
+}
+
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

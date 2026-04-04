@@ -6,7 +6,6 @@
         <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
         <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
       </div>
-      <NotificationBell :unread-count="unreadCount" @click="goToNotifications" />
     </div>
 
     <!-- Clock Status Banner -->
@@ -19,13 +18,9 @@
 
     <!-- Loading skeleton -->
     <template v-if="loading">
+      <v-skeleton-loader type="card" class="mb-4" />
+      <v-skeleton-loader type="chip, chip, chip, chip, chip, chip, chip" class="mb-4" />
       <v-row>
-        <v-col cols="12">
-          <v-skeleton-loader type="card" class="mb-4" />
-        </v-col>
-        <v-col cols="12">
-          <v-skeleton-loader type="chip, chip, chip, chip, chip, chip, chip" class="mb-4" />
-        </v-col>
         <v-col cols="12" md="4">
           <v-skeleton-loader type="card" />
         </v-col>
@@ -53,59 +48,66 @@
     </v-alert>
 
     <template v-else>
-      <!-- Primary Card: Next / Current Shift — full width -->
+      <!-- Zone 1: Next Shift Hero Card — full width with gradient -->
       <v-card
         v-if="nextShift"
-        class="next-shift-card mb-6"
+        class="next-shift-hero mb-6"
         elevation="0"
         rounded="lg"
-        border
+        :style="heroGradientStyle"
       >
-        <div class="next-shift-card__bar" :style="{ backgroundColor: nextShiftColor }"></div>
-        <div class="pa-5 flex-grow-1">
-          <v-chip size="x-small" color="primary" variant="tonal" class="mb-2">
-            {{ nextShiftLabel }}
-          </v-chip>
-          <div class="text-h6 font-weight-bold mb-1">
-            {{ nextShift.department_name || nextShift.department?.department_name || "Shift" }}
-          </div>
-          <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1">
-            <v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>
-            {{ formatTimeRange(nextShift) }}
-          </div>
-          <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1">
-            <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
-            {{ nextShift.location || "TBD" }}
-          </div>
-          <div v-if="nextShift.supervisor_name" class="d-flex align-center text-body-2 text-medium-emphasis mb-3">
-            <v-icon size="16" class="mr-1">mdi-account-tie</v-icon>
-            {{ nextShift.supervisor_name }}
+        <div class="next-shift-hero__inner d-flex align-center flex-wrap pa-5">
+          <!-- Left: color bar + time -->
+          <div class="next-shift-hero__left d-flex align-center mr-6">
+            <div class="next-shift-hero__bar" :style="{ backgroundColor: nextShiftColor }"></div>
+            <div class="ml-4">
+              <v-chip size="x-small" color="white" variant="flat" class="mb-1 font-weight-medium">
+                {{ nextShiftLabel }}
+              </v-chip>
+              <div class="text-h6 font-weight-bold" style="color: #1a1a2e">
+                {{ formatTimeRange(nextShift) }}
+              </div>
+              <div class="text-body-2" style="color: #444">
+                {{ formatShiftDate(nextShift) }}
+              </div>
+            </div>
           </div>
 
-          <div class="d-flex ga-2">
+          <!-- Center: location, supervisor, coworkers -->
+          <div class="next-shift-hero__center flex-grow-1 mr-6">
+            <div class="text-body-1 font-weight-bold mb-1" style="color: #1a1a2e">
+              {{ nextShift.department_name || nextShift.department?.department_name || "Shift" }}
+            </div>
+            <div class="d-flex align-center text-body-2 mb-1" style="color: #555">
+              <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
+              {{ nextShift.location || "TBD" }}
+            </div>
+            <div v-if="nextShift.supervisor_name" class="d-flex align-center text-body-2 mb-1" style="color: #555">
+              <v-icon size="16" class="mr-1">mdi-account-tie</v-icon>
+              {{ nextShift.supervisor_name }}
+            </div>
+            <div v-if="nextShift.coworker_count" class="d-flex align-center text-body-2" style="color: #555">
+              <v-icon size="16" class="mr-1">mdi-account-group</v-icon>
+              {{ nextShift.coworker_count }} coworker{{ nextShift.coworker_count !== 1 ? 's' : '' }}
+            </div>
+          </div>
+
+          <!-- Right: clock in button -->
+          <div class="next-shift-hero__right d-flex flex-column align-end">
             <v-btn
               color="primary"
               variant="flat"
+              size="large"
               :disabled="!canClockIn"
-              @click="handleClockIn"
               :loading="clockingIn"
-              aria-label="Clock in to shift"
+              @click="handleClockIn"
             >
               <v-icon start>mdi-login</v-icon>
               Clock In
             </v-btn>
-            <v-btn
-              variant="outlined"
-              color="primary"
-              @click="openSwapDialog(nextShift)"
-              aria-label="Find cover for this shift"
-            >
-              <v-icon start>mdi-account-switch</v-icon>
-              Find Cover
-            </v-btn>
-          </div>
-          <div v-if="!canClockIn && !clockStatus.isClockedIn" class="text-caption text-medium-emphasis mt-2">
-            Clock-in available within 15 minutes of shift start
+            <div v-if="!canClockIn && !clockStatus.isClockedIn" class="text-caption text-medium-emphasis mt-1">
+              Available 15 min before shift
+            </div>
           </div>
         </div>
       </v-card>
@@ -117,7 +119,7 @@
         <div class="text-caption text-medium-emphasis">Check the Open Shifts tab for available shifts</div>
       </v-card>
 
-      <!-- Week Strip — full width -->
+      <!-- Zone 2: Week Strip — full width -->
       <WeekStrip
         :selected-date="selectedDate"
         :shift-dates="shiftDates"
@@ -126,7 +128,7 @@
         @change-week="onWeekChange"
       />
 
-      <!-- 3-column grid: Open Shifts, Pending Requests, Weekly Summary -->
+      <!-- Zone 3: 3-column grid -->
       <v-row>
         <!-- Open Shifts Card -->
         <v-col cols="12" md="4">
@@ -168,7 +170,7 @@
             <v-card-text class="pa-4">
               <div class="text-subtitle-1 font-weight-bold mb-2">
                 <v-icon size="20" class="mr-1">mdi-clipboard-text-clock</v-icon>
-                Pending Requests
+                My Requests
               </div>
               <template v-if="pendingRequests.length">
                 <div
@@ -246,7 +248,6 @@ import { ref, computed, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
-import NotificationBell from "../components/student/NotificationBell.vue";
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
@@ -323,13 +324,21 @@ const nextShiftColor = computed(() => {
   return "#80162B";
 });
 
+const heroGradientStyle = computed(() => {
+  const color = nextShiftColor.value;
+  return {
+    background: `linear-gradient(135deg, ${color}08 0%, ${color}18 100%)`,
+    border: `1px solid ${color}30`,
+  };
+});
+
 const canClockIn = computed(() => {
   if (clockStatus.isClockedIn) return false;
   if (!nextShift.value) return false;
   const start = new Date(nextShift.value.start_time || nextShift.value.shift_start);
   const now = new Date();
   const diffMin = (start - now) / 60000;
-  return diffMin <= 15 && diffMin >= -60; // within 15 min before to 60 min after
+  return diffMin <= 15 && diffMin >= -60;
 });
 
 function formatTimeRange(shift) {
@@ -337,6 +346,11 @@ function formatTimeRange(shift) {
   const start = shift.start_time || shift.shift_start;
   const end = shift.end_time || shift.shift_end;
   return `${fmt(start)} – ${fmt(end)}`;
+}
+
+function formatShiftDate(shift) {
+  const d = new Date(shift.shift_date || shift.start_time || shift.shift_start);
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
 function showSnack(text, color = "success") {
@@ -347,29 +361,17 @@ function showSnack(text, color = "success") {
 
 function normalizeOpenShiftPayload(payload) {
   if (Array.isArray(payload)) {
-    return {
-      count: payload.length,
-      shifts: payload,
-    };
+    return { count: payload.length, shifts: payload };
   }
-
   if (payload && typeof payload === "object") {
     const shifts = Array.isArray(payload.preview)
       ? payload.preview
       : Array.isArray(payload.shifts)
         ? payload.shifts
         : [];
-
-    return {
-      count: Number(payload.count ?? shifts.length ?? 0),
-      shifts,
-    };
+    return { count: Number(payload.count ?? shifts.length ?? 0), shifts };
   }
-
-  return {
-    count: 0,
-    shifts: [],
-  };
+  return { count: 0, shifts: [] };
 }
 
 async function loadDashboard() {
@@ -377,7 +379,6 @@ async function loadDashboard() {
   error.value = null;
 
   try {
-    // Try the aggregated dashboard endpoint first
     const res = await studentService.getDashboard();
     const data = res?.data?.data || res?.data || {};
     const openShiftData = normalizeOpenShiftPayload(data.openShifts);
@@ -392,7 +393,6 @@ async function loadDashboard() {
     weeklyShifts.value = data.weeklyShifts || weekShifts.value.length;
     estimatedEarnings.value = data.estimatedEarnings || "0.00";
 
-    // Map pending requests
     const rawRequests = Array.isArray(data.pendingRequests)
       ? data.pendingRequests
       : data.pendingCounts && typeof data.pendingCounts === "object"
@@ -414,7 +414,6 @@ async function loadDashboard() {
       statusColor: r.status === "approved" ? "success" : r.status === "denied" ? "error" : "warning",
     }));
 
-    // Clock status
     if (data.clockStatus) {
       clockStatus.isClockedIn = data.clockStatus.isClockedIn || false;
       clockStatus.clockInTime = data.clockStatus.clockInTime || null;
@@ -422,7 +421,6 @@ async function loadDashboard() {
       clockStatus.clockRecordId = data.clockStatus.clockRecordId || null;
     }
   } catch (dashErr) {
-    // Fallback: load data from individual endpoints
     try {
       await loadFromIndividualEndpoints();
     } catch (fallbackErr) {
@@ -444,7 +442,6 @@ async function loadFromIndividualEndpoints() {
     studentService.getOpenShifts(),
   ]);
 
-  // Parse shifts
   if (shiftsRes.status === "fulfilled") {
     const allShifts = shiftsRes.value?.data?.data || shiftsRes.value?.data || [];
     const now = new Date();
@@ -471,7 +468,6 @@ async function loadFromIndividualEndpoints() {
     estimatedEarnings.value = (parseFloat(weeklyHours.value) * (user.value?.hourlyRate || 10)).toFixed(2);
   }
 
-  // Clock status
   if (clockRes.status === "fulfilled") {
     const record = clockRes.value?.data?.data || clockRes.value?.data;
     if (record && !record.clock_out_time) {
@@ -482,13 +478,11 @@ async function loadFromIndividualEndpoints() {
     }
   }
 
-  // Notification count
   if (notifRes.status === "fulfilled") {
     const notifs = notifRes.value?.data?.data || notifRes.value?.data || [];
     unreadCount.value = Array.isArray(notifs) ? notifs.filter((n) => !n.isRead).length : 0;
   }
 
-  // Open shifts
   if (openRes.status === "fulfilled") {
     const openShiftData = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data);
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
@@ -545,27 +539,51 @@ async function handleSwapSubmit(data) {
   }
 }
 
-function goToNotifications() {
-  router.push({ name: "student-notifications" });
-}
-
 onMounted(loadDashboard);
 </script>
 
 <style scoped>
 .student-dashboard {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
 }
 
-.next-shift-card {
+/* Hero card */
+.next-shift-hero {
   overflow: hidden;
-  display: flex;
 }
 
-.next-shift-card__bar {
+.next-shift-hero__inner {
+  gap: 8px;
+}
+
+.next-shift-hero__bar {
   width: 5px;
+  min-height: 80px;
+  border-radius: 3px;
   flex-shrink: 0;
+}
+
+.next-shift-hero__left {
+  min-width: 200px;
+}
+
+.next-shift-hero__center {
+  min-width: 180px;
+}
+
+.next-shift-hero__right {
+  min-width: 140px;
+}
+
+@media (max-width: 960px) {
+  .next-shift-hero__inner {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .next-shift-hero__right {
+    align-self: flex-start;
+  }
 }
 </style>

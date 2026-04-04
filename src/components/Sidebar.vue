@@ -95,10 +95,13 @@ const displayInitial = computed(() => {
 })
 
 const navItems = [
-  { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
-  { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
-  { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
-  { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
+  { title: 'Dashboard',    icon: 'mdi-home',             route: '/student/dashboard' },
+  { title: 'My Schedule',  icon: 'mdi-calendar',         route: '/student/schedule' },
+  { title: 'Clock In/Out', icon: 'mdi-clock-outline',    route: '/student/clock' },
+  { title: 'Trade Board',  icon: 'mdi-swap-horizontal',  route: '/student/trade-board' },
+  { title: 'Notifications',icon: 'mdi-bell-outline',     route: '/student/notifications' },
+  { title: 'Availability', icon: 'mdi-calendar-check',   route: '/student/more' },
+  { title: 'Settings',     icon: 'mdi-cog-outline',      route: '/student/more' },
 ]
 
 onMounted(async () => {

@@ -76,8 +76,7 @@ export default {
 
   // ─── Availability ────────────────────────────────────────────────
   getAvailability() {
-    const userId = getUserId();
-    return apiClient.get(`/availabilities/user/${userId}`);
+    return apiClient.get("/student/availability");
   },
 
   updateAvailability(data) {

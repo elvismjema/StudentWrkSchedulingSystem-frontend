@@ -59,7 +59,7 @@ const props = defineProps({
   shiftDates: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['update:selectedDate', 'week-change']);
+const emit = defineEmits(['select-day', 'change-week']);
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const FULL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -117,17 +117,17 @@ const weekLabel = computed(() => {
 });
 
 const selectDay = (dateStr) => {
-  emit('update:selectedDate', dateStr);
+  emit('select-day', dateStr);
 };
 
 const prevWeek = () => {
   weekOffset.value--;
-  emit('week-change', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
+  emit('change-week', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
 };
 
 const nextWeek = () => {
   weekOffset.value++;
-  emit('week-change', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
+  emit('change-week', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
 };
 
 watch(weekOffset, () => {
@@ -135,7 +135,7 @@ watch(weekOffset, () => {
   if (!dates.includes(props.selectedDate)) {
     const today = todayStr.value;
     const inWeek = dates.includes(today) ? today : dates[0];
-    emit('update:selectedDate', inWeek);
+    emit('select-day', inWeek);
   }
 });
 </script>

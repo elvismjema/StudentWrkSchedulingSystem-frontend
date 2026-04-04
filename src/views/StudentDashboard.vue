@@ -1,28 +1,41 @@
 <template>
-  <div class="student-dashboard pa-4">
+  <div class="student-dashboard pa-6">
     <!-- Header -->
-    <div class="dashboard-header d-flex align-center justify-space-between mb-4">
+    <div class="dashboard-header d-flex align-center justify-space-between mb-6">
       <div>
-        <div class="text-h5 font-weight-bold">Hi, {{ firstName }}!</div>
-        <div class="text-body-2 text-medium-emphasis">{{ todayLabel }}</div>
+        <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
+        <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
       </div>
       <NotificationBell :unread-count="unreadCount" @click="goToNotifications" />
     </div>
 
     <!-- Clock Status Banner -->
     <ClockStatusBanner
-      :is-clocked-in="clockStatus.isClockedIn"
+      :clocked-in="clockStatus.isClockedIn"
       :clock-in-time="clockStatus.clockInTime"
       :on-break="clockStatus.onBreak"
-      class="mb-4"
+      class="mb-6"
     />
 
     <!-- Loading skeleton -->
     <template v-if="loading">
-      <v-skeleton-loader type="card" class="mb-4" />
-      <v-skeleton-loader type="chip, chip, chip, chip, chip, chip, chip" class="mb-4" />
-      <v-skeleton-loader type="card" class="mb-4" />
-      <v-skeleton-loader type="card" class="mb-4" />
+      <v-row>
+        <v-col cols="12">
+          <v-skeleton-loader type="card" class="mb-4" />
+        </v-col>
+        <v-col cols="12">
+          <v-skeleton-loader type="chip, chip, chip, chip, chip, chip, chip" class="mb-4" />
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-skeleton-loader type="card" />
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-skeleton-loader type="card" />
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-skeleton-loader type="card" />
+        </v-col>
+      </v-row>
     </template>
 
     <!-- Error state -->
@@ -40,16 +53,16 @@
     </v-alert>
 
     <template v-else>
-      <!-- Primary Card: Next / Current Shift -->
+      <!-- Primary Card: Next / Current Shift — full width -->
       <v-card
         v-if="nextShift"
-        class="next-shift-card mb-4"
+        class="next-shift-card mb-6"
         elevation="0"
         rounded="lg"
         border
       >
         <div class="next-shift-card__bar" :style="{ backgroundColor: nextShiftColor }"></div>
-        <div class="pa-4">
+        <div class="pa-5 flex-grow-1">
           <v-chip size="x-small" color="primary" variant="tonal" class="mb-2">
             {{ nextShiftLabel }}
           </v-chip>
@@ -98,101 +111,115 @@
       </v-card>
 
       <!-- Empty state: no upcoming shift -->
-      <v-card v-else class="mb-4 pa-6 text-center" elevation="0" rounded="lg" border>
+      <v-card v-else class="mb-6 pa-8 text-center" elevation="0" rounded="lg" border>
         <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank</v-icon>
         <div class="text-body-1 text-medium-emphasis">No upcoming shifts</div>
         <div class="text-caption text-medium-emphasis">Check the Open Shifts tab for available shifts</div>
       </v-card>
 
-      <!-- Week Strip -->
+      <!-- Week Strip — full width -->
       <WeekStrip
         :selected-date="selectedDate"
         :shift-dates="shiftDates"
-        class="mb-4"
+        class="mb-6"
         @select-day="selectedDate = $event"
-        @change-week="selectedDate = $event"
+        @change-week="onWeekChange"
       />
 
-      <!-- Open Shifts Card -->
-      <v-card class="mb-4" elevation="0" rounded="lg" border>
-        <v-card-text class="pa-4">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <div class="text-subtitle-1 font-weight-bold">
-              <v-icon size="20" class="mr-1">mdi-briefcase-plus</v-icon>
-              Open Shifts
-            </div>
-            <v-btn
-              variant="text"
-              color="primary"
-              size="small"
-              @click="$router.push({ name: 'student-schedule', query: { tab: 'open' } })"
-            >
-              See All ({{ openShiftsCount }})
-            </v-btn>
-          </div>
-          <template v-if="topOpenShifts.length">
-            <ShiftCard
-              v-for="shift in topOpenShifts"
-              :key="shift.id"
-              :shift="shift"
-              :show-actions="false"
-              class="mb-2"
-            />
-          </template>
-          <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
-            No open shifts available right now
-          </div>
-        </v-card-text>
-      </v-card>
+      <!-- 3-column grid: Open Shifts, Pending Requests, Weekly Summary -->
+      <v-row>
+        <!-- Open Shifts Card -->
+        <v-col cols="12" md="4">
+          <v-card class="fill-height" elevation="0" rounded="lg" border>
+            <v-card-text class="pa-4">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="text-subtitle-1 font-weight-bold">
+                  <v-icon size="20" class="mr-1">mdi-briefcase-plus</v-icon>
+                  Open Shifts
+                </div>
+                <v-btn
+                  variant="text"
+                  color="primary"
+                  size="small"
+                  @click="$router.push({ name: 'student-schedule', query: { tab: 'open' } })"
+                >
+                  See All ({{ openShiftsCount }})
+                </v-btn>
+              </div>
+              <template v-if="topOpenShifts.length">
+                <ShiftCard
+                  v-for="shift in topOpenShifts"
+                  :key="shift.id"
+                  :shift="shift"
+                  :show-actions="false"
+                  class="mb-2"
+                />
+              </template>
+              <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
+                No open shifts available right now
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
 
-      <!-- Pending Requests -->
-      <v-card v-if="pendingRequests.length" class="mb-4" elevation="0" rounded="lg" border>
-        <v-card-text class="pa-4">
-          <div class="text-subtitle-1 font-weight-bold mb-2">
-            <v-icon size="20" class="mr-1">mdi-clipboard-text-clock</v-icon>
-            Pending Requests
-          </div>
-          <div
-            v-for="req in pendingRequests"
-            :key="req.id"
-            class="d-flex align-center justify-space-between py-2"
-          >
-            <div class="d-flex align-center">
-              <v-icon size="18" :color="req.iconColor" class="mr-2">{{ req.icon }}</v-icon>
-              <span class="text-body-2">{{ req.label }}</span>
-            </div>
-            <v-chip :color="req.statusColor" size="x-small" variant="tonal">
-              {{ req.status }}
-            </v-chip>
-          </div>
-        </v-card-text>
-      </v-card>
+        <!-- Pending Requests -->
+        <v-col cols="12" md="4">
+          <v-card class="fill-height" elevation="0" rounded="lg" border>
+            <v-card-text class="pa-4">
+              <div class="text-subtitle-1 font-weight-bold mb-2">
+                <v-icon size="20" class="mr-1">mdi-clipboard-text-clock</v-icon>
+                Pending Requests
+              </div>
+              <template v-if="pendingRequests.length">
+                <div
+                  v-for="req in pendingRequests"
+                  :key="req.id"
+                  class="d-flex align-center justify-space-between py-2"
+                >
+                  <div class="d-flex align-center">
+                    <v-icon size="18" :color="req.iconColor" class="mr-2">{{ req.icon }}</v-icon>
+                    <span class="text-body-2">{{ req.label }}</span>
+                  </div>
+                  <v-chip :color="req.statusColor" size="x-small" variant="tonal">
+                    {{ req.status }}
+                  </v-chip>
+                </div>
+              </template>
+              <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
+                No pending requests
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
 
-      <!-- Weekly Summary -->
-      <v-card class="mb-4" elevation="0" rounded="lg" border>
-        <v-card-text class="pa-4">
-          <div class="text-subtitle-1 font-weight-bold mb-3">
-            <v-icon size="20" class="mr-1">mdi-chart-bar</v-icon>
-            This Week
-          </div>
-          <div class="d-flex ga-4">
-            <div class="flex-1 text-center">
-              <div class="text-h5 font-weight-bold" style="color: #80162B">{{ weeklyHours }}</div>
-              <div class="text-caption text-medium-emphasis">Hours Scheduled</div>
-            </div>
-            <v-divider vertical />
-            <div class="flex-1 text-center">
-              <div class="text-h5 font-weight-bold" style="color: #196CA2">{{ weeklyShifts }}</div>
-              <div class="text-caption text-medium-emphasis">Shifts</div>
-            </div>
-            <v-divider vertical />
-            <div class="flex-1 text-center">
-              <div class="text-h5 font-weight-bold" style="color: #2e7d32">${{ estimatedEarnings }}</div>
-              <div class="text-caption text-medium-emphasis">Est. Earnings</div>
-            </div>
-          </div>
-        </v-card-text>
-      </v-card>
+        <!-- Weekly Summary -->
+        <v-col cols="12" md="4">
+          <v-card class="fill-height" elevation="0" rounded="lg" border>
+            <v-card-text class="pa-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">
+                <v-icon size="20" class="mr-1">mdi-chart-bar</v-icon>
+                This Week
+              </div>
+              <div class="d-flex flex-column ga-4">
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #80162B">{{ weeklyHours }}</div>
+                  <div class="text-caption text-medium-emphasis">Hours Scheduled</div>
+                </div>
+                <v-divider />
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #196CA2">{{ weeklyShifts }}</div>
+                  <div class="text-caption text-medium-emphasis">Shifts</div>
+                </div>
+                <v-divider />
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #2e7d32">${{ estimatedEarnings }}</div>
+                  <div class="text-caption text-medium-emphasis">Est. Earnings</div>
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
     </template>
 
     <!-- Swap Dialog -->
@@ -201,7 +228,7 @@
       :shift="swapShift"
       mode="cover"
       :coworkers="[]"
-      @submit="handleSwapSubmit"
+      @submitted="handleSwapSubmit"
     />
 
     <!-- Snackbar -->
@@ -497,6 +524,10 @@ function openSwapDialog(shift) {
   swapDialogOpen.value = true;
 }
 
+function onWeekChange({ monday }) {
+  selectedDate.value = monday;
+}
+
 async function handleSwapSubmit(data) {
   try {
     if (data.type === "pool") {
@@ -524,7 +555,7 @@ onMounted(loadDashboard);
 <style scoped>
 .student-dashboard {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -536,11 +567,5 @@ onMounted(loadDashboard);
 .next-shift-card__bar {
   width: 5px;
   flex-shrink: 0;
-}
-
-@media (max-width: 375px) {
-  .student-dashboard {
-    padding: 12px !important;
-  }
 }
 </style>

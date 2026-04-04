@@ -1,28 +1,30 @@
 <template>
-  <div class="student-schedule pa-4">
+  <div class="student-schedule pa-6">
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between mb-2">
-      <div class="text-h5 font-weight-bold">Schedule</div>
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div class="text-h4 font-weight-bold">Schedule</div>
       <v-btn-toggle v-model="activeTab" density="compact" mandatory color="primary">
         <v-btn value="mine" size="small" aria-label="My Schedule">My Schedule</v-btn>
         <v-btn value="open" size="small" aria-label="Open Shifts">Open Shifts</v-btn>
       </v-btn-toggle>
     </div>
 
-    <!-- Week Strip -->
+    <!-- Week Strip — full width -->
     <WeekStrip
       :selected-date="selectedDate"
       :shift-dates="shiftDates"
-      class="mb-4"
+      class="mb-6"
       @select-day="selectedDate = $event"
       @change-week="handleWeekChange"
     />
 
     <!-- Loading -->
     <template v-if="loading">
-      <v-skeleton-loader type="card" class="mb-3" />
-      <v-skeleton-loader type="card" class="mb-3" />
-      <v-skeleton-loader type="card" class="mb-3" />
+      <v-row>
+        <v-col v-for="n in 3" :key="n" cols="12" md="4">
+          <v-skeleton-loader type="card" />
+        </v-col>
+      </v-row>
     </template>
 
     <!-- Error -->
@@ -37,117 +39,138 @@
       <!-- My Schedule Tab -->
       <div v-if="activeTab === 'mine'">
         <!-- Selected day label -->
-        <div class="text-subtitle-2 text-medium-emphasis mb-2">
+        <div class="text-subtitle-1 font-weight-medium text-medium-emphasis mb-3">
           {{ selectedDayLabel }}
         </div>
 
-        <!-- Shifts for selected day -->
+        <!-- Shifts for selected day — grid layout -->
         <template v-if="selectedDayShifts.length">
-          <ShiftCard
-            v-for="shift in selectedDayShifts"
-            :key="shift.id"
-            :shift="shift"
-            :show-actions="true"
-            class="mb-3"
-            @find-cover="openSwap($event, 'cover')"
-            @trade="openSwap($event, 'trade')"
-            @add-to-calendar="addToCalendar"
-          />
+          <v-row>
+            <v-col
+              v-for="shift in selectedDayShifts"
+              :key="shift.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <ShiftCard
+                :shift="shift"
+                :show-actions="true"
+                class="fill-height"
+                @find-cover="openSwap($event, 'cover')"
+                @trade="openSwap($event, 'trade')"
+                @add-to-calendar="addToCalendar"
+              />
+            </v-col>
+          </v-row>
         </template>
 
         <!-- Empty state -->
-        <v-card v-else elevation="0" rounded="lg" border class="pa-6 text-center">
+        <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
           <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank-outline</v-icon>
           <div class="text-body-1 text-medium-emphasis">No shifts on this day</div>
           <div class="text-caption text-medium-emphasis">
-            Tap a different day above, or check Open Shifts
+            Select a different day above, or check Open Shifts
           </div>
         </v-card>
 
         <!-- Pending Acknowledgements -->
-        <div v-if="pendingAcks.length" class="mt-4">
-          <div class="text-subtitle-2 font-weight-bold mb-2">
+        <div v-if="pendingAcks.length" class="mt-6">
+          <div class="text-subtitle-1 font-weight-bold mb-3">
             <v-icon size="18" class="mr-1">mdi-alert-circle-outline</v-icon>
             Shifts to Acknowledge ({{ pendingAcks.length }})
           </div>
-          <v-card
-            v-for="ack in pendingAcks"
-            :key="ack.id"
-            elevation="0"
-            rounded="lg"
-            border
-            class="pa-3 mb-2 d-flex align-center justify-space-between"
-          >
-            <div>
-              <div class="text-body-2 font-weight-medium">
-                {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.start_time || ack.shift?.shift_start) }}
-              </div>
-              <div class="text-caption text-medium-emphasis">
-                {{ formatTimeRange(ack.shift) }}
-              </div>
-            </div>
-            <v-btn
-              size="small"
-              color="primary"
-              variant="flat"
-              :loading="ack._loading"
-              @click="acknowledgeShift(ack)"
+          <v-row>
+            <v-col
+              v-for="ack in pendingAcks"
+              :key="ack.id"
+              cols="12"
+              sm="6"
+              lg="4"
             >
-              Acknowledge
-            </v-btn>
-          </v-card>
+              <v-card
+                elevation="0"
+                rounded="lg"
+                border
+                class="pa-4 d-flex align-center justify-space-between fill-height"
+              >
+                <div>
+                  <div class="text-body-2 font-weight-medium">
+                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.start_time || ack.shift?.shift_start) }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ formatTimeRange(ack.shift) }}
+                  </div>
+                </div>
+                <v-btn
+                  size="small"
+                  color="primary"
+                  variant="flat"
+                  :loading="ack._loading"
+                  @click="acknowledgeShift(ack)"
+                >
+                  Acknowledge
+                </v-btn>
+              </v-card>
+            </v-col>
+          </v-row>
         </div>
       </div>
 
       <!-- Open Shifts Tab -->
       <div v-else>
         <template v-if="openShifts.length">
-          <v-card
-            v-for="shift in openShifts"
-            :key="shift.id"
-            elevation="0"
-            rounded="lg"
-            border
-            class="mb-3 d-flex"
-          >
-            <div class="open-shift-color" :style="{ backgroundColor: getDeptColor(shift) }"></div>
-            <div class="pa-3 flex-grow-1">
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-body-1 font-weight-bold">
+          <v-row>
+            <v-col
+              v-for="shift in openShifts"
+              :key="shift.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <v-card
+                elevation="0"
+                rounded="lg"
+                border
+                class="d-flex fill-height"
+              >
+                <div class="open-shift-color" :style="{ backgroundColor: getDeptColor(shift) }"></div>
+                <div class="pa-4 flex-grow-1">
+                  <div class="text-body-1 font-weight-bold mb-1">
                     {{ shift.department_name || shift.department?.department_name || "Open Shift" }}
                   </div>
-                  <div class="text-body-2 text-medium-emphasis">
+                  <div class="text-body-2 text-medium-emphasis mb-1">
                     {{ formatDate(shift.shift_date || shift.start_time) }} · {{ formatTimeRange(shift) }}
                   </div>
-                  <div v-if="shift.location" class="text-caption text-medium-emphasis">
+                  <div v-if="shift.location" class="text-caption text-medium-emphasis mb-3">
                     <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>{{ shift.location }}
                   </div>
+                  <v-btn
+                    color="primary"
+                    variant="flat"
+                    size="small"
+                    block
+                    :loading="shift._claiming"
+                    @click="claimShift(shift)"
+                  >
+                    Pick Up
+                  </v-btn>
+                  <v-alert
+                    v-if="shift._conflict"
+                    type="warning"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-2"
+                  >
+                    {{ shift._conflict }}
+                  </v-alert>
                 </div>
-                <v-btn
-                  color="primary"
-                  variant="flat"
-                  size="small"
-                  :loading="shift._claiming"
-                  @click="claimShift(shift)"
-                >
-                  Pick Up
-                </v-btn>
-              </div>
-              <v-alert
-                v-if="shift._conflict"
-                type="warning"
-                variant="tonal"
-                density="compact"
-                class="mt-2"
-              >
-                {{ shift._conflict }}
-              </v-alert>
-            </div>
-          </v-card>
+              </v-card>
+            </v-col>
+          </v-row>
         </template>
 
-        <v-card v-else elevation="0" rounded="lg" border class="pa-6 text-center">
+        <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
           <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-briefcase-off</v-icon>
           <div class="text-body-1 text-medium-emphasis">No open shifts available</div>
           <div class="text-caption text-medium-emphasis">
@@ -163,7 +186,7 @@
       :shift="swapTarget"
       :mode="swapMode"
       :coworkers="coworkers"
-      @submit="handleSwapSubmit"
+      @submitted="handleSwapSubmit"
     />
 
     <!-- Snackbar -->
@@ -279,8 +302,8 @@ async function loadShifts() {
   }
 }
 
-function handleWeekChange(date) {
-  selectedDate.value = date;
+function handleWeekChange({ monday }) {
+  selectedDate.value = monday;
 }
 
 // Watch for tab changes to reload open shifts if needed
@@ -403,7 +426,7 @@ onMounted(loadShifts);
 <style scoped>
 .student-schedule {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -411,11 +434,5 @@ onMounted(loadShifts);
   width: 4px;
   flex-shrink: 0;
   border-radius: 4px 0 0 4px;
-}
-
-@media (max-width: 375px) {
-  .student-schedule {
-    padding: 12px !important;
-  }
 }
 </style>

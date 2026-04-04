@@ -6,11 +6,11 @@
     <!-- Top navigation bar -->
     <TopNav @toggle-sidebar="toggleSidebar" />
 
-    <!-- Main content area -->
+    <!-- Main content area — fills remaining width -->
     <v-main class="main-content">
-      <v-container fluid class="student-content pa-0">
+      <div class="student-content">
         <router-view />
-      </v-container>
+      </div>
     </v-main>
   </v-app>
 </template>
@@ -40,6 +40,8 @@ const toggleSidebar = () => {
 
 .student-content {
   flex: 1;
+  width: 100%;
+  max-width: none;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;

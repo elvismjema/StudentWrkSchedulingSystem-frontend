@@ -107,7 +107,7 @@ const router = createRouter({
         {
           path: "trade-board",
           name: "student-trade-board",
-          redirect: { name: "student-schedule" },
+          component: () => import("./views/StudentTradeBoard.vue"),
         },
         {
           path: "tasks",

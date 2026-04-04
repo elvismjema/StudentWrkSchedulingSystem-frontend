@@ -153,6 +153,8 @@ const clearAll = () => {
   }
 };
 
+const parseHour = (t) => parseInt(t.split(':')[0]);
+
 const formatHour = (h) => {
   if (h === 0) return '12 AM';
   if (h < 12) return h + ' AM';
@@ -192,11 +194,11 @@ const loadAvailability = async () => {
     const res = await studentService.getAvailability();
     const data = res?.data?.data || res?.data || [];
     initGrid();
-    // Expect array of { dayOfWeek, startHour, endHour } or similar
+    // Expect array of { dayOfWeek, startHour/startTime, endHour/endTime } or similar
     for (const slot of data) {
       const d = slot.dayOfWeek ?? slot.day_of_week;
-      const start = slot.startHour ?? slot.start_hour ?? 0;
-      const end = slot.endHour ?? slot.end_hour ?? 0;
+      const start = slot.startTime ? parseHour(slot.startTime) : (slot.startHour ?? slot.start_hour ?? 0);
+      const end = slot.endTime ? parseHour(slot.endTime) : (slot.endHour ?? slot.end_hour ?? 0);
       if (d !== undefined) {
         for (let h = start; h < end; h++) {
           if (grid[d]) grid[d][h] = true;

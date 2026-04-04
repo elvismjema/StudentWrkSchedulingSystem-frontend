@@ -1,568 +1,423 @@
 <template>
-  <div class="trade-board-page">
-    <section class="page-header">
-      <div>
-        <h1 class="page-title">Shift Trade Board</h1>
-        <p class="page-subtitle">Pick up open shifts or request shift coverage</p>
-      </div>
-    </section>
-
-    <div class="tab-row">
-      <button
-        v-for="tab in tabs"
-        :key="tab.value"
-        type="button"
-        class="tab-button"
-        :class="{ active: activeTab === tab.value }"
-        @click="activeTab = tab.value"
-      >
-        {{ tab.label }}
-      </button>
+  <div class="trade-board-page pa-6">
+    <div class="mb-6">
+      <h1 class="text-h4 font-weight-bold">Shift Trade Board</h1>
+      <p class="text-body-1 text-medium-emphasis mt-1">Pick up open shifts, manage swap requests, or post a swap</p>
     </div>
 
-    <div class="board-grid">
-      <v-card
-        v-for="trade in filteredTrades"
-        :key="trade.id"
-        class="trade-card"
-        elevation="0"
-      >
-        <div class="trade-card-top">
-          <div class="trade-chip-row">
-            <div class="department-pill" :class="trade.departmentTheme">
-              <span class="department-dot" />
-              {{ trade.department }}
-            </div>
-            <div class="request-pill" :class="trade.requestType">
-              {{ requestTypeLabel(trade.requestType) }}
-            </div>
-          </div>
+    <v-tabs v-model="activeTab" color="#8B1538" class="mb-6">
+      <v-tab value="open">Open Shifts</v-tab>
+      <v-tab value="swaps">Swap Requests</v-tab>
+      <v-tab value="post">Post a Swap</v-tab>
+    </v-tabs>
 
-          <div class="status-pill" :class="trade.status">
-            {{ statusLabel(trade.status) }}
-          </div>
-        </div>
-
-        <div class="trade-role">{{ trade.position }}</div>
-
-        <div class="trade-meta-list">
-          <div class="trade-meta">
-            <v-icon size="20" class="trade-meta-icon">mdi-calendar-blank-outline</v-icon>
-            <span>{{ trade.dateLabel }}</span>
-          </div>
-          <div class="trade-meta">
-            <v-icon size="20" class="trade-meta-icon">mdi-clock-outline</v-icon>
-            <span>{{ trade.timeRange }}</span>
-          </div>
-          <div class="trade-meta">
-            <v-icon size="20" class="trade-meta-icon">mdi-map-marker-outline</v-icon>
-            <span>{{ trade.location }}</span>
-          </div>
-        </div>
-
-        <div v-if="trade.reason" class="trade-reason">
-          {{ trade.reason }}
-        </div>
-
-        <div class="trade-footer">
-          <div class="approval-note">
-            {{ approvalCopy(trade.requestType) }}
-          </div>
-
-          <v-btn
-            v-if="showClaimAction(trade)"
-            class="claim-button"
-            size="large"
-            block
-            @click="claimShift(trade.id)"
+    <!-- Tab 1: Open Shifts -->
+    <div v-if="activeTab === 'open'">
+      <template v-if="loadingOpen">
+        <v-row>
+          <v-col v-for="n in 3" :key="n" cols="12" sm="6" lg="4">
+            <v-skeleton-loader type="card" />
+          </v-col>
+        </v-row>
+      </template>
+      <template v-else-if="openShifts.length">
+        <v-row>
+          <v-col
+            v-for="shift in openShifts"
+            :key="shift.id"
+            cols="12"
+            sm="6"
+            lg="4"
           >
-            Claim This Shift
-          </v-btn>
-        </div>
+            <v-card elevation="0" rounded="lg" border class="fill-height">
+              <v-card-text class="pa-4">
+                <div class="text-body-1 font-weight-bold mb-1">
+                  {{ shift.department_name || shift.department?.department_name || 'Open Shift' }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
+                  {{ formatDate(shift.shift_date || shift.start_time) }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ formatTimeRange(shift) }}
+                </div>
+                <div v-if="shift.location" class="text-caption text-medium-emphasis mb-3">
+                  <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
+                  {{ shift.location }}
+                </div>
+                <v-btn
+                  color="#8B1538"
+                  variant="flat"
+                  size="small"
+                  block
+                  :loading="shift._claiming"
+                  @click="claimShift(shift)"
+                >
+                  Claim This Shift
+                </v-btn>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+      </template>
+      <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
+        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-briefcase-off</v-icon>
+        <div class="text-body-1 text-medium-emphasis">No open shifts available</div>
+        <div class="text-caption text-medium-emphasis">Check back later for new shifts</div>
       </v-card>
     </div>
 
-    <div v-if="filteredTrades.length === 0" class="empty-state">
-      <h2 class="empty-title">No trade requests match your filters</h2>
-      <p class="empty-copy">There are no shifts to show right now.</p>
+    <!-- Tab 2: Swap Requests -->
+    <div v-if="activeTab === 'swaps'">
+      <template v-if="loadingSwaps">
+        <v-row>
+          <v-col v-for="n in 3" :key="n" cols="12" sm="6" lg="4">
+            <v-skeleton-loader type="card" />
+          </v-col>
+        </v-row>
+      </template>
+      <template v-else>
+        <!-- Incoming Requests -->
+        <div v-if="incomingSwaps.length" class="mb-6">
+          <div class="text-subtitle-1 font-weight-bold mb-3">
+            <v-icon size="18" class="mr-1">mdi-arrow-down-bold-circle</v-icon>
+            Incoming Requests
+          </div>
+          <v-row>
+            <v-col
+              v-for="req in incomingSwaps"
+              :key="req.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <v-card elevation="0" rounded="lg" border class="fill-height">
+                <v-card-text class="pa-4">
+                  <div class="text-body-1 font-weight-bold mb-1">
+                    {{ req.requester_name || 'Swap Request' }}
+                  </div>
+                  <div class="text-body-2 text-medium-emphasis mb-1">
+                    {{ req.shift_details || req.notes || 'Wants to swap shifts with you' }}
+                  </div>
+                  <v-chip
+                    size="small"
+                    :color="statusColor(req.status)"
+                    variant="tonal"
+                    class="mb-3"
+                  >
+                    {{ req.status || 'Pending' }}
+                  </v-chip>
+                  <div v-if="(req.status || '').toLowerCase() === 'pending'" class="d-flex ga-2">
+                    <v-btn
+                      color="success"
+                      variant="flat"
+                      size="small"
+                      :loading="req._responding"
+                      @click="respondSwap(req, 'accepted')"
+                    >
+                      Accept
+                    </v-btn>
+                    <v-btn
+                      color="error"
+                      variant="outlined"
+                      size="small"
+                      :loading="req._responding"
+                      @click="respondSwap(req, 'declined')"
+                    >
+                      Decline
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- Outgoing Requests -->
+        <div v-if="outgoingSwaps.length" class="mb-6">
+          <div class="text-subtitle-1 font-weight-bold mb-3">
+            <v-icon size="18" class="mr-1">mdi-arrow-up-bold-circle</v-icon>
+            Outgoing Requests
+          </div>
+          <v-row>
+            <v-col
+              v-for="req in outgoingSwaps"
+              :key="req.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <v-card elevation="0" rounded="lg" border class="fill-height">
+                <v-card-text class="pa-4">
+                  <div class="text-body-1 font-weight-bold mb-1">
+                    {{ req.target_name || 'Swap Request' }}
+                  </div>
+                  <div class="text-body-2 text-medium-emphasis mb-2">
+                    {{ req.shift_details || req.notes || 'Awaiting response' }}
+                  </div>
+                  <v-chip
+                    size="small"
+                    :color="statusColor(req.status)"
+                    variant="tonal"
+                  >
+                    {{ req.status || 'Pending' }}
+                  </v-chip>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
+
+        <v-card
+          v-if="!incomingSwaps.length && !outgoingSwaps.length"
+          elevation="0"
+          rounded="lg"
+          border
+          class="pa-8 text-center"
+        >
+          <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-swap-horizontal</v-icon>
+          <div class="text-body-1 text-medium-emphasis">No swap requests</div>
+          <div class="text-caption text-medium-emphasis">Post a swap from the "Post a Swap" tab</div>
+        </v-card>
+      </template>
     </div>
+
+    <!-- Tab 3: Post a Swap -->
+    <div v-if="activeTab === 'post'">
+      <v-card elevation="0" rounded="lg" border class="pa-6" max-width="600">
+        <div class="text-subtitle-1 font-weight-bold mb-4">Request Shift Coverage</div>
+
+        <v-select
+          v-model="postForm.shiftId"
+          :items="myShifts"
+          item-title="label"
+          item-value="id"
+          label="Select your shift"
+          variant="outlined"
+          density="comfortable"
+          :loading="loadingMyShifts"
+          class="mb-4"
+        />
+
+        <v-radio-group v-model="postForm.type" inline class="mb-4">
+          <v-radio label="Post to pool (anyone can pick up)" value="pool" />
+          <v-radio label="Request swap with specific coworker" value="specific" />
+        </v-radio-group>
+
+        <v-text-field
+          v-if="postForm.type === 'specific'"
+          v-model="postForm.coworkerId"
+          label="Coworker ID or name"
+          variant="outlined"
+          density="comfortable"
+          class="mb-4"
+        />
+
+        <v-textarea
+          v-model="postForm.notes"
+          label="Notes (optional)"
+          variant="outlined"
+          density="comfortable"
+          rows="3"
+          class="mb-4"
+        />
+
+        <v-btn
+          color="#8B1538"
+          variant="flat"
+          :loading="postForm.submitting"
+          :disabled="!postForm.shiftId"
+          @click="submitPost"
+        >
+          Submit Request
+        </v-btn>
+      </v-card>
+    </div>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
+      {{ snackbar.text }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
+      </template>
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { ref, reactive, computed, onMounted, watch } from 'vue';
+import Utils from '../config/utils.js';
+import studentService from '../services/studentService.js';
 
-const tabs = [
-  { label: "Available Shifts", value: "available" },
-  { label: "My Requests", value: "my-requests" },
-];
+const user = ref(Utils.getStore('user') || {});
+const userId = computed(() => user.value?.userId || user.value?.id);
 
-const tradeRequests = ref([
-  {
-    id: 1,
-    department: "The Brew",
-    departmentTheme: "brew",
-    position: "Barista",
-    dateLabel: "Tuesday, Mar 3",
-    timeRange: "8:00 AM - 12:00 PM",
-    location: "The Brew - Main Campus",
-    requestType: "pickup",
-    status: "claimed",
-    reason: "Morning class conflict, need someone to cover opening shift.",
-    owner: "me",
-    openForClaim: false,
-  },
-  {
-    id: 2,
-    department: "Fitness Center",
-    departmentTheme: "fitness",
-    position: "Lifeguard",
-    dateLabel: "Wednesday, Mar 4",
-    timeRange: "2:00 PM - 6:00 PM",
-    location: "Gaylord Fitness Center - Pool",
-    requestType: "giveaway",
-    status: "pending",
-    reason: "Pool supervision - certification required",
-    owner: "other",
-    openForClaim: true,
-  },
-  {
-    id: 3,
-    department: "Campus Dining",
-    departmentTheme: "dining",
-    position: "Cashier",
-    dateLabel: "Thursday, Mar 5",
-    timeRange: "11:00 AM - 3:00 PM",
-    location: "Student Center Dining Hall",
-    requestType: "swap",
-    status: "approved",
-    reason: "Looking to trade for an evening shift this week.",
-    owner: "me",
-    openForClaim: false,
-  },
-  {
-    id: 4,
-    department: "Library",
-    departmentTheme: "library",
-    position: "Desk Assistant",
-    dateLabel: "Friday, Mar 6",
-    timeRange: "6:00 PM - 9:00 PM",
-    location: "Mabee Library - Front Desk",
-    requestType: "pickup",
-    status: "pending",
-    reason: "Evening help needed for event setup.",
-    owner: "other",
-    openForClaim: true,
-  },
-  {
-    id: 5,
-    department: "Mail Services",
-    departmentTheme: "mail",
-    position: "Sorting Clerk",
-    dateLabel: "Monday, Mar 9",
-    timeRange: "9:00 AM - 1:00 PM",
-    location: "Mail Center",
-    requestType: "giveaway",
-    status: "denied",
-    reason: "Coverage request denied due to staffing minimums.",
-    owner: "me",
-    openForClaim: false,
-  },
-]);
+const activeTab = ref('open');
 
-const activeTab = ref("available");
+// Open shifts state
+const loadingOpen = ref(false);
+const openShifts = ref([]);
 
-const filteredTrades = computed(() => {
-  return tradeRequests.value.filter((trade) => {
-    if (activeTab.value === "available" && !trade.openForClaim) {
-      return false;
-    }
+// Swap requests state
+const loadingSwaps = ref(false);
+const allSwapRequests = ref([]);
 
-    if (activeTab.value === "my-requests" && trade.owner !== "me") {
-      return false;
-    }
+const incomingSwaps = computed(() =>
+  allSwapRequests.value
+    .filter((r) => r.target_user_id === userId.value || r.direction === 'incoming')
+    .map((r) => ({ ...r, _responding: false }))
+);
 
-    return true;
-  });
+const outgoingSwaps = computed(() =>
+  allSwapRequests.value.filter((r) => r.requester_id === userId.value || r.direction === 'outgoing')
+);
+
+// Post form state
+const loadingMyShifts = ref(false);
+const myShifts = ref([]);
+
+const postForm = reactive({
+  shiftId: null,
+  type: 'pool',
+  coworkerId: '',
+  notes: '',
+  submitting: false,
 });
 
-const requestTypeLabel = (type) => {
-  if (type === "swap") {
-    return "Swap";
+// Snackbar
+const snackbar = reactive({ show: false, text: '', color: 'success' });
+
+function showSnack(text, color = 'success') {
+  snackbar.text = text;
+  snackbar.color = color;
+  snackbar.show = true;
+}
+
+function statusColor(status) {
+  const s = (status || '').toLowerCase();
+  if (s === 'approved' || s === 'accepted') return 'success';
+  if (s === 'denied' || s === 'declined') return 'error';
+  if (s === 'claimed') return 'info';
+  return 'warning';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatTimeRange(shift) {
+  if (!shift) return '';
+  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${fmt(shift.start_time || shift.shift_start)} – ${fmt(shift.end_time || shift.shift_end)}`;
+}
+
+// Data loaders
+async function loadOpenShifts() {
+  loadingOpen.value = true;
+  try {
+    const res = await studentService.getOpenShifts();
+    const data = res?.data?.data || res?.data || [];
+    const shifts = Array.isArray(data) ? data : (data.shifts || data.preview || []);
+    openShifts.value = shifts.map((s) => ({ ...s, _claiming: false }));
+  } catch {
+    showSnack('Failed to load open shifts', 'error');
+  } finally {
+    loadingOpen.value = false;
   }
+}
 
-  if (type === "giveaway") {
-    return "Giveaway";
+async function loadSwapRequests() {
+  loadingSwaps.value = true;
+  try {
+    const res = await studentService.getSwapRequests();
+    allSwapRequests.value = res?.data?.data || res?.data || [];
+  } catch {
+    showSnack('Failed to load swap requests', 'error');
+  } finally {
+    loadingSwaps.value = false;
   }
+}
 
-  return "Pickup";
-};
-
-const statusLabel = (status) => {
-  if (status === "approved") {
-    return "Approved";
+async function loadMyShifts() {
+  loadingMyShifts.value = true;
+  try {
+    const res = await studentService.getMySchedule();
+    const shifts = res?.data?.data || res?.data || [];
+    myShifts.value = shifts.map((s) => ({
+      id: s.id,
+      label: `${s.department_name || s.department?.department_name || 'Shift'} — ${formatDate(s.shift_date || s.start_time)} ${formatTimeRange(s)}`,
+    }));
+  } catch {
+    showSnack('Failed to load your shifts', 'error');
+  } finally {
+    loadingMyShifts.value = false;
   }
+}
 
-  if (status === "denied") {
-    return "Denied";
+async function claimShift(shift) {
+  shift._claiming = true;
+  try {
+    await studentService.claimOpenShift(shift.id);
+    openShifts.value = openShifts.value.filter((s) => s.id !== shift.id);
+    showSnack('Shift claimed!');
+  } catch (err) {
+    showSnack(err?.response?.data?.message || 'Failed to claim shift', 'error');
+  } finally {
+    shift._claiming = false;
   }
+}
 
-  if (status === "claimed") {
-    return "Claimed";
+async function respondSwap(req, action) {
+  req._responding = true;
+  try {
+    await studentService.respondToSwap(req.id, { status: action });
+    showSnack(`Swap ${action}!`);
+    await loadSwapRequests();
+  } catch (err) {
+    showSnack(err?.response?.data?.message || `Failed to ${action} swap`, 'error');
+  } finally {
+    req._responding = false;
   }
+}
 
-  return "Pending";
-};
-
-const approvalCopy = (requestType) => {
-  if (requestType === "pickup") {
-    return "Pickups are auto-approved once claimed.";
+async function submitPost() {
+  postForm.submitting = true;
+  try {
+    if (postForm.type === 'pool') {
+      await studentService.findCover(postForm.shiftId, { notes: postForm.notes });
+    } else {
+      await studentService.requestSwap(postForm.shiftId, {
+        targetUserId: postForm.coworkerId,
+        notes: postForm.notes,
+      });
+    }
+    showSnack('Request submitted!');
+    postForm.shiftId = null;
+    postForm.notes = '';
+    postForm.coworkerId = '';
+  } catch (err) {
+    showSnack(err?.response?.data?.message || 'Failed to submit request', 'error');
+  } finally {
+    postForm.submitting = false;
   }
+}
 
-  if (requestType === "swap") {
-    return "Manager approval required for swaps.";
-  }
+// Load data when tab changes
+watch(activeTab, (tab) => {
+  if (tab === 'open' && !openShifts.value.length) loadOpenShifts();
+  if (tab === 'swaps' && !allSwapRequests.value.length) loadSwapRequests();
+  if (tab === 'post' && !myShifts.value.length) loadMyShifts();
+});
 
-  return "Giveaway requests are reviewed before final approval.";
-};
-
-const showClaimAction = (trade) =>
-  activeTab.value !== "my-requests" && trade.openForClaim && trade.status === "pending";
-
-const claimShift = (tradeId) => {
-  tradeRequests.value = tradeRequests.value.map((trade) =>
-    trade.id === tradeId
-      ? {
-          ...trade,
-          status: trade.requestType === "pickup" ? "approved" : "claimed",
-          openForClaim: false,
-        }
-      : trade
-  );
-};
+onMounted(() => {
+  loadOpenShifts();
+});
 </script>
 
 <style scoped>
 .trade-board-page {
-  min-height: 100%;
-  padding: 24px;
-  background: #f3f3f4;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 32px;
-  color: #202228;
-}
-
-.page-subtitle {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 24px;
-  color: #6f7685;
-}
-
-.tab-row {
-  display: inline-flex;
-  gap: 0;
-  padding: 4px;
-  border-radius: 16px;
-  background: #ececef;
-  margin-bottom: 24px;
-}
-
-.tab-button {
-  min-width: 180px;
-  min-height: 56px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: #6f7685;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.tab-button.active {
-  background: #ffffff;
-  color: #202228;
-  box-shadow: 0 1px 4px rgba(25, 30, 38, 0.08);
-}
-
-.board-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 24px;
-}
-
-.trade-card {
-  border: 1px solid #d4d7dd;
-  border-radius: 18px;
-  background: #f7f7f8;
-  box-shadow: 0 2px 8px rgba(26, 33, 46, 0.08);
-  padding: 24px;
-}
-
-.trade-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.trade-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.department-pill,
-.request-pill,
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.department-pill {
-  border: 1px solid transparent;
-}
-
-.department-pill.brew {
-  color: #f27a21;
-  background: #fbefe6;
-  border-color: #f1b38e;
-}
-
-.department-pill.fitness {
-  color: #27b957;
-  background: #edf9ef;
-  border-color: #addfb8;
-}
-
-.department-pill.dining {
-  color: #6e56cf;
-  background: #f1ecff;
-  border-color: #cdbef9;
-}
-
-.department-pill.library {
-  color: #1c7ed6;
-  background: #ebf5ff;
-  border-color: #b7d7f5;
-}
-
-.department-pill.mail {
-  color: #9c36b5;
-  background: #f7ecfb;
-  border-color: #dec0ea;
-}
-
-.department-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.request-pill.swap {
-  color: #9a3412;
-  background: #fff3e8;
-}
-
-.request-pill.giveaway {
-  color: #7c3aed;
-  background: #f3edff;
-}
-
-.request-pill.pickup {
-  color: #0f766e;
-  background: #eafaf8;
-}
-
-.status-pill.pending {
-  color: #d18a00;
-  background: #fff4d6;
-}
-
-.status-pill.approved {
-  color: #1f9d49;
-  background: #e8f8ed;
-}
-
-.status-pill.denied {
-  color: #d64545;
-  background: #fdecec;
-}
-
-.status-pill.claimed {
-  color: #1f6fd6;
-  background: #ebf3ff;
-}
-
-.trade-role {
-  margin-top: 20px;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-  color: #202228;
-}
-
-.trade-meta-list {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.trade-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  line-height: 24px;
-  color: #6f7685;
-}
-
-.trade-meta-icon {
-  color: #717887;
-}
-
-.trade-reason {
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 12px;
-  background: #f0f1f4;
-  font-size: 14px;
-  line-height: 20px;
-  color: #6f7685;
-}
-
-.trade-footer {
-  margin-top: 24px;
-}
-
-.approval-note {
-  margin-bottom: 16px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  color: #6f7685;
-}
-
-.claim-button {
-  min-height: 48px;
-  border-radius: 12px;
-  background: #98002e;
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
-  text-transform: none;
-}
-
-.empty-state {
-  padding: 40px 24px;
-  text-align: center;
-}
-
-.empty-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 28px;
-  color: #202228;
-}
-
-.empty-copy {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 24px;
-  color: #6f7685;
-}
-
-.post-dialog {
-  border-radius: 20px;
-  padding: 24px;
-}
-
-.dialog-header {
-  margin-bottom: 24px;
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 32px;
-  color: #202228;
-}
-
-.dialog-copy {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 24px;
-  color: #6f7685;
-}
-
-.dialog-body {
-  display: grid;
-  gap: 16px;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-@media (max-width: 960px) {
-  .page-header {
-    flex-direction: column;
-  }
-
-  .filters-card {
-    grid-template-columns: 1fr;
-  }
-
-  .search-group {
-    max-width: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .trade-board-page {
-    padding: 24px 16px;
-  }
-
-  .tab-row {
-    display: grid;
-    width: 100%;
-  }
-
-  .tab-button {
-    min-width: 0;
-  }
-
-  .trade-card {
-    padding: 20px;
-  }
-
-  .trade-card-top {
-    flex-direction: column;
-  }
+  width: 100%;
 }
 </style>

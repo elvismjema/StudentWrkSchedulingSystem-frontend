@@ -196,14 +196,14 @@
                       <div class="course-details">
                         <div class="course-id">{{ course.CourseID }}</div>
                         <div class="course-instructors">
-                          <span v-for="instructor in course.Instructors" :key="instructor.Email" class="instructor">
+                          <span v-for="instructor in getCourseInstructors(course)" :key="instructor.Email || instructor.Name" class="instructor">
                             {{ instructor.Name }}
                           </span>
                         </div>
                       </div>
                       <div class="meeting-times">
                         <div
-                          v-for="meeting in course.meeting_times"
+                          v-for="meeting in getCourseMeetings(course)"
                           :key="`${meeting.days.join('-')}-${meeting.start_time}`"
                           class="meeting-time"
                         >
@@ -262,7 +262,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../services/services.js';
 import studentScheduleService from '../services/studentScheduleService.js';
@@ -375,6 +375,14 @@ const formatMeetingDays = (days) => {
   return days.map(day => dayMap[day] || day).join(', ');
 };
 
+const getCourseInstructors = (course) => {
+  return Array.isArray(course?.Instructors) ? course.Instructors : [];
+};
+
+const getCourseMeetings = (course) => {
+  return Array.isArray(course?.meeting_times) ? course.meeting_times : [];
+};
+
 const openWorkerModal = (worker) => {
   workerModal.selectedWorker = worker;
   workerModal.open = true;
@@ -397,7 +405,7 @@ const openAddWorkerDialog = () => {
 const navigateToUserManagement = () => {
   // Navigate to admin user management with query params for manager context
   router.push({
-    path: '/manager/workers',
+    path: '/manager/admin/users',
     query: { 
       mode: 'add',
       departmentId: deptContext.department_id 
@@ -485,7 +493,9 @@ const loadClassSchedule = async () => {
     const scheduleData = await studentScheduleService.getStudentSchedule(workerEmail);
     
     if (scheduleData && scheduleData.Courses && Array.isArray(scheduleData.Courses)) {
-      classSchedule.value = scheduleData.Courses;
+      classSchedule.value = scheduleData.Courses.map((course) =>
+        studentScheduleService.formatCourseData(course)
+      );
     } else {
       classSchedule.value = [];
       scheduleError.value = 'No class schedule data available.';
@@ -503,6 +513,17 @@ const loadClassSchedule = async () => {
 // Lifecycle
 onMounted(() => {
   loadWorkers();
+});
+
+watch(activeTab, (nextTab) => {
+  if (
+    nextTab === 'schedule' &&
+    !loadingSchedule.value &&
+    !scheduleError.value &&
+    classSchedule.value.length === 0
+  ) {
+    loadClassSchedule();
+  }
 });
 </script>
 

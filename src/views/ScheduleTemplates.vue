@@ -191,17 +191,17 @@
     <v-progress-linear v-if="loading" indeterminate color="primary" class="mt-4" />
 
     <!-- ─────────────────────────────────────────────────────────────────────
-         CREATE / EDIT DIALOG
+         CREATE / EDIT DIALOG (calendar-based shift editor)
     ───────────────────────────────────────────────────────────────────────── -->
-    <v-dialog v-model="showDialog" max-width="900px" persistent scrollable>
+    <v-dialog v-model="showDialog" :max-width="1300" fullscreen-breakpoint="md" persistent scrollable>
       <v-card>
-        <v-card-title class="d-flex align-center">
-          <v-icon class="mr-2">{{ editingTemplate ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
+        <v-card-title class="d-flex align-center pa-4 pb-2">
+          <v-icon class="mr-2">{{ editingTemplate ? 'mdi-pencil' : 'mdi-calendar-plus' }}</v-icon>
           {{ editingTemplate ? 'Edit Template' : 'New Schedule Template' }}
         </v-card-title>
         <v-divider />
 
-        <!-- Inline conflict banner shown while editing -->
+        <!-- Conflict banner -->
         <v-alert
           v-if="editorConflicts.length > 0"
           type="warning"
@@ -211,22 +211,36 @@
           icon="mdi-alert"
         >
           <strong>{{ editorConflicts.length }} issue{{ editorConflicts.length > 1 ? 's' : '' }} detected</strong>
-          — check the shifts below for warnings.
+          — click the highlighted shift blocks to review.
         </v-alert>
 
-        <v-card-text class="overflow-y-auto" style="max-height:70vh">
+        <!-- Missing-position warning -->
+        <v-alert
+          v-if="hasUnassignedPositions"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="ma-4 mb-0"
+          icon="mdi-alert-circle"
+        >
+          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's' : '' }} still need{{ unassignedPositionCount === 1 ? 's' : '' }} a position.</strong>
+          Click the grey shift blocks on the calendar to assign a position before saving.
+        </v-alert>
+
+        <v-card-text class="pa-4 overflow-y-auto" style="max-height: calc(100vh - 180px)">
           <v-form ref="formRef" v-model="formValid">
-            <!-- Template meta -->
-            <v-row>
-              <v-col cols="12" md="8">
+            <!-- Template metadata row -->
+            <v-row class="mb-2">
+              <v-col cols="12" md="6">
                 <v-text-field
                   v-model="form.template_name"
                   label="Template Name"
                   variant="outlined"
+                  density="compact"
                   :rules="[v => !!v || 'Name is required']"
                 />
               </v-col>
-              <v-col cols="12" md="4">
+              <v-col cols="12" md="3">
                 <v-select
                   v-model="form.recurrence_type"
                   :items="recurrenceOptions"
@@ -234,226 +248,45 @@
                   item-value="value"
                   label="Recurrence"
                   variant="outlined"
+                  density="compact"
                   :rules="[v => !!v || 'Recurrence is required']"
+                />
+              </v-col>
+              <v-col cols="12" md="3" class="d-flex align-center">
+                <v-checkbox
+                  v-model="form.is_active"
+                  label="Active (visible on template list)"
+                  hide-details
+                  density="compact"
                 />
               </v-col>
             </v-row>
 
-            <v-divider class="my-3" />
+            <v-divider class="mb-3" />
 
-            <!-- Shifts section -->
-            <div class="d-flex align-center mb-3">
-              <span class="text-subtitle-2 font-weight-bold">
-                Shifts in Template ({{ form.shifts.length }})
-              </span>
-              <v-spacer />
-              <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addShiftRow">
-                Add Shift
-              </v-btn>
-            </div>
-
-            <div v-if="form.shifts.length === 0" class="text-caption text-medium-emphasis py-3 text-center">
-              No shifts added yet. Click "Add Shift" to define the pattern.
-            </div>
-
-            <!-- One card per template shift -->
-            <v-card
-              v-for="(shift, idx) in form.shifts"
-              :key="idx"
-              variant="outlined"
-              class="mb-3"
-              :color="shiftEditorConflictType(idx) === 'no_coverage' ? 'error' : shiftEditorConflictType(idx) === 'availability_conflict' ? 'warning' : undefined"
-            >
-              <!-- Conflict banner for this shift -->
-              <v-alert
-                v-if="shiftEditorConflict(idx)"
-                :type="shiftEditorConflictType(idx) === 'no_coverage' ? 'error' : 'warning'"
-                density="compact"
-                variant="tonal"
-                class="ma-2 mb-0"
-                :icon="shiftEditorConflictType(idx) === 'no_coverage' ? 'mdi-account-alert' : 'mdi-calendar-alert'"
-              >
-                {{ shiftEditorConflict(idx).message }}
-              </v-alert>
-
-              <v-card-text class="pb-2">
-                <!-- Row 1: Day, Start, End, Position -->
-                <v-row dense>
-                  <v-col cols="12" sm="3">
-                    <v-select
-                      v-model="shift.day_of_week"
-                      :items="dayOptions"
-                      item-title="label"
-                      item-value="value"
-                      label="Day"
-                      variant="outlined"
-                      density="compact"
-                      hide-details
-                    />
-                  </v-col>
-                  <v-col cols="6" sm="2">
-                    <v-text-field
-                      v-model="shift.start_time"
-                      type="time"
-                      label="Start"
-                      variant="outlined"
-                      density="compact"
-                      hide-details
-                    />
-                  </v-col>
-                  <v-col cols="6" sm="2">
-                    <v-text-field
-                      v-model="shift.end_time"
-                      type="time"
-                      label="End"
-                      variant="outlined"
-                      density="compact"
-                      hide-details
-                    />
-                  </v-col>
-                  <v-col cols="12" sm="4">
-                    <v-select
-                      v-model="shift.position_id"
-                      :items="positions"
-                      item-title="position_name"
-                      item-value="position_id"
-                      label="Position"
-                      variant="outlined"
-                      density="compact"
-                      hide-details
-                      clearable
-                      :rules="[v => !!v || 'Position is required']"
-                    />
-                  </v-col>
-                  <v-col cols="12" sm="1" class="d-flex align-center justify-end">
-                    <v-btn
-                      icon
-                      size="small"
-                      variant="text"
-                      color="error"
-                      @click="removeShiftRow(idx)"
-                    >
-                      <v-icon>mdi-close</v-icon>
-                    </v-btn>
-                  </v-col>
-                </v-row>
-
-                <!-- Row 2: Assigned worker -->
-                <v-row dense class="mt-1">
-                  <v-col cols="12">
-                    <v-autocomplete
-                      v-model="shift.assigned_user_id"
-                      :items="deptWorkers"
-                      :item-title="w => `${w.user.fName} ${w.user.lName}`"
-                      item-value="user_id"
-                      label="Assigned Worker (optional)"
-                      variant="outlined"
-                      density="compact"
-                      clearable
-                      hide-details
-                      prepend-inner-icon="mdi-account"
-                      @update:modelValue="refreshEditorConflicts"
-                    >
-                      <template #item="{ item, props }">
-                        <v-list-item v-bind="props">
-                          <template #title>
-                            {{ item.raw.user.fName }} {{ item.raw.user.lName }}
-                          </template>
-                          <template #subtitle>
-                            {{ item.raw.user.email }}
-                          </template>
-                        </v-list-item>
-                      </template>
-                    </v-autocomplete>
-                  </v-col>
-                </v-row>
-
-                <!-- Tasks section (collapsible) -->
-                <v-expansion-panels class="mt-2" flat>
-                  <v-expansion-panel>
-                    <v-expansion-panel-title density="compact" class="py-1 px-2">
-                      <v-icon size="16" class="mr-2">mdi-format-list-checks</v-icon>
-                      Tasks ({{ shift.tasks.length }})
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text>
-                      <div
-                        v-for="(task, tIdx) in shift.tasks"
-                        :key="tIdx"
-                        class="d-flex align-center gap-2 mb-2"
-                      >
-                        <v-text-field
-                          v-model="task.taskName"
-                          label="Task name"
-                          variant="outlined"
-                          density="compact"
-                          hide-details
-                          class="flex-grow-1"
-                        />
-                        <v-select
-                          v-model="task.taskType"
-                          :items="taskTypeOptions"
-                          item-title="label"
-                          item-value="value"
-                          label="Type"
-                          variant="outlined"
-                          density="compact"
-                          hide-details
-                          style="max-width:130px"
-                        />
-                        <v-select
-                          v-model="task.priority"
-                          :items="taskPriorityOptions"
-                          item-title="label"
-                          item-value="value"
-                          label="Priority"
-                          variant="outlined"
-                          density="compact"
-                          hide-details
-                          style="max-width:110px"
-                        />
-                        <v-btn
-                          icon
-                          size="small"
-                          variant="text"
-                          color="error"
-                          @click="removeTask(idx, tIdx)"
-                        >
-                          <v-icon size="16">mdi-close</v-icon>
-                        </v-btn>
-                      </div>
-
-                      <v-btn
-                        size="small"
-                        variant="tonal"
-                        prepend-icon="mdi-plus"
-                        class="mt-1"
-                        @click="addTask(idx)"
-                      >
-                        Add Task
-                      </v-btn>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
-              </v-card-text>
-            </v-card>
-
-            <v-divider class="my-3" />
-            <v-checkbox
-              v-model="form.is_active"
-              label="Active (visible on template list)"
-              hide-details
+            <!-- Calendar editor — only mounted when dialog is open -->
+            <TemplateCalendarEditor
+              v-if="showDialog"
+              v-model="form.shifts"
+              :positions="positions"
+              :workers="deptWorkers"
+              :conflicts="editorConflicts"
             />
           </v-form>
         </v-card-text>
 
+        <v-divider />
         <v-card-actions class="pa-4">
+          <span class="text-caption text-medium-emphasis">
+            {{ form.shifts.length }} shift{{ form.shifts.length !== 1 ? 's' : '' }} in template
+          </span>
           <v-spacer />
           <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
           <v-btn
             color="primary"
             variant="elevated"
             :loading="saving"
-            :disabled="!formValid"
+            :disabled="!formValid || hasUnassignedPositions"
             @click="saveTemplate"
           >
             {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
@@ -520,9 +353,11 @@
               <v-text-field
                 v-model="publishForm.start_date"
                 type="date"
-                label="Week start (Monday)"
+                :label="publishWeekLabel"
                 variant="outlined"
-                :rules="[v => !!v || 'Date required']"
+                :rules="[v => !!v || 'Date required', v => publishDateIsMonday(v) || 'Please pick a Monday']"
+                :hint="publishDateRangeHint"
+                persistent-hint
                 @update:modelValue="loadPublishConflicts"
               />
             </v-col>
@@ -597,6 +432,7 @@ import { ref, onMounted, computed } from 'vue'
 import templateService from '../services/templateService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 const deptContext = Utils.getStore('currentDepartmentContext') || {}
@@ -648,38 +484,9 @@ const publishForm = ref({
 
 // ─── Reference data ───────────────────────────────────────────────────────────
 const recurrenceOptions = [
-  { label: 'Weekly', value: 'weekly' },
+  { label: 'Weekly',    value: 'weekly'   },
   { label: 'Bi-weekly', value: 'biweekly' },
-  { label: 'Monthly', value: 'monthly' },
-]
-
-const dayOptions = [
-  { label: 'Sunday', value: 0 },
-  { label: 'Monday', value: 1 },
-  { label: 'Tuesday', value: 2 },
-  { label: 'Wednesday', value: 3 },
-  { label: 'Thursday', value: 4 },
-  { label: 'Friday', value: 5 },
-  { label: 'Saturday', value: 6 },
-]
-
-const taskTypeOptions = [
-  { label: 'Opening', value: 'opening' },
-  { label: 'Closing', value: 'closing' },
-  { label: 'Maintenance', value: 'maintenance' },
-  { label: 'Customer Service', value: 'customer_service' },
-  { label: 'Inventory', value: 'inventory' },
-  { label: 'Cleaning', value: 'cleaning' },
-  { label: 'Training', value: 'training' },
-  { label: 'Administrative', value: 'administrative' },
-  { label: 'Other', value: 'other' },
-]
-
-const taskPriorityOptions = [
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-  { label: 'Urgent', value: 'urgent' },
+  { label: 'Monthly',   value: 'monthly'  },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -699,6 +506,34 @@ const formatTime12 = (t) => {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
+// ─── Calendar-editor shift validation ────────────────────────────────────────
+const unassignedPositionCount = computed(
+  () => form.value.shifts.filter((s) => !s.position_id).length
+)
+const hasUnassignedPositions = computed(() => unassignedPositionCount.value > 0)
+
+// ─── Publish date helpers ─────────────────────────────────────────────────────
+const publishWeekLabel = computed(() => {
+  const rec = publishTarget.value?.recurrence_type
+  if (rec === 'biweekly') return 'Fortnight start (Monday)'
+  if (rec === 'monthly')  return 'Month start (Monday)'
+  return 'Week start (Monday)'
+})
+
+const publishDateIsMonday = (v) => {
+  if (!v) return true
+  return new Date(v + 'T00:00:00').getDay() === 1
+}
+
+const publishDateRangeHint = computed(() => {
+  if (!publishForm.value.start_date || !publishDateIsMonday(publishForm.value.start_date)) return ''
+  const start  = new Date(publishForm.value.start_date + 'T00:00:00')
+  const end    = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const fmt    = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return `Shifts will be created: ${fmt(start)} – ${fmt(end)}`
+})
+
 // ─── Conflict helpers ─────────────────────────────────────────────────────────
 const templateCachedConflicts = (tmpl) =>
   templateConflictsMap.value[tmpl.template_id] || []
@@ -713,19 +548,6 @@ const availabilityConflictCount = (tmpl) =>
 
 const shiftHasConflict = (tmpl, shift) =>
   templateCachedConflicts(tmpl).some((c) => c.templateShiftId === shift.shift_id)
-
-// Conflict for the shift at `idx` in the editor (using editorConflicts + shift_id / index matching)
-const shiftEditorConflict = (idx) => {
-  // After saving, we match by shift_id; during new creation we use index-based approach
-  const shift = form.value.shifts[idx]
-  if (!shift) return null
-  if (shift.shift_id) {
-    return editorConflicts.value.find((c) => c.templateShiftId === shift.shift_id) || null
-  }
-  return null
-}
-
-const shiftEditorConflictType = (idx) => shiftEditorConflict(idx)?.type || null
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 const loadTemplates = async () => {
@@ -808,37 +630,6 @@ const closeDialog = () => {
   editingTemplate.value = null
   editorConflicts.value = []
 }
-
-const addShiftRow = () => {
-  form.value.shifts.push({
-    day_of_week: 1,
-    start_time: '09:00',
-    end_time: '17:00',
-    position_id: null,
-    assigned_user_id: null,
-    tasks: [],
-  })
-}
-
-const removeShiftRow = (idx) => {
-  form.value.shifts.splice(idx, 1)
-}
-
-const addTask = (shiftIdx) => {
-  form.value.shifts[shiftIdx].tasks.push({
-    taskName: '',
-    taskType: 'other',
-    priority: 'medium',
-    taskDescription: '',
-    dueTime: null,
-    estimatedDuration: null,
-  })
-}
-
-const removeTask = (shiftIdx, taskIdx) => {
-  form.value.shifts[shiftIdx].tasks.splice(taskIdx, 1)
-}
-
 /**
  * Re-run editor-level conflict check after the user changes worker assignments
  * (only when editing an existing template that has server-side shift IDs).

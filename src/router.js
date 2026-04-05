@@ -102,7 +102,7 @@ const router = createRouter({
         {
           path: "availability",
           name: "student-availability",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentAvailability.vue"),
         },
         {
           path: "trade-board",
@@ -127,7 +127,7 @@ const router = createRouter({
         {
           path: "settings",
           name: "student-settings",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentSettings.vue"),
         },
       ],
     },

@@ -212,6 +212,10 @@ const submitting = ref(false);
 const checkingEmail = ref(false);
 const loadingPositions = ref(false);
 const availablePositions = ref([]);
+const existingUser = ref(null);
+const createPositionModal = reactive({
+  open: false,
+});
 const emailStatus = reactive({
   type: '',
   message: '',
@@ -249,7 +253,8 @@ const resetForm = () => {
     departmentName: deptContext.department_name || '',
     positionId: props.worker?.positionId || null,
   });
-  
+
+  existingUser.value = null;
   emailStatus.type = '';
   emailStatus.message = '';
 };
@@ -270,7 +275,8 @@ const loadPositions = async () => {
 };
 
 const checkEmailExists = async () => {
-  if (!form.email || !rules.email(form.email)) {
+  if (!form.email || rules.email(form.email) !== true) {
+    existingUser.value = null;
     emailStatus.type = '';
     emailStatus.message = '';
     return;
@@ -282,12 +288,14 @@ const checkEmailExists = async () => {
 
   try {
     const response = await apiClient.get(`/users/check-email/${encodeURIComponent(form.email)}`);
-    const existingUser = response?.data;
-    
-    if (existingUser && existingUser.userId) {
-      if (existingUser.userId !== props.worker?.userId) {
+    const foundUser = response?.data?.data || response?.data || null;
+    existingUser.value = foundUser && (foundUser.userId || foundUser.id) ? foundUser : null;
+
+    if (existingUser.value) {
+      const foundUserId = existingUser.value.userId || existingUser.value.id;
+      if (foundUserId !== props.worker?.userId) {
         emailStatus.type = 'info';
-        emailStatus.message = `User exists: ${existingUser.fName} ${existingUser.lName}. Will be added to your department.`;
+        emailStatus.message = `User exists: ${existingUser.value.fName || ''} ${existingUser.value.lName || ''}`.trim() + '. Will be added to your department.';
       } else {
         emailStatus.type = 'success';
         emailStatus.message = 'This is the current user\'s email.';
@@ -305,10 +313,12 @@ const checkEmailExists = async () => {
 };
 
 const submitForm = async () => {
-  if (!form.value) return;
+  if (!valid.value || submitting.value) return;
 
   submitting.value = true;
   try {
+    await checkEmailExists();
+
     const payload = {
       fName: form.fName.trim(),
       lName: form.lName.trim(),
@@ -324,9 +334,31 @@ const submitForm = async () => {
       const response = await apiClient.put(`/users/${props.worker.userId}`, payload);
       emit('worker-updated', response.data);
     } else {
-      // Add new worker (or assign existing user)
-      const response = await apiClient.post('/user-departments/assign-worker', payload);
-      emit('worker-added', response.data);
+      let userId = existingUser.value?.userId || existingUser.value?.id || null;
+
+      // Create a user only when the email is not already in the system.
+      if (!userId) {
+        const createUserResponse = await apiClient.post('/users', {
+          fName: payload.fName,
+          lName: payload.lName,
+          email: payload.email,
+          phone: payload.phone,
+          studentId: payload.studentId,
+        });
+
+        const createdUser = createUserResponse?.data?.data || createUserResponse?.data || {};
+        userId = createdUser.userId || createdUser.id;
+      }
+
+      // Always assign the user to the manager's department and selected position.
+      const assignResponse = await apiClient.post('/user-departments/assign-worker', {
+        userId,
+        departmentId: payload.departmentId,
+        positionId: payload.positionId,
+        phone: payload.phone,
+        studentId: payload.studentId,
+      });
+      emit('worker-added', assignResponse.data);
     }
 
     closeModal();

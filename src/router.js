@@ -155,7 +155,7 @@ const router = createRouter({
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: ShiftManagement,
+          component: () => import("./views/ManagerCreateShift.vue"),
         },
         {
           path: "availability",

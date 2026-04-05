@@ -16,7 +16,7 @@
           prepend-icon="mdi-briefcase-plus" 
           @click="goToPositionsScreen"
         >
-          Position
+          Positions
         </v-btn>
       </div>
     </div>
@@ -397,7 +397,7 @@ const openAddWorkerDialog = () => {
 };
 
 const goToPositionsScreen = () => {
-  router.push('/manager/admin/departments');
+  router.push('/manager/positions');
 };
 
 const onWorkerAdded = (newWorker) => {

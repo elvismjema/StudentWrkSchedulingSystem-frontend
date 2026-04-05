@@ -12,9 +12,6 @@
               </p>
             </div>
           </div>
-          <v-btn icon variant="text" @click="closeModal">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
         </v-card-title>
 
         <v-card-text class="modal-content">

@@ -6,9 +6,6 @@
           <h2 class="modal-title">Create Shift</h2>
           <p class="modal-subtitle">Schedule a new shift for your department</p>
         </div>
-        <v-btn icon variant="text" @click="closeModal">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
       </v-card-title>
 
       <v-card-text class="modal-content">

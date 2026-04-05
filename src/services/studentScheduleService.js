@@ -11,12 +11,13 @@ class StudentScheduleService {
    * @param {string} termCode - Term code (defaults to current term)
    * @returns {Promise<Object>} Schedule data
    */
-  async getStudentSchedule(studentEmail, termCode = DEFAULT_TERM_CODE) {
+  async getStudentSchedule(studentEmail, termCode = null) {
     try {
       // Use email as the user identifier for the external API
       const userId = studentEmail;
+      const resolvedTermCode = termCode || this.getCurrentTermCode() || DEFAULT_TERM_CODE;
       
-      const response = await axios.get(`${STUDENT_SCHEDULE_API_BASE}/${userId}/${termCode}`, {
+      const response = await axios.get(`${STUDENT_SCHEDULE_API_BASE}/${userId}/${resolvedTermCode}`, {
         headers: {
           'Content-Type': 'application/json',
           // Add any required headers for the external API
@@ -45,6 +46,9 @@ class StudentScheduleService {
         }
       } else if (error.request) {
         // The request was made but no response was received
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Schedule service request timed out');
+        }
         throw new Error('Unable to connect to schedule service');
       } else {
         // Something else happened
@@ -60,13 +64,13 @@ class StudentScheduleService {
    */
   formatCourseData(courseData) {
     return {
-      courseName: courseData.CourseName,
-      courseId: courseData.CourseID,
-      instructors: courseData.Instructors || [],
-      startDate: courseData.start_date,
-      endDate: courseData.end_date,
-      meetingTimes: courseData.meeting_times || [],
-      meetingDays: courseData.meeting_days || [],
+      CourseName: courseData.CourseName || '',
+      CourseID: courseData.CourseID || '',
+      Instructors: Array.isArray(courseData.Instructors) ? courseData.Instructors : [],
+      start_date: courseData.start_date || null,
+      end_date: courseData.end_date || null,
+      meeting_times: Array.isArray(courseData.meeting_times) ? courseData.meeting_times : [],
+      meeting_days: Array.isArray(courseData.meeting_days) ? courseData.meeting_days : [],
     };
   }
 
@@ -75,9 +79,13 @@ class StudentScheduleService {
    * @returns {string} Current term code
    */
   getCurrentTermCode() {
-    // This can be enhanced to calculate based on current date
-    // For now, return the default term
-    return DEFAULT_TERM_CODE;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    if (month >= 1 && month <= 5) return `${year}SP`;
+    if (month >= 6 && month <= 7) return `${year}SU`;
+    return `${year}FA`;
   }
 
   /**

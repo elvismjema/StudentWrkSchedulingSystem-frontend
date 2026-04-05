@@ -181,11 +181,6 @@ const router = createRouter({
           },
         },
         {
-          path: "workers",
-          name: "manager-workers",
-          component: () => import("./views/UserManagement.vue"),
-        },
-        {
           path: "tasks",
           name: "manager-tasks",
           component: () => import("./views/ManagerPlaceholder.vue"),

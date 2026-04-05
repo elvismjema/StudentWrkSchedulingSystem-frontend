@@ -61,6 +61,10 @@ export default {
     return apiClient.put(`/student/swap-requests/${requestId}`, data);
   },
 
+  cancelSwapRequest(requestId) {
+    return apiClient.delete(`/student/swap-requests/${requestId}`);
+  },
+
   // ─── Time Off ────────────────────────────────────────────────────
   submitTimeOff(data) {
     return apiClient.post("/student/time-off", data);

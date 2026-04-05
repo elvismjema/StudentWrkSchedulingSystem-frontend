@@ -14,9 +14,9 @@
           color="#8B1538" 
           variant="outlined" 
           prepend-icon="mdi-briefcase-plus" 
-          @click="openCreatePositionDialog"
+          @click="goToPositionsScreen"
         >
-          Create Position
+          Position
         </v-btn>
       </div>
     </div>
@@ -50,10 +50,6 @@
       <v-icon size="48" color="#667085">mdi-account-group-outline</v-icon>
       <h3 class="empty-title">No workers in your department yet</h3>
       <p class="empty-subtitle">Start by adding student workers to your department</p>
-      <v-btn color="#8B1538" variant="outlined" @click="openAddWorkerDialog">
-        <v-icon start>mdi-account-plus</v-icon>
-        Add Your First Worker
-      </v-btn>
     </div>
 
     <!-- Worker Cards Grid -->
@@ -99,68 +95,6 @@
           </div>
         </v-card-text>
       </v-card>
-    </div>
-
-    <!-- Positions Section -->
-    <div class="positions-section">
-      <div class="section-header">
-        <h3 class="section-title">Department Positions</h3>
-        <v-btn
-          size="small"
-          color="#8B1538"
-          variant="outlined"
-          @click="openCreatePositionDialog"
-        >
-          <v-icon start>mdi-plus</v-icon>
-          Create Position
-        </v-btn>
-      </div>
-      <div class="positions-grid">
-        <v-card
-          v-for="position in departmentPositions"
-          :key="position.position_id"
-          class="position-card"
-          elevation="0"
-        >
-          <v-card-text class="position-card-content">
-            <div class="position-header">
-              <h4 class="position-name">{{ position.position_name }}</h4>
-              <div class="position-actions">
-                <v-btn
-                  size="small"
-                  variant="text"
-                  color="#8B1538"
-                  @click="editPosition(position)"
-                >
-                  <v-icon>mdi-pencil</v-icon>
-                </v-btn>
-                <v-btn
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="confirmDeletePosition(position)"
-                  :disabled="position.workerCount > 0"
-                >
-                  <v-icon>mdi-delete</v-icon>
-                </v-btn>
-              </div>
-            </div>
-            <p class="position-description">{{ position.description || 'No description available' }}</p>
-            <div class="position-meta">
-              <v-chip
-                v-if="position.is_critical"
-                size="small"
-                color="warning"
-                variant="tonal"
-              >
-                <v-icon start>mdi-alert</v-icon>
-                Critical
-              </v-chip>
-              <span class="worker-count">{{ position.workerCount || 0 }} workers assigned</span>
-            </div>
-          </v-card-text>
-        </v-card>
-      </div>
     </div>
 
     <!-- Worker Detail Modal -->
@@ -315,44 +249,6 @@
       @worker-updated="onWorkerUpdated"
     />
 
-    <!-- Create Position Modal -->
-    <CreatePositionModal
-      v-model="createPositionModal.open"
-      :department-id="deptContext.department_id"
-      @position-created="onPositionCreated"
-    />
-
-    <!-- Delete Position Confirmation Dialog -->
-    <v-dialog v-model="deletePositionModal.open" max-width="400px">
-      <v-card>
-        <v-card-title class="text-h6 pa-4">
-          <v-icon color="warning" class="mr-2">mdi-alert</v-icon>
-          Delete Position?
-        </v-card-title>
-        <v-card-text class="pa-4">
-          <p v-if="deletePositionModal.position.workerCount > 0" class="text-body-2 mb-3">
-            <strong>Cannot delete this position.</strong> It is currently assigned to 
-            {{ deletePositionModal.position.workerCount }} worker(s).
-          </p>
-          <p v-else class="text-body-2 mb-3">
-            Are you sure you want to delete the position 
-            <strong>"{{ deletePositionModal.position.position_name }}"</strong>? 
-            This action cannot be undone.
-          </p>
-        </v-card-text>
-        <v-card-actions class="pa-4">
-          <v-spacer />
-          <v-btn variant="text" @click="deletePositionModal.open = false">Cancel</v-btn>
-          <v-btn
-            v-if="deletePositionModal.position.workerCount === 0"
-            color="error"
-            @click="deletePosition"
-          >
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
@@ -363,7 +259,6 @@ import apiClient from '../services/services.js';
 import studentScheduleService from '../services/studentScheduleService.js';
 import Utils from '../config/utils.js';
 import AddWorkerModal from '../components/AddWorkerModal.vue';
-import CreatePositionModal from '../components/CreatePositionModal.vue';
 
 const router = useRouter();
 
@@ -379,7 +274,6 @@ const scheduleError = ref('');
 const activeTab = ref('details');
 
 // Department context
-const currentUser = Utils.getStore('user') || {};
 const deptContext = Utils.getStore('currentDepartmentContext') || {};
 
 // Modal state
@@ -392,17 +286,6 @@ const addWorkerModal = reactive({
   open: false,
   selectedWorker: null,
 });
-
-const createPositionModal = reactive({
-  open: false,
-});
-
-const deletePositionModal = reactive({
-  open: false,
-  position: null,
-});
-
-const departmentPositions = ref([]);
 
 // Week days for availability display
 const weekDays = [
@@ -513,8 +396,8 @@ const openAddWorkerDialog = () => {
   addWorkerModal.selectedWorker = null;
 };
 
-const openCreatePositionDialog = () => {
-  createPositionModal.open = true;
+const goToPositionsScreen = () => {
+  router.push('/manager/admin/departments');
 };
 
 const onWorkerAdded = (newWorker) => {
@@ -525,81 +408,6 @@ const onWorkerAdded = (newWorker) => {
 const onWorkerUpdated = (updatedWorker) => {
   loadWorkers(); // Refresh the workers list
   // Could show success notification here
-};
-
-// Position management methods
-const loadPositions = async () => {
-  if (!deptContext.department_id) return;
-
-  try {
-    const response = await apiClient.get(`/positions?department_id=${deptContext.department_id}`);
-    const positions = response?.data?.data || response?.data || [];
-    
-    // Add worker count to each position
-    const positionsWithCounts = positions.map(position => {
-      const workerCount = workers.value.filter(worker => 
-        worker.positionId === position.position_id || 
-        worker.position?.position_id === position.position_id
-      ).length;
-      
-      return {
-        ...position,
-        workerCount
-      };
-    });
-    
-    departmentPositions.value = positionsWithCounts;
-  } catch (error) {
-    console.error('Error loading positions:', error);
-    departmentPositions.value = [];
-  }
-};
-
-const onPositionCreated = (newPosition) => {
-  departmentPositions.value.push(newPosition);
-  // Could show success notification here
-};
-
-const editPosition = (position) => {
-  // Open edit dialog (for future implementation)
-  console.log('Edit position:', position);
-};
-
-const confirmDeletePosition = (position) => {
-  deletePositionModal.position = position;
-  deletePositionModal.open = true;
-};
-
-const deletePosition = async () => {
-  if (!deletePositionModal.position) return;
-
-  try {
-    await apiClient.delete(`/positions/${deletePositionModal.position.position_id}`);
-    
-    // Remove from local list
-    const index = departmentPositions.value.findIndex(p => p.position_id === deletePositionModal.position.position_id);
-    if (index > -1) {
-      departmentPositions.value.splice(index, 1);
-    }
-    
-    deletePositionModal.open = false;
-    deletePositionModal.position = null;
-    // Could show success notification here
-  } catch (error) {
-    console.error('Error deleting position:', error);
-    // Could show error notification here
-  }
-};
-
-const navigateToUserManagement = () => {
-  // Navigate to admin user management with query params for manager context
-  router.push({
-    path: '/manager/admin/users',
-    query: { 
-      mode: 'add',
-      departmentId: deptContext.department_id 
-    }
-  });
 };
 
 const loadWorkers = async () => {
@@ -702,7 +510,6 @@ const loadClassSchedule = async () => {
 // Lifecycle
 onMounted(() => {
   loadWorkers();
-  loadPositions();
 });
 
 watch(activeTab, (nextTab) => {
@@ -755,84 +562,6 @@ watch(activeTab, (nextTab) => {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.positions-section {
-  margin-top: 32px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #101828;
-}
-
-.positions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
-
-.position-card {
-  border: 1px solid #e3e5e8;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.position-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.position-card-content {
-  padding: 20px;
-}
-
-.position-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.position-name {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #101828;
-  flex: 1;
-}
-
-.position-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.position-description {
-  margin: 0 0 12px;
-  color: #667085;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.position-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.worker-count {
-  font-size: 12px;
-  color: #667085;
 }
 
 .search-section {
@@ -1147,17 +876,6 @@ watch(activeTab, (nextTab) => {
   .workers-grid {
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-
-  .positions-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
   }
 
   .availability-grid {

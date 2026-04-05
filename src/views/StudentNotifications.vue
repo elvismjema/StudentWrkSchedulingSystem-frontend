@@ -122,8 +122,7 @@ onMounted(() => {
 <style scoped>
 .notifications-container {
   padding: 24px;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .notifications-header {

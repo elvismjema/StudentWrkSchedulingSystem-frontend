@@ -129,8 +129,8 @@ const navItems = [
   { title: 'Clock In/Out', icon: 'mdi-clock-check-outline', route: '/student/clock', name: 'student-clock' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board', name: 'student-trade-board' },
   { title: 'Notifications', icon: 'mdi-bell-outline', route: '/student/notifications', name: 'student-notifications' },
-  { title: 'Availability', icon: 'mdi-calendar-edit', route: '/student/more', name: 'student-more' },
-  { title: 'Settings', icon: 'mdi-cog-outline', route: '/student/more', name: 'student-settings' },
+  { title: 'Availability', icon: 'mdi-calendar-edit', route: '/student/availability', name: 'student-availability' },
+  { title: 'Settings', icon: 'mdi-cog-outline', route: '/student/settings', name: 'student-settings' },
 ];
 
 const isActiveRoute = (item) => {

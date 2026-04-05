@@ -211,7 +211,7 @@ import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
 
 const currentUser = Utils.getStore("user") || {};
-const userId = currentUser.userId;
+const userId = currentUser.userId || currentUser.id;
 
 // --- State ---
 const loading = ref(false);

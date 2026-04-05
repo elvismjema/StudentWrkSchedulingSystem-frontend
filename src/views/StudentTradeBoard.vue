@@ -1,17 +1,56 @@
 <template>
   <div class="trade-board-page pa-6">
-    <div class="mb-6">
-      <h1 class="text-h4 font-weight-bold">Shift Trade Board</h1>
-      <p class="text-body-1 text-medium-emphasis mt-1">Pick up open shifts, manage swap requests, or post a swap</p>
+    <div class="d-flex align-center justify-space-between mb-6">
+      <div>
+        <h1 class="text-h4 font-weight-bold">Shift Trade Board</h1>
+        <p class="text-body-1 text-medium-emphasis mt-1">
+          Browse open requests, manage your trades, and respond to incoming swap requests
+        </p>
+      </div>
+      <v-btn
+        color="#8B1538"
+        variant="flat"
+        prepend-icon="mdi-plus"
+        @click="showPostDialog = true"
+      >
+        Post Trade Request
+      </v-btn>
     </div>
 
     <v-tabs v-model="activeTab" color="#8B1538" class="mb-6">
-      <v-tab value="open">Open Shifts</v-tab>
-      <v-tab value="swaps">Swap Requests</v-tab>
-      <v-tab value="post">Post a Swap</v-tab>
+      <v-tab value="open">
+        Open Requests
+        <v-badge
+          v-if="openRequests.length"
+          :content="openRequests.length"
+          color="#8B1538"
+          inline
+          class="ml-1"
+        />
+      </v-tab>
+      <v-tab value="mine">
+        My Requests
+        <v-badge
+          v-if="myRequests.length"
+          :content="myRequests.length"
+          color="grey"
+          inline
+          class="ml-1"
+        />
+      </v-tab>
+      <v-tab value="incoming">
+        Incoming
+        <v-badge
+          v-if="pendingIncoming.length"
+          :content="pendingIncoming.length"
+          color="warning"
+          inline
+          class="ml-1"
+        />
+      </v-tab>
     </v-tabs>
 
-    <!-- Tab 1: Open Shifts -->
+    <!-- Tab 1: Open Requests (from other students) -->
     <div v-if="activeTab === 'open'">
       <template v-if="loadingOpen">
         <v-row>
@@ -20,41 +59,55 @@
           </v-col>
         </v-row>
       </template>
-      <template v-else-if="openShifts.length">
+      <template v-else-if="openRequests.length">
         <v-row>
           <v-col
-            v-for="shift in openShifts"
-            :key="shift.id"
+            v-for="req in openRequests"
+            :key="req.id"
             cols="12"
             sm="6"
             lg="4"
           >
             <v-card elevation="0" rounded="lg" border class="fill-height">
               <v-card-text class="pa-4">
-                <div class="text-body-1 font-weight-bold mb-1">
-                  {{ shift.department_name || shift.department?.department_name || 'Open Shift' }}
+                <div class="d-flex align-center mb-2">
+                  <v-avatar size="32" color="#8B1538" class="mr-2">
+                    <span class="text-caption text-white">
+                      {{ getInitials(req.requester_name || req.user?.fName) }}
+                    </span>
+                  </v-avatar>
+                  <div>
+                    <div class="text-body-1 font-weight-bold">
+                      {{ req.requester_name || formatUserName(req.user) || 'Student' }}
+                    </div>
+                  </div>
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-briefcase-outline</v-icon>
+                  {{ req.department_name || req.shift?.department_name || 'Shift' }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
-                  {{ formatDate(shift.shift_date || shift.start_time) }}
+                  {{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                  {{ formatTimeRange(shift) }}
+                  {{ formatTimeRange(req.shift || req) }}
                 </div>
-                <div v-if="shift.location" class="text-caption text-medium-emphasis mb-3">
-                  <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
-                  {{ shift.location }}
+                <div v-if="req.notes" class="text-caption text-medium-emphasis mb-3">
+                  <v-icon size="12" class="mr-1">mdi-note-text</v-icon>
+                  {{ req.notes }}
                 </div>
                 <v-btn
                   color="#8B1538"
                   variant="flat"
                   size="small"
                   block
-                  :loading="shift._claiming"
-                  @click="claimShift(shift)"
+                  :loading="req._loading"
+                  @click="pickUpRequest(req)"
+                  class="mt-2"
                 >
-                  Claim This Shift
+                  Pick Up
                 </v-btn>
               </v-card-text>
             </v-card>
@@ -62,99 +115,37 @@
         </v-row>
       </template>
       <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
-        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-briefcase-off</v-icon>
-        <div class="text-body-1 text-medium-emphasis">No open shifts available</div>
-        <div class="text-caption text-medium-emphasis">Check back later for new shifts</div>
+        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-swap-horizontal</v-icon>
+        <div class="text-body-1 text-medium-emphasis">No open trade requests</div>
+        <div class="text-caption text-medium-emphasis">
+          When other students post trade requests, they'll appear here
+        </div>
       </v-card>
     </div>
 
-    <!-- Tab 2: Swap Requests -->
-    <div v-if="activeTab === 'swaps'">
-      <template v-if="loadingSwaps">
+    <!-- Tab 2: My Requests -->
+    <div v-if="activeTab === 'mine'">
+      <template v-if="loadingMine">
         <v-row>
           <v-col v-for="n in 3" :key="n" cols="12" sm="6" lg="4">
             <v-skeleton-loader type="card" />
           </v-col>
         </v-row>
       </template>
-      <template v-else>
-        <!-- Incoming Requests -->
-        <div v-if="incomingSwaps.length" class="mb-6">
-          <div class="text-subtitle-1 font-weight-bold mb-3">
-            <v-icon size="18" class="mr-1">mdi-arrow-down-bold-circle</v-icon>
-            Incoming Requests
-          </div>
-          <v-row>
-            <v-col
-              v-for="req in incomingSwaps"
-              :key="req.id"
-              cols="12"
-              sm="6"
-              lg="4"
-            >
-              <v-card elevation="0" rounded="lg" border class="fill-height">
-                <v-card-text class="pa-4">
-                  <div class="text-body-1 font-weight-bold mb-1">
-                    {{ req.requester_name || 'Swap Request' }}
-                  </div>
-                  <div class="text-body-2 text-medium-emphasis mb-1">
-                    {{ req.shift_details || req.notes || 'Wants to swap shifts with you' }}
-                  </div>
-                  <v-chip
-                    size="small"
-                    :color="statusColor(req.status)"
-                    variant="tonal"
-                    class="mb-3"
-                  >
-                    {{ req.status || 'Pending' }}
-                  </v-chip>
-                  <div v-if="(req.status || '').toLowerCase() === 'pending'" class="d-flex ga-2">
-                    <v-btn
-                      color="success"
-                      variant="flat"
-                      size="small"
-                      :loading="req._responding"
-                      @click="respondSwap(req, 'accepted')"
-                    >
-                      Accept
-                    </v-btn>
-                    <v-btn
-                      color="error"
-                      variant="outlined"
-                      size="small"
-                      :loading="req._responding"
-                      @click="respondSwap(req, 'declined')"
-                    >
-                      Decline
-                    </v-btn>
-                  </div>
-                </v-card-text>
-              </v-card>
-            </v-col>
-          </v-row>
-        </div>
-
-        <!-- Outgoing Requests -->
-        <div v-if="outgoingSwaps.length" class="mb-6">
-          <div class="text-subtitle-1 font-weight-bold mb-3">
-            <v-icon size="18" class="mr-1">mdi-arrow-up-bold-circle</v-icon>
-            Outgoing Requests
-          </div>
-          <v-row>
-            <v-col
-              v-for="req in outgoingSwaps"
-              :key="req.id"
-              cols="12"
-              sm="6"
-              lg="4"
-            >
-              <v-card elevation="0" rounded="lg" border class="fill-height">
-                <v-card-text class="pa-4">
-                  <div class="text-body-1 font-weight-bold mb-1">
-                    {{ req.target_name || 'Swap Request' }}
-                  </div>
-                  <div class="text-body-2 text-medium-emphasis mb-2">
-                    {{ req.shift_details || req.notes || 'Awaiting response' }}
+      <template v-else-if="myRequests.length">
+        <v-row>
+          <v-col
+            v-for="req in myRequests"
+            :key="req.id"
+            cols="12"
+            sm="6"
+            lg="4"
+          >
+            <v-card elevation="0" rounded="lg" border class="fill-height">
+              <v-card-text class="pa-4">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <div class="text-body-1 font-weight-bold">
+                    {{ req.department_name || req.shift?.department_name || 'Trade Request' }}
                   </div>
                   <v-chip
                     size="small"
@@ -163,77 +154,207 @@
                   >
                     {{ req.status || 'Pending' }}
                   </v-chip>
-                </v-card-text>
-              </v-card>
-            </v-col>
-          </v-row>
-        </div>
-
-        <v-card
-          v-if="!incomingSwaps.length && !outgoingSwaps.length"
-          elevation="0"
-          rounded="lg"
-          border
-          class="pa-8 text-center"
-        >
-          <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-swap-horizontal</v-icon>
-          <div class="text-body-1 text-medium-emphasis">No swap requests</div>
-          <div class="text-caption text-medium-emphasis">Post a swap from the "Post a Swap" tab</div>
-        </v-card>
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
+                  {{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ formatTimeRange(req.shift || req) }}
+                </div>
+                <div v-if="req.notes" class="text-caption text-medium-emphasis mb-2">
+                  <v-icon size="12" class="mr-1">mdi-note-text</v-icon>
+                  {{ req.notes }}
+                </div>
+                <div class="text-caption text-medium-emphasis mb-3">
+                  Posted {{ formatDate(req.createdAt || req.created_at) }}
+                </div>
+                <v-btn
+                  v-if="(req.status || '').toLowerCase() === 'pending' || (req.status || '').toLowerCase() === 'open'"
+                  color="error"
+                  variant="outlined"
+                  size="small"
+                  block
+                  :loading="req._loading"
+                  @click="cancelRequest(req)"
+                >
+                  Cancel Request
+                </v-btn>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
       </template>
-    </div>
-
-    <!-- Tab 3: Post a Swap -->
-    <div v-if="activeTab === 'post'">
-      <v-card elevation="0" rounded="lg" border class="pa-6" max-width="600">
-        <div class="text-subtitle-1 font-weight-bold mb-4">Request Shift Coverage</div>
-
-        <v-select
-          v-model="postForm.shiftId"
-          :items="myShifts"
-          item-title="label"
-          item-value="id"
-          label="Select your shift"
-          variant="outlined"
-          density="comfortable"
-          :loading="loadingMyShifts"
-          class="mb-4"
-        />
-
-        <v-radio-group v-model="postForm.type" inline class="mb-4">
-          <v-radio label="Post to pool (anyone can pick up)" value="pool" />
-          <v-radio label="Request swap with specific coworker" value="specific" />
-        </v-radio-group>
-
-        <v-text-field
-          v-if="postForm.type === 'specific'"
-          v-model="postForm.coworkerId"
-          label="Coworker ID or name"
-          variant="outlined"
-          density="comfortable"
-          class="mb-4"
-        />
-
-        <v-textarea
-          v-model="postForm.notes"
-          label="Notes (optional)"
-          variant="outlined"
-          density="comfortable"
-          rows="3"
-          class="mb-4"
-        />
-
-        <v-btn
-          color="#8B1538"
-          variant="flat"
-          :loading="postForm.submitting"
-          :disabled="!postForm.shiftId"
-          @click="submitPost"
-        >
-          Submit Request
-        </v-btn>
+      <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
+        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-clipboard-text-outline</v-icon>
+        <div class="text-body-1 text-medium-emphasis">You haven't posted any trade requests</div>
+        <div class="text-caption text-medium-emphasis">
+          Use the "Post Trade Request" button to request coverage for a shift
+        </div>
       </v-card>
     </div>
+
+    <!-- Tab 3: Incoming Requests -->
+    <div v-if="activeTab === 'incoming'">
+      <template v-if="loadingIncoming">
+        <v-row>
+          <v-col v-for="n in 3" :key="n" cols="12" sm="6" lg="4">
+            <v-skeleton-loader type="card" />
+          </v-col>
+        </v-row>
+      </template>
+      <template v-else-if="incomingRequests.length">
+        <v-row>
+          <v-col
+            v-for="req in incomingRequests"
+            :key="req.id"
+            cols="12"
+            sm="6"
+            lg="4"
+          >
+            <v-card elevation="0" rounded="lg" border class="fill-height">
+              <v-card-text class="pa-4">
+                <div class="d-flex align-center mb-2">
+                  <v-avatar size="32" color="#196CA2" class="mr-2">
+                    <span class="text-caption text-white">
+                      {{ getInitials(req.requester_name || req.user?.fName) }}
+                    </span>
+                  </v-avatar>
+                  <div>
+                    <div class="text-body-1 font-weight-bold">
+                      {{ req.requester_name || formatUserName(req.user) || 'Student' }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis">wants to trade with you</div>
+                  </div>
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-briefcase-outline</v-icon>
+                  {{ req.shift_details || req.shift?.department_name || 'Shift details' }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
+                  {{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ formatTimeRange(req.shift || req) }}
+                </div>
+                <div v-if="req.notes" class="text-caption text-medium-emphasis mb-2">
+                  <v-icon size="12" class="mr-1">mdi-note-text</v-icon>
+                  {{ req.notes }}
+                </div>
+                <v-chip
+                  size="small"
+                  :color="statusColor(req.status)"
+                  variant="tonal"
+                  class="mb-3"
+                >
+                  {{ req.status || 'Pending' }}
+                </v-chip>
+                <div v-if="(req.status || '').toLowerCase() === 'pending'" class="d-flex ga-2">
+                  <v-btn
+                    color="success"
+                    variant="flat"
+                    size="small"
+                    class="flex-grow-1"
+                    :loading="req._accepting"
+                    @click="acceptIncoming(req)"
+                  >
+                    Accept
+                  </v-btn>
+                  <v-btn
+                    color="error"
+                    variant="outlined"
+                    size="small"
+                    class="flex-grow-1"
+                    :loading="req._declining"
+                    @click="declineIncoming(req)"
+                  >
+                    Decline
+                  </v-btn>
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+      </template>
+      <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
+        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-arrow-down-bold-circle-outline</v-icon>
+        <div class="text-body-1 text-medium-emphasis">No incoming trade requests</div>
+        <div class="text-caption text-medium-emphasis">
+          When someone wants to trade a shift with you, it'll show up here
+        </div>
+      </v-card>
+    </div>
+
+    <!-- Post Trade Request Dialog -->
+    <v-dialog v-model="showPostDialog" max-width="560">
+      <v-card rounded="lg">
+        <v-card-title class="pa-4 d-flex align-center">
+          <v-icon class="mr-2">mdi-swap-horizontal</v-icon>
+          Post Trade Request
+        </v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          <v-alert
+            v-if="!myShifts.length && !loadingMyShifts"
+            type="info"
+            variant="tonal"
+            class="mb-4"
+          >
+            You need to be assigned shifts before you can post trade requests.
+          </v-alert>
+
+          <v-select
+            v-model="postForm.shiftId"
+            :items="myShifts"
+            item-title="label"
+            item-value="id"
+            label="Select your shift to trade"
+            variant="outlined"
+            density="comfortable"
+            :loading="loadingMyShifts"
+            :disabled="!myShifts.length"
+            class="mb-4"
+          />
+
+          <v-radio-group v-model="postForm.type" inline class="mb-4">
+            <v-radio label="Post to pool (anyone can pick up)" value="pool" />
+            <v-radio label="Request swap with specific coworker" value="specific" />
+          </v-radio-group>
+
+          <v-text-field
+            v-if="postForm.type === 'specific'"
+            v-model="postForm.coworkerId"
+            label="Coworker ID or name"
+            variant="outlined"
+            density="comfortable"
+            class="mb-4"
+          />
+
+          <v-textarea
+            v-model="postForm.notes"
+            label="Reason / Notes (optional)"
+            variant="outlined"
+            density="comfortable"
+            rows="3"
+          />
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="showPostDialog = false">Cancel</v-btn>
+          <v-btn
+            color="#8B1538"
+            variant="flat"
+            :loading="postForm.submitting"
+            :disabled="!postForm.shiftId"
+            @click="submitTradeRequest"
+          >
+            Submit Request
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
@@ -254,29 +375,53 @@ const user = ref(Utils.getStore('user') || {});
 const userId = computed(() => user.value?.userId || user.value?.id);
 
 const activeTab = ref('open');
+const showPostDialog = ref(false);
 
-// Open shifts state
+// Loading states
 const loadingOpen = ref(false);
-const openShifts = ref([]);
-
-// Swap requests state
-const loadingSwaps = ref(false);
-const allSwapRequests = ref([]);
-
-const incomingSwaps = computed(() =>
-  allSwapRequests.value
-    .filter((r) => r.target_user_id === userId.value || r.direction === 'incoming')
-    .map((r) => ({ ...r, _responding: false }))
-);
-
-const outgoingSwaps = computed(() =>
-  allSwapRequests.value.filter((r) => r.requester_id === userId.value || r.direction === 'outgoing')
-);
-
-// Post form state
+const loadingMine = ref(false);
+const loadingIncoming = ref(false);
 const loadingMyShifts = ref(false);
+
+// Data
+const allSwapRequests = ref([]);
+const openShifts = ref([]);
 const myShifts = ref([]);
 
+// Derived lists
+const openRequests = computed(() => {
+  // Open/pool requests from OTHER students (not mine)
+  return allSwapRequests.value
+    .filter((r) => {
+      const isMyRequest = r.requester_id === userId.value || r.user_id === userId.value;
+      const isOpenStatus = (r.status || '').toLowerCase() === 'open' || (r.status || '').toLowerCase() === 'pending';
+      const isPoolType = r.type === 'pool' || r.request_type === 'pool' || r.direction === 'pool' || !r.target_user_id;
+      return !isMyRequest && isOpenStatus && isPoolType;
+    })
+    .map((r) => ({ ...r, _loading: false }));
+});
+
+const myRequests = computed(() => {
+  return allSwapRequests.value
+    .filter((r) => r.requester_id === userId.value || r.user_id === userId.value || r.direction === 'outgoing')
+    .map((r) => ({ ...r, _loading: false }));
+});
+
+const incomingRequests = computed(() => {
+  return allSwapRequests.value
+    .filter((r) => {
+      const isTargeted = r.target_user_id === userId.value || r.direction === 'incoming';
+      const isNotMine = r.requester_id !== userId.value && r.user_id !== userId.value;
+      return isTargeted && isNotMine;
+    })
+    .map((r) => ({ ...r, _accepting: false, _declining: false }));
+});
+
+const pendingIncoming = computed(() => {
+  return incomingRequests.value.filter((r) => (r.status || '').toLowerCase() === 'pending');
+});
+
+// Post form
 const postForm = reactive({
   shiftId: null,
   type: 'pool',
@@ -297,7 +442,7 @@ function showSnack(text, color = 'success') {
 function statusColor(status) {
   const s = (status || '').toLowerCase();
   if (s === 'approved' || s === 'accepted') return 'success';
-  if (s === 'denied' || s === 'declined') return 'error';
+  if (s === 'denied' || s === 'declined' || s === 'cancelled') return 'error';
   if (s === 'claimed') return 'info';
   return 'warning';
 }
@@ -309,34 +454,37 @@ function formatDate(dateStr) {
 
 function formatTimeRange(shift) {
   if (!shift) return '';
+  const start = shift.start_time || shift.shift_start;
+  const end = shift.end_time || shift.shift_end;
+  if (!start || !end) return '';
   const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return `${fmt(shift.start_time || shift.shift_start)} – ${fmt(shift.end_time || shift.shift_end)}`;
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function formatUserName(user) {
+  if (!user) return '';
+  return `${user.fName || ''} ${user.lName || ''}`.trim();
 }
 
 // Data loaders
-async function loadOpenShifts() {
+async function loadAllSwapRequests() {
   loadingOpen.value = true;
-  try {
-    const res = await studentService.getOpenShifts();
-    const data = res?.data?.data || res?.data || [];
-    const shifts = Array.isArray(data) ? data : (data.shifts || data.preview || []);
-    openShifts.value = shifts.map((s) => ({ ...s, _claiming: false }));
-  } catch {
-    showSnack('Failed to load open shifts', 'error');
-  } finally {
-    loadingOpen.value = false;
-  }
-}
-
-async function loadSwapRequests() {
-  loadingSwaps.value = true;
+  loadingMine.value = true;
+  loadingIncoming.value = true;
   try {
     const res = await studentService.getSwapRequests();
     allSwapRequests.value = res?.data?.data || res?.data || [];
   } catch {
-    showSnack('Failed to load swap requests', 'error');
+    showSnack('Failed to load trade requests', 'error');
   } finally {
-    loadingSwaps.value = false;
+    loadingOpen.value = false;
+    loadingMine.value = false;
+    loadingIncoming.value = false;
   }
 }
 
@@ -345,44 +493,83 @@ async function loadMyShifts() {
   try {
     const res = await studentService.getMySchedule();
     const shifts = res?.data?.data || res?.data || [];
-    myShifts.value = shifts.map((s) => ({
-      id: s.id,
-      label: `${s.department_name || s.department?.department_name || 'Shift'} — ${formatDate(s.shift_date || s.start_time)} ${formatTimeRange(s)}`,
-    }));
+    // Only show future shifts
+    const now = new Date();
+    myShifts.value = shifts
+      .filter((s) => {
+        const start = new Date(s.start_time || s.shift_start || s.shift_date);
+        return start >= now;
+      })
+      .map((s) => ({
+        id: s.id,
+        label: `${s.department_name || s.department?.department_name || 'Shift'} — ${formatDate(s.shift_date || s.start_time)} ${formatTimeRange(s)}`,
+      }));
   } catch {
-    showSnack('Failed to load your shifts', 'error');
+    myShifts.value = [];
   } finally {
     loadingMyShifts.value = false;
   }
 }
 
-async function claimShift(shift) {
-  shift._claiming = true;
+// Actions
+async function pickUpRequest(req) {
+  req._loading = true;
   try {
-    await studentService.claimOpenShift(shift.id);
-    openShifts.value = openShifts.value.filter((s) => s.id !== shift.id);
-    showSnack('Shift claimed!');
+    await studentService.respondToSwap(req.id, { status: 'accepted' });
+    showSnack('Shift picked up!');
+    await loadAllSwapRequests();
   } catch (err) {
-    showSnack(err?.response?.data?.message || 'Failed to claim shift', 'error');
+    showSnack(err?.response?.data?.message || 'Failed to pick up shift', 'error');
   } finally {
-    shift._claiming = false;
+    req._loading = false;
   }
 }
 
-async function respondSwap(req, action) {
-  req._responding = true;
+async function cancelRequest(req) {
+  req._loading = true;
   try {
-    await studentService.respondToSwap(req.id, { status: action });
-    showSnack(`Swap ${action}!`);
-    await loadSwapRequests();
+    // Try DELETE first, fall back to status update
+    try {
+      await studentService.cancelSwapRequest(req.id);
+    } catch {
+      await studentService.respondToSwap(req.id, { status: 'cancelled' });
+    }
+    showSnack('Request cancelled');
+    await loadAllSwapRequests();
   } catch (err) {
-    showSnack(err?.response?.data?.message || `Failed to ${action} swap`, 'error');
+    showSnack(err?.response?.data?.message || 'Failed to cancel request', 'error');
   } finally {
-    req._responding = false;
+    req._loading = false;
   }
 }
 
-async function submitPost() {
+async function acceptIncoming(req) {
+  req._accepting = true;
+  try {
+    await studentService.respondToSwap(req.id, { status: 'accepted' });
+    showSnack('Swap accepted!');
+    await loadAllSwapRequests();
+  } catch (err) {
+    showSnack(err?.response?.data?.message || 'Failed to accept swap', 'error');
+  } finally {
+    req._accepting = false;
+  }
+}
+
+async function declineIncoming(req) {
+  req._declining = true;
+  try {
+    await studentService.respondToSwap(req.id, { status: 'declined' });
+    showSnack('Swap declined');
+    await loadAllSwapRequests();
+  } catch (err) {
+    showSnack(err?.response?.data?.message || 'Failed to decline swap', 'error');
+  } finally {
+    req._declining = false;
+  }
+}
+
+async function submitTradeRequest() {
   postForm.submitting = true;
   try {
     if (postForm.type === 'pool') {
@@ -393,10 +580,12 @@ async function submitPost() {
         notes: postForm.notes,
       });
     }
-    showSnack('Request submitted!');
+    showSnack('Trade request posted!');
+    showPostDialog.value = false;
     postForm.shiftId = null;
     postForm.notes = '';
     postForm.coworkerId = '';
+    await loadAllSwapRequests();
   } catch (err) {
     showSnack(err?.response?.data?.message || 'Failed to submit request', 'error');
   } finally {
@@ -404,15 +593,15 @@ async function submitPost() {
   }
 }
 
-// Load data when tab changes
-watch(activeTab, (tab) => {
-  if (tab === 'open' && !openShifts.value.length) loadOpenShifts();
-  if (tab === 'swaps' && !allSwapRequests.value.length) loadSwapRequests();
-  if (tab === 'post' && !myShifts.value.length) loadMyShifts();
+// Watch for post dialog open to load shifts
+watch(showPostDialog, (open) => {
+  if (open && !myShifts.value.length) {
+    loadMyShifts();
+  }
 });
 
 onMounted(() => {
-  loadOpenShifts();
+  loadAllSwapRequests();
 });
 </script>
 

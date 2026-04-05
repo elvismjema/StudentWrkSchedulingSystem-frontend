@@ -1,5 +1,5 @@
 <template>
-  <div class="student-clock pa-4" role="main" aria-label="Time and Attendance">
+  <div class="student-clock pa-6" role="main" aria-label="Time and Attendance">
     <h1 class="text-h5 font-weight-bold mb-4">Time & Attendance</h1>
 
     <!-- Loading -->
@@ -483,8 +483,6 @@ onMounted(fetchAll);
 <style scoped>
 .student-clock {
   width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
 }
 
 .clock-btn {
@@ -502,9 +500,4 @@ onMounted(fetchAll);
   color: #EE5044;
 }
 
-@media (max-width: 600px) {
-  .student-clock {
-    padding: 12px !important;
-  }
-}
 </style>

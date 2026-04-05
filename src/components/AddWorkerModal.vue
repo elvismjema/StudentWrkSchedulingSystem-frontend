@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-dialog v-model="open" max-width="600px" persistent scrollable>
+    <v-dialog v-model="dialogOpen" max-width="600px" persistent scrollable>
       <v-card>
         <v-card-title class="modal-header">
           <div class="header-content">
@@ -172,11 +172,27 @@ import Utils from '../config/utils.js';
 import CreatePositionModal from './CreatePositionModal.vue';
 
 const props = defineProps({
-  open: Boolean,
+  modelValue: {
+    type: Boolean,
+    default: false,
+  },
+  // Backward compatibility for older usages while migrating to v-model.
+  open: {
+    type: Boolean,
+    default: undefined,
+  },
   worker: Object, // For edit mode
 });
 
-const emit = defineEmits(['close', 'worker-added', 'worker-updated']);
+const emit = defineEmits(['update:modelValue', 'close', 'worker-added', 'worker-updated']);
+
+const dialogOpen = computed({
+  get: () => (typeof props.open === 'boolean' ? props.open : props.modelValue),
+  set: (value) => {
+    emit('update:modelValue', value);
+    if (!value) emit('close');
+  },
+});
 
 // Form state
 const form = reactive({
@@ -218,7 +234,7 @@ const rules = {
 
 // Methods
 const closeModal = () => {
-  emit('close');
+  emit('update:modelValue', false);
   resetForm();
 };
 
@@ -332,7 +348,7 @@ const onPositionCreated = (newPosition) => {
 };
 
 // Watch for dialog open
-watch(() => props.open, (isOpen) => {
+watch(dialogOpen, (isOpen) => {
   if (isOpen) {
     resetForm();
     loadPositions();

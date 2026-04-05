@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-dialog v-model="open" max-width="500px" persistent>
+    <v-dialog v-model="dialogOpen" max-width="500px" persistent>
       <v-card>
         <v-card-title class="modal-header">
           <div class="header-content">
@@ -90,15 +90,31 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import apiClient from '../services/services.js';
 
 const props = defineProps({
-  open: Boolean,
+  modelValue: {
+    type: Boolean,
+    default: false,
+  },
+  // Backward compatibility for older usages while migrating to v-model.
+  open: {
+    type: Boolean,
+    default: undefined,
+  },
   departmentId: Number,
 });
 
-const emit = defineEmits(['close', 'position-created']);
+const emit = defineEmits(['update:modelValue', 'close', 'position-created']);
+
+const dialogOpen = computed({
+  get: () => (typeof props.open === 'boolean' ? props.open : props.modelValue),
+  set: (value) => {
+    emit('update:modelValue', value);
+    if (!value) emit('close');
+  },
+});
 
 // Form state
 const form = reactive({
@@ -118,7 +134,7 @@ const rules = {
 
 // Methods
 const closeModal = () => {
-  emit('close');
+  emit('update:modelValue', false);
   resetForm();
 };
 
@@ -131,8 +147,6 @@ const resetForm = () => {
 };
 
 const submitForm = async () => {
-  if (!form.value) return;
-
   submitting.value = true;
   try {
     const payload = {
@@ -156,7 +170,7 @@ const submitForm = async () => {
 };
 
 // Watch for dialog open
-watch(() => props.open, (isOpen) => {
+watch(dialogOpen, (isOpen) => {
   if (isOpen) {
     resetForm();
   }

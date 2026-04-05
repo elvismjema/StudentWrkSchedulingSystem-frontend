@@ -121,7 +121,7 @@ const navItems = [
   { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
   { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
-  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
+  { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 
 const adminNavItems = [

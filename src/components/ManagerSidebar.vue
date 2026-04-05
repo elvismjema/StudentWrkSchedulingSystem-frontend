@@ -74,8 +74,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import Utils from "../config/utils";
+import UserRoleServices from "../services/userRoleServices";
 
 const drawer = ref(true);
 const rail = ref(true);
@@ -128,6 +129,39 @@ const adminNavItems = [
   { title: "Manage Users", icon: "mdi-account-cog", route: "/manager/admin/users" },
   { title: "Manage Departments", icon: "mdi-office-building-cog", route: "/manager/admin/departments" },
 ];
+
+// Initialise department context on mount so every manager view has a valid
+// department_id in localStorage.  Skipped when already present.
+onMounted(async () => {
+  const existing = Utils.getStore("currentDepartmentContext");
+  if (existing?.department_id) return;
+
+  const userId = user.value?.userId || user.value?.id;
+  if (!userId) return;
+
+  try {
+    const response = await UserRoleServices.getUserDepartments(userId);
+    const memberships = response?.data || [];
+    // Prefer an active manager-level membership, fall back to any active one.
+    const managerMembership = memberships.find(
+      (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+    );
+    const membership =
+      managerMembership ||
+      memberships.find((m) => m.is_active) ||
+      memberships[0];
+    if (!membership) return;
+
+    Utils.setStore("currentDepartmentContext", {
+      department_id: membership.department_id,
+      department_name: membership.department?.department_name,
+      role_name: membership.role?.role_name || "Manager",
+      role_id: membership.role_id,
+    });
+  } catch {
+    // Non-fatal: context will just remain unset.
+  }
+});
 
 defineExpose({
   rail,

@@ -322,7 +322,6 @@
             :disabled="!canSaveTemplate"
             @click="saveTemplate"
           >
-          >
             {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
           </v-btn>
         </v-card-actions>
@@ -479,12 +478,13 @@ import { ref, onMounted, computed } from 'vue'
 import templateService from '../services/templateService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+import UserRoleServices from '../services/userRoleServices.js'
 import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 
 // ─── Context ─────────────────────────────────────────────────────────────────
-const deptContext = Utils.getStore('currentDepartmentContext') || {}
-const currentDeptId = deptContext.department_id || null
-const currentDeptName = deptContext.department_name || ''
+const _deptCtxInit = Utils.getStore('currentDepartmentContext') || {}
+const currentDeptId = ref(_deptCtxInit.department_id || null)
+const currentDeptName = ref(_deptCtxInit.department_name || '')
 const currentUser = Utils.getStore('user') || {}
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -612,10 +612,10 @@ const shiftHasConflict = (tmpl, shift) =>
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 const loadTemplates = async () => {
-  if (!currentDeptId) return
+  if (!currentDeptId.value) return
   loading.value = true
   try {
-    const res = await templateService.listTemplates(currentDeptId)
+    const res = await templateService.listTemplates(currentDeptId.value)
     templates.value = res?.data?.data || []
 
     // Cache editor-level conflicts for each template (no date = recurring only)
@@ -635,11 +635,11 @@ const loadTemplates = async () => {
 }
 
 const loadDeptData = async () => {
-  if (!currentDeptId) return
+  if (!currentDeptId.value) return
   try {
     const [posRes, workerRes] = await Promise.all([
-      apiClient.get(`positions?department_id=${currentDeptId}`),
-      apiClient.get(`admin/departments/${currentDeptId}/members`),
+      apiClient.get(`positions?department_id=${currentDeptId.value}`),
+      apiClient.get(`admin/departments/${currentDeptId.value}/members`),
     ])
     positions.value = posRes?.data?.data || posRes?.data || []
     const members = workerRes?.data?.data || workerRes?.data || []
@@ -712,7 +712,7 @@ const saveTemplate = async () => {
   saving.value = true
   try {
     const payload = {
-      department_id: currentDeptId,
+      department_id: currentDeptId.value,
       template_name: form.value.template_name,
       recurrence_type: form.value.recurrence_type,
       is_active: form.value.is_active,
@@ -845,7 +845,38 @@ const showSnackbar = (text, color = 'success') => {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
+  // If the manager sidebar hasn't set the context yet (e.g. first login or
+  // localStorage was cleared), resolve it now via the API so this page works
+  // without needing a second navigation.
+  if (!currentDeptId.value) {
+    const userId = currentUser?.userId || currentUser?.id
+    if (userId) {
+      try {
+        const response = await UserRoleServices.getUserDepartments(userId)
+        const memberships = response?.data || []
+        const managerMembership = memberships.find(
+          (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+        )
+        const membership =
+          managerMembership ||
+          memberships.find((m) => m.is_active) ||
+          memberships[0]
+        if (membership) {
+          currentDeptId.value = membership.department_id
+          currentDeptName.value = membership.department?.department_name || ''
+          Utils.setStore('currentDepartmentContext', {
+            department_id: membership.department_id,
+            department_name: currentDeptName.value,
+            role_name: membership.role?.role_name || 'Manager',
+            role_id: membership.role_id,
+          })
+        }
+      } catch {
+        // Non-fatal: page will show the "No department selected" warning.
+      }
+    }
+  }
   loadTemplates()
   loadDeptData()
 })

@@ -37,13 +37,24 @@
           <!-- Card title row -->
           <v-card-title class="d-flex align-center justify-space-between pb-1">
             <span class="text-truncate mr-2">{{ tmpl.template_name }}</span>
-            <v-chip
-              :color="tmpl.is_active ? 'success' : 'grey'"
-              size="x-small"
-              variant="tonal"
-            >
-              {{ tmpl.is_active ? 'Active' : 'Inactive' }}
-            </v-chip>
+            <div class="d-flex gap-1 align-center">
+              <v-chip
+                v-if="templateUnpositionedCount(tmpl) > 0"
+                color="orange"
+                size="x-small"
+                variant="tonal"
+                title="Some shifts have no position — cannot publish yet"
+              >
+                Draft
+              </v-chip>
+              <v-chip
+                :color="tmpl.is_active ? 'success' : 'grey'"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ tmpl.is_active ? 'Active' : 'Inactive' }}
+              </v-chip>
+            </div>
           </v-card-title>
 
           <v-card-subtitle class="d-flex align-center flex-wrap gap-2 pb-2">
@@ -131,7 +142,27 @@
             <v-btn variant="text" size="small" prepend-icon="mdi-pencil" @click="openEditDialog(tmpl)">
               Edit
             </v-btn>
+            <v-tooltip
+              v-if="templateUnpositionedCount(tmpl) > 0"
+              :text="`${templateUnpositionedCount(tmpl)} shift(s) have no position assigned`"
+              location="top"
+            >
+              <template #activator="{ props: ttProps }">
+                <span v-bind="ttProps">
+                  <v-btn
+                    variant="text"
+                    size="small"
+                    prepend-icon="mdi-calendar-export"
+                    color="grey"
+                    disabled
+                  >
+                    Publish
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
             <v-btn
+              v-else
               variant="text"
               size="small"
               prepend-icon="mdi-calendar-export"
@@ -214,17 +245,17 @@
           — click the highlighted shift blocks to review.
         </v-alert>
 
-        <!-- Missing-position warning -->
+        <!-- Missing-position info (save is still allowed; publish is blocked) -->
         <v-alert
           v-if="hasUnassignedPositions"
-          type="error"
+          type="info"
           variant="tonal"
           density="compact"
           class="ma-4 mb-0"
-          icon="mdi-alert-circle"
+          icon="mdi-information-outline"
         >
-          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's' : '' }} still need{{ unassignedPositionCount === 1 ? 's' : '' }} a position.</strong>
-          Click the grey shift blocks on the calendar to assign a position before saving.
+          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's have' : ' has' }} no position yet.</strong>
+          You can save this template as a draft — click the grey blocks to fill in positions before publishing.
         </v-alert>
 
         <v-card-text class="pa-4 overflow-y-auto" style="max-height: calc(100vh - 180px)">
@@ -286,7 +317,7 @@
             color="primary"
             variant="elevated"
             :loading="saving"
-            :disabled="!formValid || hasUnassignedPositions"
+            :disabled="!formValid"
             @click="saveTemplate"
           >
             {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
@@ -343,6 +374,19 @@
         </v-card-title>
         <v-divider />
         <v-card-text>
+          <!-- Block banner when the template has unpositioned shifts -->
+          <v-alert
+            v-if="publishTargetUnpositionedCount > 0"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+            icon="mdi-cancel"
+          >
+            <strong>Cannot publish yet.</strong>
+            {{ publishTargetUnpositionedCount }} shift{{ publishTargetUnpositionedCount > 1 ? 's require' : ' requires' }} a position before this template can be published.
+            Close this dialog and edit the template to assign positions to the grey shift blocks.
+          </v-alert>
+
           <p class="text-body-2 text-medium-emphasis mb-4">
             Generates real shifts for the chosen week from this template's pattern.
             Workers are notified when shifts are published immediately.
@@ -410,7 +454,7 @@
             color="primary"
             variant="elevated"
             :loading="publishing"
-            :disabled="!publishForm.start_date"
+            :disabled="!publishForm.start_date || publishTargetUnpositionedCount > 0"
             @click="confirmPublish"
           >
             {{ publishForm.publish_immediately ? 'Publish & Notify' : 'Create Shifts (Draft)' }}
@@ -511,6 +555,15 @@ const unassignedPositionCount = computed(
   () => form.value.shifts.filter((s) => !s.position_id).length
 )
 const hasUnassignedPositions = computed(() => unassignedPositionCount.value > 0)
+
+// Count shifts without a position on a saved template (from server data)
+const templateUnpositionedCount = (tmpl) =>
+  (tmpl.templateShifts || []).filter((s) => !s.position_id).length
+
+// Count for the template currently open in the publish dialog
+const publishTargetUnpositionedCount = computed(
+  () => templateUnpositionedCount(publishTarget.value || {})
+)
 
 // ─── Publish date helpers ─────────────────────────────────────────────────────
 const publishWeekLabel = computed(() => {

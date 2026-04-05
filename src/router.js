@@ -220,6 +220,11 @@ const router = createRouter({
         },
         // ─── Admin-only routes ──────────────────────────────────────────────
         {
+          path: "workers",
+          name: "manager-student-workers",
+          component: () => import("./views/ManagerStudentWorkers.vue"),
+        },
+        {
           path: "admin/users",
           name: "manager-admin-users",
           component: () => import("./views/AdminUsers.vue"),

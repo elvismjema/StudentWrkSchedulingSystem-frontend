@@ -131,7 +131,27 @@
             <v-btn variant="text" size="small" prepend-icon="mdi-pencil" @click="openEditDialog(tmpl)">
               Edit
             </v-btn>
+            <v-tooltip
+              v-if="templateUnassignedWorkerCount(tmpl) > 0"
+              :text="`${templateUnassignedWorkerCount(tmpl)} shift(s) need an assigned worker before publishing`"
+              location="top"
+            >
+              <template #activator="{ props: ttProps }">
+                <span v-bind="ttProps">
+                  <v-btn
+                    variant="text"
+                    size="small"
+                    prepend-icon="mdi-calendar-export"
+                    color="grey"
+                    disabled
+                  >
+                    Publish
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
             <v-btn
+              v-else
               variant="text"
               size="small"
               prepend-icon="mdi-calendar-export"
@@ -214,7 +234,7 @@
           — click the highlighted shift blocks to review.
         </v-alert>
 
-        <!-- Missing-position info (save is still allowed; publish is blocked) -->
+        <!-- Missing-position info (save is always allowed; informational only) -->
         <v-alert
           v-if="hasUnassignedPositions"
           type="info"
@@ -223,12 +243,25 @@
           class="ma-4 mb-0"
           icon="mdi-information-outline"
         >
-          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's have' : ' has' }} no position yet.</strong>
-          You can save this template as a draft — click the grey blocks to fill in positions before publishing.
+          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's have' : ' has' }} no position.</strong>
+          Position is optional — you can save and publish without one.
+        </v-alert>
+
+        <!-- Missing-worker warning (save is allowed; publish is blocked) -->
+        <v-alert
+          v-if="unassignedWorkerCount > 0"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="ma-4 mb-0"
+          icon="mdi-account-alert"
+        >
+          <strong>{{ unassignedWorkerCount }} shift{{ unassignedWorkerCount > 1 ? 's have' : ' has' }} no assigned worker.</strong>
+          You can save this template now — assign a worker to every shift before publishing.
         </v-alert>
 
         <v-card-text class="pa-4 overflow-y-auto" style="max-height: calc(100vh - 180px)">
-          <v-form ref="formRef" v-model="formValid">
+          <v-form ref="formRef">
             <!-- Template metadata row -->
             <v-row class="mb-2">
               <v-col cols="12" md="6">
@@ -286,8 +319,9 @@
             color="primary"
             variant="elevated"
             :loading="saving"
-            :disabled="!formValid"
+            :disabled="!canSaveTemplate"
             @click="saveTemplate"
+          >
           >
             {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
           </v-btn>
@@ -343,6 +377,19 @@
         </v-card-title>
         <v-divider />
         <v-card-text>
+          <!-- Block banner when the template has shifts with no worker assigned -->
+          <v-alert
+            v-if="publishTargetUnassignedCount > 0"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+            icon="mdi-account-alert"
+          >
+            <strong>Cannot publish yet.</strong>
+            {{ publishTargetUnassignedCount }} shift{{ publishTargetUnassignedCount > 1 ? 's have' : ' has' }} no assigned worker.
+            Edit the template and assign a worker to every shift, then come back to publish.
+          </v-alert>
+
           <p class="text-body-2 text-medium-emphasis mb-4">
             Generates real shifts for the chosen week from this template's pattern.
             Workers are notified when shifts are published immediately.
@@ -410,7 +457,7 @@
             color="primary"
             variant="elevated"
             :loading="publishing"
-            :disabled="!publishForm.start_date"
+            :disabled="!publishForm.start_date || publishTargetUnassignedCount > 0"
             @click="confirmPublish"
           >
             {{ publishForm.publish_immediately ? 'Publish & Notify' : 'Create Shifts (Draft)' }}
@@ -457,7 +504,6 @@ const templateConflictsMap = ref({})
 const showDialog = ref(false)
 const editingTemplate = ref(null)
 const formRef = ref(null)
-const formValid = ref(false)
 const editorConflicts = ref([])
 
 const showDuplicateDialog = ref(false)
@@ -506,11 +552,26 @@ const formatTime12 = (t) => {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
+// ─── Template save gate (replaces formValid — unblocks button immediately) ────
+const canSaveTemplate = computed(
+  () => !!(form.value.template_name?.trim()) && !!(form.value.recurrence_type)
+)
+
 // ─── Calendar-editor shift validation (informational only — does not block save or publish) ─
 const unassignedPositionCount = computed(
   () => form.value.shifts.filter((s) => !s.position_id).length
 )
 const hasUnassignedPositions = computed(() => unassignedPositionCount.value > 0)
+
+// ─── Worker assignment validation (save allowed; publish blocked) ─────────────
+const unassignedWorkerCount = computed(
+  () => form.value.shifts.filter((s) => !s.assigned_user_id).length
+)
+const templateUnassignedWorkerCount = (tmpl) =>
+  (tmpl.templateShifts || []).filter((s) => !s.assigned_user_id).length
+const publishTargetUnassignedCount = computed(
+  () => templateUnassignedWorkerCount(publishTarget.value || {})
+)
 
 // ─── Publish date helpers ─────────────────────────────────────────────────────
 const publishWeekLabel = computed(() => {

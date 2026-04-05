@@ -112,8 +112,7 @@ onMounted(loadTasks);
 
 <style scoped>
 .tasks-page {
-  max-width: 960px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .task-item {

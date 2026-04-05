@@ -185,7 +185,7 @@
 
     <!-- Tab 3: Post a Swap -->
     <div v-if="activeTab === 'post'">
-      <v-card elevation="0" rounded="lg" border class="pa-6" max-width="600">
+      <v-card elevation="0" rounded="lg" border class="pa-6">
         <div class="text-subtitle-1 font-weight-bold mb-4">Request Shift Coverage</div>
 
         <v-select

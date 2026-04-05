@@ -268,8 +268,7 @@ const saveProfile = () => {
 
 <style scoped>
 .profile-page {
-  max-width: 1240px;
-  margin: 0 auto;
+  width: 100%;
   padding: 24px;
   display: flex;
   flex-direction: column;

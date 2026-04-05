@@ -22,20 +22,6 @@
         <v-row>
           <v-col cols="12">
             <v-select
-              v-model="form.department_id"
-              :items="managedDepartments"
-              item-title="department_name"
-              item-value="department_id"
-              label="Department"
-              variant="outlined"
-              :loading="loadingDepartments"
-              :disabled="loadingDepartments"
-              hide-details="auto"
-            />
-          </v-col>
-
-          <v-col cols="12">
-            <v-select
               v-model="form.position_id"
               :items="positions"
               item-title="position_name"
@@ -43,7 +29,7 @@
               label="Position *"
               variant="outlined"
               :loading="loadingPositions"
-              :disabled="!form.department_id || loadingPositions"
+              :disabled="loadingPositions"
               hide-details="auto"
             />
           </v-col>
@@ -80,15 +66,6 @@
             />
           </v-col>
 
-          <v-col cols="12">
-            <v-text-field
-              v-model="form.location"
-              label="Location"
-              variant="outlined"
-              placeholder="e.g., The Brew - Main Campus"
-              hide-details="auto"
-            />
-          </v-col>
 
           <v-col cols="12">
             <div class="toggle-row">
@@ -137,15 +114,62 @@
           </v-col>
 
           <v-col cols="12">
-            <v-textarea
-              v-model="form.notes"
-              label="Notes"
-              variant="outlined"
-              rows="3"
-              auto-grow
-              placeholder="Any special instructions..."
-              hide-details="auto"
-            />
+            <div class="tasks-section">
+              <h3 class="section-title">Tasks & Notes</h3>
+              <p class="section-subtitle">Add tasks for this shift and any additional notes</p>
+              
+              <!-- Tasks Section -->
+              <div class="tasks-list">
+                <div class="tasks-header">
+                  <h4 class="tasks-title">Tasks</h4>
+                  <v-btn size="small" variant="outlined" @click="addTask">
+                    <v-icon start>mdi-plus</v-icon>
+                    Add Task
+                  </v-btn>
+                </div>
+                
+                <div v-if="form.tasks.length === 0" class="empty-tasks">
+                  <p>No tasks added yet. Click "Add Task" to create tasks for this shift.</p>
+                </div>
+                
+                <div v-for="(task, index) in form.tasks" :key="task.id" class="task-item">
+                  <v-checkbox
+                    v-model="task.completed"
+                    hide-details
+                    density="compact"
+                    class="task-checkbox"
+                  />
+                  <v-text-field
+                    v-model="task.text"
+                    placeholder="Enter task description..."
+                    variant="outlined"
+                    hide-details="auto"
+                    class="task-input"
+                  />
+                  <v-btn
+                    icon="mdi-delete-outline"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    @click="removeTask(index)"
+                  />
+                </div>
+              </div>
+              
+              <!-- Notes Section -->
+              <div class="notes-section">
+                <h4 class="notes-title">Additional Notes</h4>
+                <v-textarea
+                  v-model="form.notes"
+                  label="Notes"
+                  variant="outlined"
+                  rows="3"
+                  auto-grow
+                  placeholder="Any special instructions or additional information..."
+                  hide-details="auto"
+                />
+              </div>
+            </div>
           </v-col>
         </v-row>
 
@@ -177,27 +201,25 @@ const router = useRouter();
 const currentUser = Utils.getStore("user") || {};
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 
-const managedDepartments = ref([]);
 const positions = ref([]);
 const departmentWorkers = ref([]);
 
-const loadingDepartments = ref(false);
 const loadingPositions = ref(false);
 const loadingWorkers = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
 
 const form = reactive({
-  department_id: null,
+  department_id: deptContext.department_id || null,
   position_id: null,
   shift_date: "",
   start_time: "",
   end_time: "",
-  location: "",
   recurring: false,
   post_as_open: false,
   workers_needed: 1,
   assigned_user_id: null,
+  tasks: [],
   notes: "",
 });
 
@@ -247,51 +269,22 @@ const goBack = () => {
   router.push("/manager/schedule");
 };
 
-const loadDepartments = async () => {
-  loadingDepartments.value = true;
-  errorMessage.value = "";
-  try {
-    const userId = currentUser.userId || currentUser.id;
-    const membersResponse = userId ? await apiClient.get(`/user-departments/user/${userId}`) : null;
-    const memberships = Array.isArray(toItems(membersResponse)) ? toItems(membersResponse) : [];
+let taskIdCounter = 0;
 
-    const map = new Map();
-    memberships.forEach((membership) => {
-      const isActive = membership.is_active || String(membership.request_status || "").toLowerCase() === "approved";
-      const department = membership.department || {};
-      const departmentId = membership.department_id || department.department_id;
-      const departmentName = department.department_name || membership.department_name;
-      if (!isActive || !departmentId || !departmentName) return;
-      if (!map.has(Number(departmentId))) {
-        map.set(Number(departmentId), {
-          department_id: Number(departmentId),
-          department_name: departmentName,
-        });
-      }
-    });
-
-    if (map.size === 0 && deptContext.department_id && deptContext.department_name) {
-      map.set(Number(deptContext.department_id), {
-        department_id: Number(deptContext.department_id),
-        department_name: deptContext.department_name,
-      });
-    }
-
-    managedDepartments.value = Array.from(map.values());
-
-    if (managedDepartments.value.length === 1) {
-      form.department_id = managedDepartments.value[0].department_id;
-    } else if (deptContext.department_id && map.has(Number(deptContext.department_id))) {
-      form.department_id = Number(deptContext.department_id);
-    }
-  } catch (error) {
-    errorMessage.value = error?.response?.data?.message || "Failed to load departments.";
-  } finally {
-    loadingDepartments.value = false;
-  }
+const addTask = () => {
+  form.tasks.push({
+    id: ++taskIdCounter,
+    text: "",
+    completed: false,
+  });
 };
 
-const loadPositions = async (departmentId) => {
+const removeTask = (index) => {
+  form.tasks.splice(index, 1);
+};
+
+const loadPositions = async () => {
+  const departmentId = deptContext.department_id;
   if (!departmentId) {
     positions.value = [];
     return;
@@ -309,7 +302,8 @@ const loadPositions = async (departmentId) => {
   }
 };
 
-const loadWorkers = async (departmentId) => {
+const loadWorkers = async () => {
+  const departmentId = deptContext.department_id;
   if (!departmentId) {
     departmentWorkers.value = [];
     return;
@@ -337,12 +331,10 @@ const loadWorkers = async (departmentId) => {
 
 watch(
   () => form.department_id,
-  async (nextDepartmentId, previousDepartmentId) => {
-    if (nextDepartmentId === previousDepartmentId) return;
-    form.position_id = null;
-    form.assigned_user_id = null;
-    await Promise.all([loadPositions(nextDepartmentId), loadWorkers(nextDepartmentId)]);
+  async () => {
+    await Promise.all([loadPositions(), loadWorkers()]);
   },
+  { immediate: true },
 );
 
 watch(
@@ -372,6 +364,11 @@ const submitShift = async () => {
     const creatorId = currentUser.userId || currentUser.id || null;
     const isOpenShift = form.post_as_open || !form.assigned_user_id;
 
+    const tasksData = {
+      tasks: form.tasks.filter(task => task.text.trim()),
+      notes: form.notes?.trim() || null,
+    };
+
     const payload = {
       department_id: form.department_id,
       position_id: form.position_id,
@@ -384,8 +381,7 @@ const submitShift = async () => {
       is_recurring: form.recurring,
       recurrence_pattern: form.recurring ? "weekly" : null,
       recurrence_start_date: form.recurring ? form.shift_date : null,
-      location: form.location?.trim() || null,
-      notes: form.notes?.trim() || null,
+      tasks_notes: JSON.stringify(tasksData),
       workers_needed: form.post_as_open ? Number(form.workers_needed) : null,
       trade_status: isOpenShift ? "open" : null,
     };
@@ -405,7 +401,10 @@ const submitShift = async () => {
   }
 };
 
-onMounted(loadDepartments);
+onMounted(() => {
+  loadPositions();
+  loadWorkers();
+});
 </script>
 
 <style scoped>
@@ -480,13 +479,78 @@ onMounted(loadDepartments);
   gap: 10px;
 }
 
-@media (max-width: 768px) {
-  .create-shift-page {
-    padding: 16px;
-  }
+.tasks-section {
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+}
 
-  .page-title {
-    font-size: 34px;
-  }
+.section-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.section-subtitle {
+  margin: 0 0 16px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.tasks-list {
+  margin-bottom: 20px;
+}
+
+.tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tasks-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.empty-tasks {
+  padding: 16px;
+  text-align: center;
+  color: #667085;
+  font-size: 14px;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.task-checkbox {
+  flex-shrink: 0;
+}
+
+.task-input {
+  flex: 1;
+}
+
+.notes-section {
+  border-top: 1px solid #e3e5e8;
+  padding-top: 16px;
+}
+
+.notes-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
 }
 </style>

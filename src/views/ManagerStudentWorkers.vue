@@ -420,19 +420,53 @@ const loadWorkers = async () => {
   error.value = '';
   
   try {
-    // Get department workers
-    const response = await apiClient.get(`/user-departments?departmentId=${deptContext.department_id}&status=approved`);
-    const assignments = response?.data?.data || response?.data || [];
-    
-    // Filter for student workers only and map user data
-    workers.value = assignments
-      .filter((assignment) => {
-        const roleName = String(assignment?.role?.role_name || assignment?.role_name || '').toLowerCase();
-        const permissionLevel = Number(assignment?.role?.permission_level || 0);
-        return roleName.includes('student') || permissionLevel < 50;
-      })
-      .map((assignment) => assignment.user || assignment)
-      .filter((worker) => worker && (worker.userId || worker.id));
+    // Backend does not expose GET /user-departments with departmentId filter.
+    // Use manager-accessible users-with-roles endpoint and filter memberships client-side.
+    const response = await apiClient.get('/user-departments/admin/users-with-roles?activeOnly=true');
+    const usersWithRoles = response?.data?.data || response?.data || [];
+    const targetDepartmentId = Number(deptContext.department_id);
+
+    const scopedWorkers = [];
+    for (const user of usersWithRoles) {
+      const memberships = Array.isArray(user?.userDepartments) ? user.userDepartments : [];
+      const deptMembership = memberships.find((membership) => {
+        const deptId = Number(
+          membership?.department_id ??
+          membership?.department?.department_id ??
+          membership?.departmentId
+        );
+        return deptId === targetDepartmentId;
+      });
+
+      if (!deptMembership) continue;
+
+      const roleName = String(
+        deptMembership?.role?.role_name || deptMembership?.role_name || ''
+      ).toLowerCase();
+      const permissionLevel = Number(
+        deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
+      );
+      const isStudentRole = roleName.includes('student') || permissionLevel < 50;
+      if (!isStudentRole) continue;
+
+      scopedWorkers.push({
+        ...user,
+        userId: user?.userId || user?.id,
+        positionId:
+          deptMembership?.position_id ??
+          deptMembership?.position?.position_id ??
+          user?.positionId ??
+          null,
+        position:
+          deptMembership?.position ||
+          user?.position ||
+          null,
+        request_status: deptMembership?.request_status,
+        is_active: deptMembership?.is_active,
+      });
+    }
+
+    workers.value = scopedWorkers.filter((worker) => worker && (worker.userId || worker.id));
 
     // Load availability for each worker
     await loadWorkersAvailability();

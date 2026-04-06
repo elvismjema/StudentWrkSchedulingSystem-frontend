@@ -1,5 +1,58 @@
 <template>
   <div class="availability-container">
+    <h1>My Availability</h1>
+    
+    <div class="availability-grid">
+      <div class="time-slots-header">
+        <div class="day-label">Time</div>
+        <div class="day-label" v-for="day in days" :key="day.value">{{ day.label }}</div>
+      </div>
+      
+      <div class="time-slots-grid">
+        <div 
+          v-for="slot in timeSlots" 
+          :key="slot.time"
+          class="time-row"
+        >
+          <div class="time-label">{{ slot.label }}</div>
+          <div 
+            v-for="day in days" 
+            :key="`${day.value}-${slot.time}`"
+            class="time-slot"
+            :class="{
+              'selected': isSlotSelected(day.value, slot.time),
+              'selecting': isSlotSelecting(day.value, slot.time),
+              'available': isSlotAvailable(day.value, slot.time),
+              'unavailable': isSlotUnavailable(day.value, slot.time)
+            }"
+            @mousedown="startSelection(day.value, slot.time)"
+            @mouseenter="continueSelection(day.value, slot.time)"
+            @mouseup="endSelection"
+            @dragstart.prevent
+            @dragover.prevent
+            @drop.prevent
+          >
+            <div class="slot-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="availability-actions">
+      <button @click="markAsAvailable" class="mark-available-btn" :disabled="currentSelection.size === 0">
+        <v-icon left>mdi-check</v-icon>
+        MARK AVAILABLE
+      </button>
+      <button @click="markAsUnavailable" class="mark-unavailable-btn" :disabled="currentSelection.size === 0">
+        <v-icon left>mdi-close</v-icon>
+        MARK UNAVAILABLE
+      </button>
+      <button @click="saveAvailability" class="save-btn" :disabled="!hasChanges">
+        SAVE CHANGES
+      </button>
+      <button @click="clearAll" class="clear-all-btn">
+        CLEAR ALL
+      </button>
 
     <!-- Header -->
     <div class="page-header">
@@ -30,6 +83,7 @@
         Save Changes
       </v-btn>
       <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
+
     </div>
 
     <!-- Loading Indicator -->
@@ -319,12 +373,36 @@ const openTimeRangeDialog = (day, hour) => {
   }
   existingHours.sort((a, b) => a - b);
 
+const timeSlots = ref(generateTimeSlots())
+const selectedSlots = ref(new Set())
+const availableSlots = ref(new Set())
+const unavailableSlots = ref(new Set())
+const currentSelection = ref(new Set())
+const isSelecting = ref(false)
+const selectionStart = ref(null)
+const existingAvailability = ref([])
+const successMessage = ref('')
+const errorMessage = ref('')
+
+const isSlotSelected = (day, time) => {
+  return currentSelection.value.has(`${day}-${time}`)
+}
+
+const isSlotAvailable = (day, time) => {
+  return availableSlots.value.has(`${day}-${time}`)
+}
+
+const isSlotUnavailable = (day, time) => {
+  return unavailableSlots.value.has(`${day}-${time}`)
+}
+
   let startH = hour;
   let endH = hour + 1;
   if (existingHours.length > 0) {
     startH = existingHours[0];
     endH = existingHours[existingHours.length - 1] + 1;
   }
+
 
   timeRangeForm.value = {
     dayValue: day.value,
@@ -355,6 +433,11 @@ const applyTimeRange = () => {
   const updated = new Set(targetSet.value);
   const updatedOther = new Set(otherSet.value);
 
+
+const endSelection = () => {
+  if (isSelecting.value) {
+    // Keep currentSelection for marking operations
+
   // Clear existing slots for this day in both sets
   for (const key of [...updated]) {
     if (key.startsWith(`${dayValue}-`)) updated.delete(key);
@@ -362,6 +445,59 @@ const applyTimeRange = () => {
   for (const key of [...updatedOther]) {
     if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
   }
+
+const markAsAvailable = () => {
+  currentSelection.value.forEach(slot => {
+    availableSlots.value.add(slot)
+    unavailableSlots.value.delete(slot)
+  })
+  currentSelection.value.clear()
+}
+
+const markAsUnavailable = () => {
+  currentSelection.value.forEach(slot => {
+    unavailableSlots.value.add(slot)
+    availableSlots.value.delete(slot)
+  })
+  currentSelection.value.clear()
+}
+
+const clearAll = () => {
+  availableSlots.value.clear()
+  unavailableSlots.value.clear()
+  currentSelection.value.clear()
+  successMessage.value = ''
+  errorMessage.value = ''
+}
+
+const hasChanges = computed(() => {
+  const existingAvailable = new Set()
+  const existingUnavailable = new Set()
+  
+  existingAvailability.value.forEach(avail => {
+    const startHour = parseInt(avail.startTime.split(':')[0])
+    const endHour = parseInt(avail.endTime.split(':')[0])
+    
+    for (let h = startHour; h < endHour; h++) {
+      const timeStr = h.toString().padStart(2, '0') + ':00'
+      if (avail.availabilityType === 'available') {
+        existingAvailable.add(`${avail.dayOfWeek}-${timeStr}`)
+      } else {
+        existingUnavailable.add(`${avail.dayOfWeek}-${timeStr}`)
+      }
+    }
+  })
+  
+  // Check if available slots changed
+  if (availableSlots.value.size !== existingAvailable.size) return true
+  for (const slot of availableSlots.value) {
+    if (!existingAvailable.has(slot)) return true
+  }
+  
+  // Check if unavailable slots changed
+  if (unavailableSlots.value.size !== existingUnavailable.size) return true
+  for (const slot of unavailableSlots.value) {
+    if (!existingUnavailable.has(slot)) return true
 
   // Fill slots for the range (round to full hours)
   const effectiveStart = startH;
@@ -424,6 +560,7 @@ const loadAvailabilities = async () => {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
     loading.value = false;
+
   }
 };
 
@@ -431,6 +568,74 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
+
+    successMessage.value = ''
+    errorMessage.value = ''
+    
+    // Save available slots
+    const availableByDay = {}
+    availableSlots.value.forEach(slot => {
+      const [day, time] = slot.split('-')
+      if (!availableByDay[day]) {
+        availableByDay[day] = { startHour: 24, endHour: 0 }
+      }
+      
+      const hour = parseInt(time.split(':')[0])
+      availableByDay[day].startHour = Math.min(availableByDay[day].startHour, hour)
+      availableByDay[day].endHour = Math.max(availableByDay[day].endHour, hour + 1)
+    })
+    
+    // Save unavailable slots
+    const unavailableByDay = {}
+    unavailableSlots.value.forEach(slot => {
+      const [day, time] = slot.split('-')
+      if (!unavailableByDay[day]) {
+        unavailableByDay[day] = { startHour: 24, endHour: 0 }
+      }
+      
+      const hour = parseInt(time.split(':')[0])
+      unavailableByDay[day].startHour = Math.min(unavailableByDay[day].startHour, hour)
+      unavailableByDay[day].endHour = Math.max(unavailableByDay[day].endHour, hour + 1)
+    })
+    
+    const userId = getCurrentUserId()
+    
+    // Save available time blocks
+    for (const [day, timeRange] of Object.entries(availableByDay)) {
+      const availability = {
+        userId: userId,
+        dayOfWeek: parseInt(day),
+        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
+        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
+        availabilityType: 'available',
+        isRecurring: true
+      }
+      
+      await axios.post('/api/availability', availability)
+    }
+    
+    // Save unavailable time blocks
+    for (const [day, timeRange] of Object.entries(unavailableByDay)) {
+      const availability = {
+        userId: userId,
+        dayOfWeek: parseInt(day),
+        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
+        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
+        availabilityType: 'unavailable',
+        isRecurring: true
+      }
+      
+      await axios.post('/api/availability', availability)
+    }
+    
+    await loadExistingAvailability()
+    successMessage.value = 'Availability saved successfully!'
+    
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
+    
+
     const recurringRecords = existingRecords.value.filter(
       (r) => !r.specificDate || r.isRecurring
     );
@@ -480,6 +685,7 @@ const saveChanges = async () => {
 
     notify("Availability saved successfully.");
     await loadAvailabilities();
+
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to save availability.", "error");
   } finally {
@@ -493,6 +699,29 @@ const saveException = async () => {
 
   savingException.value = true;
   try {
+
+    const userId = getCurrentUserId()
+    const response = await axios.get(`/api/availability/user/${userId}`)
+    existingAvailability.value = response.data
+    
+    availableSlots.value.clear()
+    unavailableSlots.value.clear()
+    
+    existingAvailability.value.forEach(avail => {
+      const startHour = parseInt(avail.startTime.split(':')[0])
+      const endHour = parseInt(avail.endTime.split(':')[0])
+      
+      for (let h = startHour; h < endHour; h++) {
+        const timeStr = h.toString().padStart(2, '0') + ':00'
+        if (avail.availabilityType === 'available') {
+          availableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
+        } else {
+          unavailableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
+        }
+      }
+    })
+    
+
     await availabilityService.create({
       userId,
       startTime: exceptionForm.value.startTime,
@@ -505,6 +734,7 @@ const saveException = async () => {
     showExceptionDialog.value = false;
     exceptionForm.value = { specificDate: "", startTime: "", endTime: "", availabilityType: "unavailable" };
     await loadAvailabilities();
+
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to add exception.", "error");
   } finally {
@@ -616,6 +846,75 @@ onMounted(loadAvailabilities);
   width: 100px;
 }
 
+
+.time-slot.available {
+  background: #4caf50;
+}
+
+.time-slot.available:hover {
+  background: #45a049;
+}
+
+.time-slot.unavailable {
+  background: #f44336;
+}
+
+.time-slot.unavailable:hover {
+  background: #d32f2f;
+}
+
+.slot-content {
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+}
+
+.availability-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.save-btn, .clear-btn, .mark-available-btn, .mark-unavailable-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mark-available-btn {
+  background: #00897b;
+  color: white;
+}
+
+.mark-available-btn:hover:not(:disabled) {
+  background: #00796b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 137, 123, 0.3);
+}
+
+.mark-unavailable-btn {
+  background: white;
+  color: #333;
+  border: 2px solid #ddd;
+}
+
+.mark-unavailable-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #bbb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 .slot-cell {
   height: 44px;
   cursor: pointer;
@@ -630,6 +929,7 @@ onMounted(loadAvailabilities);
 
 .slot-cell:hover {
   background-color: #e0f2f1;
+
 }
 
 .slot-cell.disabled:hover {
@@ -640,6 +940,26 @@ onMounted(loadAvailabilities);
   background-color: #0D9488;
 }
 
+.save-btn:disabled, .mark-available-btn:disabled, .mark-unavailable-btn:disabled {
+  background: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-color: #e0e0e0;
+}
+
+.clear-btn {
+  background: white;
+  color: #333;
+  border: 2px solid #ddd;
+}
+
+.clear-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  
 .slot-cell.available:hover {
   background-color: #0f766e;
 }

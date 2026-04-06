@@ -397,19 +397,20 @@ const selectShift = (shift) => {
 }
 
 const previousWeek = () => {
-  const nextDate = new Date(currentDate.value)
-  nextDate.setMonth(nextDate.getMonth() - 1)
-  currentDate.value = nextDate
+  const y = currentDate.value.getFullYear()
+  const m = currentDate.value.getMonth()
+  currentDate.value = new Date(y, m - 1, 1)
 }
 
 const nextWeek = () => {
-  const nextDate = new Date(currentDate.value)
-  nextDate.setMonth(nextDate.getMonth() + 1)
-  currentDate.value = nextDate
+  const y = currentDate.value.getFullYear()
+  const m = currentDate.value.getMonth()
+  currentDate.value = new Date(y, m + 1, 1)
 }
 
 const goToToday = () => {
-  currentDate.value = new Date()
+  const now = new Date()
+  currentDate.value = new Date(now.getFullYear(), now.getMonth(), 1)
 }
 
 const openAddToSchedule = () => {

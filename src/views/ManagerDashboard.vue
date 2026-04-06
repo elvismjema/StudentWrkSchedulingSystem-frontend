@@ -2,7 +2,7 @@
   <div class="dashboard-page">
     <section class="page-header">
       <div class="header-text">
-        <h1 class="page-title">Dashboard</h1>
+        <h1 class="page-title">{{ managerHeading }}</h1>
         <p class="page-subtitle">{{ todayLabel }}</p>
       </div>
       <div class="header-actions">
@@ -114,15 +114,15 @@
         <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
           <div class="quick-content">
             <v-icon size="24">mdi-clock-outline</v-icon>
-            <span>Time &amp; Attendance</span>
+            <span>Time &amp; Pay</span>
           </div>
         </v-btn>
       </v-col>
       <v-col cols="12" sm="6">
-        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/availability')">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/workers')">
           <div class="quick-content">
-            <v-icon size="24">mdi-calendar-month-outline</v-icon>
-            <span>Availability</span>
+            <v-icon size="24">mdi-account-group-outline</v-icon>
+            <span>Student Workers</span>
           </div>
         </v-btn>
       </v-col>
@@ -144,6 +144,7 @@ import Utils from "../config/utils.js";
 import CreateShiftModal from "../components/CreateShiftModal.vue";
 
 const router = useRouter();
+const currentUser = Utils.getStore("user") || {};
 const error = ref("");
 const allShifts = ref([]);
 const swapRequests = ref([]);
@@ -151,6 +152,11 @@ const createShiftModal = reactive({ open: false });
 
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 const currentDeptId = deptContext.department_id || null;
+
+const managerHeading = computed(() => {
+  const fullName = `${currentUser?.fName || ""} ${currentUser?.lName || ""}`.trim();
+  return fullName || "Manager";
+});
 
 const todayLabel = computed(() =>
   new Date().toLocaleDateString("en-US", {

@@ -1,18 +1,8 @@
 <template>
   <div class="schedule-container">
-    <div class="greeting-banner">
-      <h2 class="greeting-title">Manager Schedule</h2>
-      <p class="greeting-date">{{ currentGreetingDate }}</p>
-    </div>
-
-    <!-- Calendar Header -->
-    <div class="calendar-header">
-      <div>
-        <p class="selected-shift-note" v-if="selectedShift">
-          Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
-        </p>
-      </div>
-      <div class="header-controls">
+    <div class="schedule-top-header">
+      <h2 class="month-title">{{ monthYearLabel }}</h2>
+      <div class="month-nav">
         <v-btn variant="outlined" class="nav-btn" @click="previousWeek">
           <v-icon>mdi-chevron-left</v-icon>
         </v-btn>
@@ -20,10 +10,49 @@
         <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
-        <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
-          Add to Schedule
+      </div>
+    </div>
+
+    <div class="schedule-actions-bar">
+      <div class="filter-group">
+        <v-select
+          v-model="filters.position_id"
+          :items="positions"
+          item-title="position_name"
+          item-value="position_id"
+          label="All Positions"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          clearable
+          class="action-filter"
+        />
+        <v-select
+          v-model="filters.view_filter"
+          :items="viewFilterOptions"
+          item-title="label"
+          item-value="value"
+          label="All Shifts"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          class="action-filter"
+        />
+      </div>
+      <div class="action-buttons">
+        <v-btn variant="outlined" prepend-icon="mdi-download" @click="exportSchedule">
+          Export
+        </v-btn>
+        <v-btn color="#8B1538" variant="elevated" @click="showCreateDialog = true" prepend-icon="mdi-plus">
+          Create Shift
         </v-btn>
       </div>
+    </div>
+
+    <div class="calendar-header">
+      <p class="selected-shift-note" v-if="selectedShift">
+        Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
+      </p>
     </div>
 
     <div class="calendar-scroll-container" v-if="!shiftsLoading">
@@ -226,7 +255,8 @@ const positions = ref([])
 const departmentWorkers = ref([])
 const filters = ref({
   position_id: null,
-  shift_date: null
+  shift_date: null,
+  view_filter: 'all'
 })
 
 const showCreateDialog = ref(false)
@@ -286,15 +316,25 @@ const weekDays = computed(() => {
 
 const timeSlots = computed(() => Array.from({ length: 19 }, (_, i) => i + 5))
 
-const currentGreetingDate = computed(() => {
-  if (!weekDays.value.length) return ''
-  const first = new Date(weekDays.value[0].isoDate)
-  const last = new Date(weekDays.value[6].isoDate)
-  return `${first.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
-})
+const monthYearLabel = computed(() =>
+  currentDate.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+)
+
+const viewFilterOptions = [
+  { label: 'All Shifts', value: 'all' },
+  { label: 'Assigned', value: 'assigned' },
+  { label: 'Open', value: 'open' },
+]
 
 const filteredShifts = computed(() => {
-  return shifts.value
+  return shifts.value.filter((shift) => {
+    const positionMatch = !filters.value.position_id || Number(shift.position_id) === Number(filters.value.position_id)
+    if (!positionMatch) return false
+
+    if (filters.value.view_filter === 'assigned') return !!shift.assigned_user_id
+    if (filters.value.view_filter === 'open') return !shift.assigned_user_id
+    return true
+  })
 })
 
 const formatTime = (hour) => {
@@ -336,7 +376,7 @@ const formatShiftTime = (startTime, endTime) => {
 }
 
 const getShiftsForCell = (isoDate, hour) => {
-  return shifts.value.filter((shift) => {
+  return filteredShifts.value.filter((shift) => {
     if (shift.shift_date !== isoDate) return false
     const start = parseHour(shift.start_time)
     if (start == null) return false
@@ -358,13 +398,13 @@ const selectShift = (shift) => {
 
 const previousWeek = () => {
   const nextDate = new Date(currentDate.value)
-  nextDate.setDate(nextDate.getDate() - 7)
+  nextDate.setMonth(nextDate.getMonth() - 1)
   currentDate.value = nextDate
 }
 
 const nextWeek = () => {
   const nextDate = new Date(currentDate.value)
-  nextDate.setDate(nextDate.getDate() + 7)
+  nextDate.setMonth(nextDate.getMonth() + 1)
   currentDate.value = nextDate
 }
 
@@ -400,11 +440,40 @@ const loadShifts = async () => {
 const loadDepartmentWorkers = async () => {
   if (!currentDeptId) return
   try {
-    const response = await apiClient.get(`/user-departments?departmentId=${currentDeptId}&status=approved`)
-    const assignments = response?.data?.data || response?.data || []
-    departmentWorkers.value = assignments
-      .map(a => a.user || a)
-      .filter(u => u && u.userId)
+    const response = await apiClient.get('/user-departments/admin/users-with-roles?activeOnly=true')
+    const users = response?.data?.data || response?.data || []
+    const targetDepartmentId = Number(currentDeptId)
+
+    departmentWorkers.value = users
+      .map((user) => {
+        const memberships = Array.isArray(user?.userDepartments) ? user.userDepartments : []
+        const deptMembership = memberships.find((membership) => {
+          const deptId = Number(
+            membership?.department_id ??
+            membership?.department?.department_id ??
+            membership?.departmentId
+          )
+          return deptId === targetDepartmentId
+        })
+        if (!deptMembership || deptMembership?.is_active === false) return null
+
+        const roleName = String(
+          deptMembership?.role?.role_name || deptMembership?.role_name || ''
+        ).toLowerCase()
+        const permissionLevel = Number(
+          deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
+        )
+        const isStudentRole = roleName.includes('student') || permissionLevel < 50
+        if (!isStudentRole) return null
+
+        return {
+          userId: user?.userId || user?.id,
+          fName: user?.fName || '',
+          lName: user?.lName || '',
+          email: user?.email || '',
+        }
+      })
+      .filter((user) => user && user.userId)
   } catch (error) {
     console.error('Error loading department workers:', error)
   }
@@ -420,12 +489,42 @@ const loadDepartments = async () => {
 }
 
 const loadPositions = async () => {
+  if (!currentDeptId) return
   try {
-    const response = await apiClient.get('/positions')
+    const response = await apiClient.get(`/positions?department_id=${currentDeptId}`)
     positions.value = response?.data?.data || []
   } catch (error) {
     console.error('Error loading positions:', error)
   }
+}
+
+const exportSchedule = () => {
+  const rows = filteredShifts.value.map((shift) => ({
+    date: shift.shift_date,
+    start_time: shift.start_time,
+    end_time: shift.end_time,
+    position: shift.position?.position_name || '',
+    assigned_to: shift.assigned_user?.fName
+      ? `${shift.assigned_user.fName} ${shift.assigned_user.lName || ''}`.trim()
+      : '',
+    published: shift.is_published ? 'yes' : 'no',
+  }))
+
+  const headers = ['date', 'start_time', 'end_time', 'position', 'assigned_to', 'published']
+  const csv = [
+    headers.join(','),
+    ...rows.map((row) => headers.map((key) => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', `manager-schedule-${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 const createShift = async () => {
@@ -526,66 +625,68 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.calendar-header {
+.schedule-top-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
+  align-items: center;
+  margin-bottom: 14px;
   gap: 12px;
 }
 
-.month-year {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
+.month-title {
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 700;
+  color: #101828;
   margin: 0;
 }
 
-.selected-shift-note {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 13px;
+.month-nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
-.header-controls {
+.schedule-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-filter {
+  min-width: 210px;
+  max-width: 240px;
+}
+
+.action-buttons {
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
+}
+
+.calendar-header {
+  margin-bottom: 10px;
+}
+
+.selected-shift-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .nav-btn {
   border-color: #e0e0e0;
   color: #666;
-}
-
-.today-btn {
-  background-color: #8B1538;
-  color: white;
-}
-
-.greeting-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.greeting-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #333;
-  margin: 0;
-}
-
-.greeting-date {
-  font-size: 18px;
-  font-weight: 500;
-  color: #64748b;
-  margin: 0;
-  text-align: right;
 }
 
 .calendar-scroll-container {
@@ -739,24 +840,27 @@ onMounted(() => {
 }
 
 @media (max-width: 900px) {
-  .calendar-header {
+  .schedule-top-header,
+  .schedule-actions-bar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .header-controls {
+  .filter-group,
+  .action-buttons,
+  .month-nav {
     justify-content: flex-start;
   }
 }
 
 @media (max-width: 768px) {
-  .greeting-banner {
-    flex-direction: column;
-    align-items: flex-start;
+  .month-title {
+    font-size: 36px;
   }
 
-  .greeting-date {
-    text-align: left;
+  .action-filter {
+    min-width: 100%;
+    max-width: 100%;
   }
 }
 </style>

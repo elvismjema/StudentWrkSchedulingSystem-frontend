@@ -236,7 +236,6 @@ const router = createRouter({
         }
       ]
     }
-
   ],
 });
 

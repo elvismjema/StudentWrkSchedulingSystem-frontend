@@ -154,8 +154,8 @@ const deptContext = Utils.getStore("currentDepartmentContext") || {};
 const currentDeptId = deptContext.department_id || null;
 
 const managerHeading = computed(() => {
-  const fullName = `${currentUser?.fName || ""} ${currentUser?.lName || ""}`.trim();
-  return fullName || "Manager";
+  const firstName = currentUser?.fName || "";
+  return firstName ? `Hi, ${firstName}!` : "Hi, Manager!";
 });
 
 const todayLabel = computed(() =>

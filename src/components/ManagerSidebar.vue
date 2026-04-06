@@ -120,7 +120,7 @@ const navItems = [
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
-  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
+  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-pay" },
   { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 

@@ -111,7 +111,7 @@
 
     <v-row>
       <v-col cols="12" sm="6">
-        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-pay')">
           <div class="quick-content">
             <v-icon size="24">mdi-clock-outline</v-icon>
             <span>Time &amp; Pay</span>

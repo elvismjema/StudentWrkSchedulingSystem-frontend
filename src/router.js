@@ -141,7 +141,7 @@ const router = createRouter({
         {
           path: "qualifications",
           name: "manager-qualifications",
-          component: StudentQualifications
+          component: () => import("./views/StudentQualifications.vue")
         },
         {
           path: "shifts",

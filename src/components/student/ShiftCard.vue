@@ -148,16 +148,28 @@ const departmentColor = computed(() => {
   return props.shift.department_color || props.shift.departmentColor || DEPARTMENT_COLORS.default;
 });
 
+/** Combine separate shift_date + time fields into a parseable datetime string */
+const buildDateTime = (shift, timeField) => {
+  const time = shift[timeField];
+  if (!time) return null;
+  if (time.includes('T') || time.includes('-')) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return date + 'T' + time;
+  return null;
+};
+
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (isNaN(d)) return '';
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const formattedTime = computed(() => {
-  const start = formatTime(props.shift.start_time || props.shift.startTime || props.shift.shift_start);
-  const end = formatTime(props.shift.end_time || props.shift.endTime || props.shift.shift_end);
-  return start + ' – ' + end;
+  const s = props.shift;
+  const startDT = buildDateTime(s, 'start_time') || buildDateTime(s, 'startTime') || s.start_time || s.startTime || s.shift_start;
+  const endDT = buildDateTime(s, 'end_time') || buildDateTime(s, 'endTime') || s.end_time || s.endTime || s.shift_end;
+  return formatTime(startDT) + ' – ' + formatTime(endDT);
 });
 
 const statusLabel = computed(() => {

@@ -137,6 +137,17 @@ const router = createRouter({
       component: Manager,
       redirect: { name: "manager-dashboard" },
       children: [
+
+        {
+          path: "qualifications",
+          name: "manager-qualifications",
+          component: StudentQualifications
+        },
+        {
+          path: "shifts",
+          name: "manager-shifts",
+          component: ShiftManagement
+        },
         {
           path: "dashboard",
           name: "manager-dashboard",
@@ -267,8 +278,19 @@ const router = createRouter({
               "View system-wide staffing and operations reports.",
           },
         },
+
+        {
+          path: "settings",
+          name: "admin-settings",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
+        }
+      ]
+    },
+
       ],
     },
+
   ],
 });
 

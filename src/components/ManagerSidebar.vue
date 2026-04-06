@@ -151,12 +151,15 @@ onMounted(async () => {
       memberships[0];
     if (!membership) return;
 
-    Utils.setStore("currentDepartmentContext", {
+    const ctx = {
       department_id: membership.department_id,
       department_name: membership.department?.department_name,
       role_name: membership.role?.role_name || "Manager",
       role_id: membership.role_id,
-    });
+    };
+    Utils.setStore("currentDepartmentContext", ctx);
+    // Notify other components (e.g. ScheduleTemplates) on the same tab
+    window.dispatchEvent(new CustomEvent("departmentContextReady", { detail: ctx }));
   } catch {
     // Non-fatal: context will just remain unset.
   }

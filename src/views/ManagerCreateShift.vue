@@ -31,6 +31,7 @@
               :loading="loadingPositions"
               :disabled="loadingPositions"
               hide-details="auto"
+              no-data-text="No positions available — ask an admin to add positions for this department"
             />
           </v-col>
 
@@ -108,8 +109,10 @@
               label="Assign To"
               variant="outlined"
               :disabled="!form.department_id || loadingWorkers"
+              :loading="loadingWorkers"
               clearable
               hide-details="auto"
+              no-data-text="No workers found — check department member setup"
             />
           </v-col>
 
@@ -292,7 +295,7 @@ const loadPositions = async () => {
 
   loadingPositions.value = true;
   try {
-    const response = await apiClient.get(`/positions?department_id=${departmentId}`);
+    const response = await apiClient.get(`positions?department_id=${departmentId}`);
     positions.value = toItems(response);
   } catch (error) {
     positions.value = [];
@@ -311,16 +314,48 @@ const loadWorkers = async () => {
 
   loadingWorkers.value = true;
   try {
-    const response = await apiClient.get(`/user-departments?departmentId=${departmentId}&status=approved`);
-    const assignments = toItems(response);
-    departmentWorkers.value = assignments
-      .filter((assignment) => {
-        const roleName = String(assignment?.role?.role_name || assignment?.role_name || "").toLowerCase();
-        if (!roleName) return true;
-        return roleName.includes("student");
+    // Primary: admin endpoint with all users + role info
+    const response = await apiClient.get("user-departments/admin/users-with-roles?activeOnly=true");
+    const users = toItems(response);
+    const targetDeptId = Number(departmentId);
+
+    const workers = [];
+    for (const u of users) {
+      const memberships = Array.isArray(u?.userDepartments) ? u.userDepartments
+        : Array.isArray(u?.departments) ? u.departments
+        : [];
+      const deptMembership = memberships.find((m) => {
+        const dId = Number(m?.department_id ?? m?.department?.department_id ?? m?.departmentId ?? 0);
+        return dId === targetDeptId;
+      });
+      if (!deptMembership) continue;
+      if (deptMembership?.is_active === false) continue;
+
+      const roleName = String(deptMembership?.role?.role_name || deptMembership?.role_name || "").toLowerCase();
+      const permLevel = Number(deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0);
+      if (!(roleName.includes("student") || permLevel < 50)) continue;
+
+      const userId = u?.userId || u?.id || u?.user_id;
+      if (!userId) continue;
+      workers.push({ userId, id: userId, fName: u?.fName || "", lName: u?.lName || "", email: u?.email || "" });
+    }
+
+    if (workers.length > 0) {
+      departmentWorkers.value = workers;
+      return;
+    }
+
+    // Fallback: department-scoped member list
+    const membersRes = await apiClient.get(`admin/departments/${departmentId}/members`);
+    const members = toItems(membersRes);
+    departmentWorkers.value = members
+      .filter((m) => {
+        const rn = String(m?.role?.role_name || m?.role_name || "").toLowerCase();
+        const pl = Number(m?.role?.permission_level ?? m?.permission_level ?? 0);
+        return rn.includes("student") || pl < 50;
       })
-      .map((assignment) => assignment.user || assignment)
-      .filter((worker) => worker && (worker.userId || worker.id));
+      .map((m) => m.user || m)
+      .filter((w) => w && (w.userId || w.id));
   } catch (error) {
     departmentWorkers.value = [];
     errorMessage.value = error?.response?.data?.message || "Failed to load workers.";

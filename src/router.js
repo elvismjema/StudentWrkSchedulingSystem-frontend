@@ -174,13 +174,13 @@ const router = createRouter({
           component: () => import("./views/ManagerApprovals.vue"),
         },
         {
+          path: "time-pay",
+          name: "manager-time-pay",
+          component: () => import("./views/ManagerTimePay.vue"),
+        },
+        {
           path: "time-attendance",
-          name: "manager-time-attendance",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Time & Pay",
-            description: "Track clock-in activity and payroll-related records.",
-          },
+          redirect: { name: "manager-time-pay" },
         },
         {
           path: "tasks",

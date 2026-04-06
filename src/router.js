@@ -286,7 +286,7 @@ const router = createRouter({
           props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
         }
       ]
-    },
+    }
 
       ],
     },

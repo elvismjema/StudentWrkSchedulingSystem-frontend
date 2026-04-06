@@ -413,9 +413,10 @@ const confirmClockIn = () => {
 const doClockIn = async () => {
   clockingIn.value = true;
   try {
-    const payload = {};
+    const payload = {
+      user_id: user?.userId || user?.id,
+    };
     if (activeShift.value) {
-      payload.shiftId = activeShift.value.id;
       payload.shift_id = activeShift.value.id;
     }
     await studentService.clockIn(payload);

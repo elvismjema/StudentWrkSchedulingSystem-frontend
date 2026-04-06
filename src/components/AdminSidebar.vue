@@ -181,6 +181,8 @@ defineExpose({
 .admin-user-role {
   font-size: 14px;
   color: #667085;
+}
+
 .logo-text {
   flex: 1;
 }

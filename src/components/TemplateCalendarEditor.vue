@@ -87,6 +87,7 @@
             density="compact"
             clearable
             class="mb-3"
+            :no-data-text="'No positions available \u2014 ask an admin to add positions for this department'"
             :hint="dialog.isNew ? 'You can skip this and fill in later by clicking the shift block.' : ''"
             persistent-hint
           />
@@ -97,12 +98,15 @@
             :items="workers"
             :item-title="(w) => `${w.user.fName} ${w.user.lName}`"
             item-value="user_id"
-            label="Assigned Worker (optional)"
+            label="Assigned Worker *"
             variant="outlined"
             density="compact"
             clearable
             prepend-inner-icon="mdi-account"
             class="mb-3"
+            no-data-text="No workers found — check department member setup"
+            :hint="!workers.length ? 'No workers loaded for this department' : 'Required for publishing'"
+            persistent-hint
           >
             <template #item="{ item, props: iProps }">
               <v-list-item v-bind="iProps">

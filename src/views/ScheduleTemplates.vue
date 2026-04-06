@@ -89,6 +89,7 @@
                 v-for="(s, i) in tmpl.templateShifts.slice(0, 4)"
                 :key="i"
                 class="shift-row text-body-2 d-flex align-center"
+                :class="{ 'shift-row--unassigned': !s.assigned_user_id }"
               >
                 <!-- Coverage / conflict indicator -->
                 <v-icon
@@ -407,12 +408,17 @@
                 @update:modelValue="loadPublishConflicts"
               />
             </v-col>
-            <v-col cols="12" md="6" class="d-flex align-center">
+            <v-col cols="12" md="6">
               <v-checkbox
                 v-model="publishForm.publish_immediately"
                 label="Publish immediately & notify workers"
                 hide-details
               />
+              <p class="text-caption text-medium-emphasis ml-8 mt-n1">
+                {{ publishForm.publish_immediately
+                  ? 'Shifts will be visible to student workers immediately.'
+                  : 'Shifts will be saved as drafts — students will not see them until you publish manually.' }}
+              </p>
             </v-col>
           </v-row>
 
@@ -474,7 +480,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import templateService from '../services/templateService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
@@ -525,7 +531,7 @@ const form = ref({
 
 const publishForm = ref({
   start_date: '',
-  publish_immediately: false,
+  publish_immediately: true,
 })
 
 // ─── Reference data ───────────────────────────────────────────────────────────
@@ -636,12 +642,21 @@ const loadTemplates = async () => {
 
 const loadDeptData = async () => {
   if (!currentDeptId.value) return
+
+  // ── Positions ─────────────────────────────────────────────────────────────
   try {
-    const [posRes, usersRes] = await Promise.all([
-      apiClient.get(`positions?department_id=${currentDeptId.value}`),
-      apiClient.get(`user-departments/admin/users-with-roles?activeOnly=true`),
-    ])
+    const posRes = await apiClient.get(`positions?department_id=${currentDeptId.value}`)
     positions.value = posRes?.data?.data || posRes?.data || []
+  } catch (err) {
+    console.error('Error loading positions:', err)
+    positions.value = []
+  }
+
+  // ── Workers ───────────────────────────────────────────────────────────────
+  // Try the admin users-with-roles endpoint first; fall back to the
+  // department-members endpoint if it returns nothing usable.
+  try {
+    const usersRes = await apiClient.get('user-departments/admin/users-with-roles?activeOnly=true')
 
     // Normalize workers to the shape expected by TemplateCalendarEditor:
     // { user_id, user: { fName, lName, email } }
@@ -649,13 +664,17 @@ const loadDeptData = async () => {
     const targetDepartmentId = Number(currentDeptId.value)
 
     const departmentWorkers = []
-    for (const user of users) {
-      const memberships = Array.isArray(user?.userDepartments) ? user.userDepartments : []
+    for (const u of users) {
+      // Each user object may carry its department memberships in several shapes
+      const memberships = Array.isArray(u?.userDepartments) ? u.userDepartments
+        : Array.isArray(u?.departments) ? u.departments
+        : []
       const deptMembership = memberships.find((membership) => {
         const deptId = Number(
           membership?.department_id ??
           membership?.department?.department_id ??
-          membership?.departmentId
+          membership?.departmentId ??
+          0
         )
         return deptId === targetDepartmentId
       })
@@ -669,25 +688,54 @@ const loadDeptData = async () => {
       const permissionLevel = Number(
         deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
       )
+      // Include students and any role with permission_level < 50 (non-manager)
       const isStudentRole = roleName.includes('student') || permissionLevel < 50
       if (!isStudentRole) continue
 
-      const userId = user?.userId || user?.id || user?.user_id
+      const userId = u?.userId || u?.id || u?.user_id
       if (!userId) continue
 
       departmentWorkers.push({
         user_id: userId,
         user: {
-          fName: user?.fName || '',
-          lName: user?.lName || '',
-          email: user?.email || '',
+          fName: u?.fName || '',
+          lName: u?.lName || '',
+          email: u?.email || '',
         },
       })
     }
 
-    deptWorkers.value = departmentWorkers
+    // If the primary endpoint returned users but none matched the department,
+    // fall through to the department-members fallback.
+    if (departmentWorkers.length > 0) {
+      deptWorkers.value = departmentWorkers
+      return
+    }
   } catch (err) {
-    console.error('Error loading department data:', err)
+    console.error('Primary worker endpoint failed, trying fallback:', err)
+  }
+
+  // Fallback: department-scoped member list
+  try {
+    const membersRes = await apiClient.get(`admin/departments/${currentDeptId.value}/members`)
+    const members = membersRes?.data?.data || membersRes?.data || []
+    deptWorkers.value = members
+      .filter((m) => {
+        const roleName = String(m?.role?.role_name || m?.role_name || '').toLowerCase()
+        const permLevel = Number(m?.role?.permission_level ?? m?.permission_level ?? 0)
+        return roleName.includes('student') || permLevel < 50
+      })
+      .map((m) => {
+        const u = m.user || m
+        return {
+          user_id: u?.userId || u?.id || u?.user_id,
+          user: { fName: u?.fName || '', lName: u?.lName || '', email: u?.email || '' },
+        }
+      })
+      .filter((w) => w.user_id)
+  } catch (err) {
+    console.error('Error loading department workers:', err)
+    deptWorkers.value = []
   }
 }
 
@@ -813,7 +861,7 @@ const confirmDuplicate = async () => {
 const openPublishDialog = (tmpl) => {
   publishTarget.value = tmpl
   publishConflicts.value = []
-  publishForm.value = { start_date: '', publish_immediately: false }
+  publishForm.value = { start_date: '', publish_immediately: true }
   showPublishDialog.value = true
 }
 
@@ -885,11 +933,36 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
 
+// ─── Sidebar context listener ────────────────────────────────────────────────
+// If ManagerSidebar resolves the department context after this page has already
+// mounted, pick it up via the custom event instead of showing "No department".
+const onDeptContextReady = (e) => {
+  const ctx = e.detail
+  if (ctx?.department_id && !currentDeptId.value) {
+    currentDeptId.value = ctx.department_id
+    currentDeptName.value = ctx.department_name || ''
+    loadTemplates()
+    loadDeptData()
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('departmentContextReady', onDeptContextReady)
+
   // If the manager sidebar hasn't set the context yet (e.g. first login or
   // localStorage was cleared), resolve it now via the API so this page works
   // without needing a second navigation.
+  if (!currentDeptId.value) {
+    // First, re-check localStorage — the sidebar may have written it between
+    // our initial read (top of <script setup>) and this onMounted callback.
+    const freshCtx = Utils.getStore('currentDepartmentContext')
+    if (freshCtx?.department_id) {
+      currentDeptId.value = freshCtx.department_id
+      currentDeptName.value = freshCtx.department_name || ''
+    }
+  }
+
   if (!currentDeptId.value) {
     const userId = currentUser?.userId || currentUser?.id
     if (userId) {
@@ -921,6 +994,10 @@ onMounted(async () => {
   loadTemplates()
   loadDeptData()
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('departmentContextReady', onDeptContextReady)
+})
 </script>
 
 <style scoped>
@@ -937,6 +1014,12 @@ onMounted(async () => {
 }
 .shift-row {
   color: #555;
+}
+.shift-row--unassigned {
+  background-color: #fff3e0;
+  border-left: 3px solid #F57C00;
+  padding-left: 4px;
+  border-radius: 2px;
 }
 .gap-2 {
   gap: 8px;

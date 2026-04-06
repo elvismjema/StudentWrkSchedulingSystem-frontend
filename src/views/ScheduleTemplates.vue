@@ -637,14 +637,55 @@ const loadTemplates = async () => {
 const loadDeptData = async () => {
   if (!currentDeptId.value) return
   try {
-    const [posRes, workerRes] = await Promise.all([
+    const [posRes, usersRes] = await Promise.all([
       apiClient.get(`positions?department_id=${currentDeptId.value}`),
-      apiClient.get(`admin/departments/${currentDeptId.value}/members`),
+      apiClient.get(`user-departments/admin/users-with-roles?activeOnly=true`),
     ])
     positions.value = posRes?.data?.data || posRes?.data || []
-    const members = workerRes?.data?.data || workerRes?.data || []
-    // Filter to active members with user data
-    deptWorkers.value = members.filter((m) => m.is_active && m.user)
+
+    // Normalize workers to the shape expected by TemplateCalendarEditor:
+    // { user_id, user: { fName, lName, email } }
+    const users = usersRes?.data?.data || usersRes?.data || []
+    const targetDepartmentId = Number(currentDeptId.value)
+
+    const departmentWorkers = []
+    for (const user of users) {
+      const memberships = Array.isArray(user?.userDepartments) ? user.userDepartments : []
+      const deptMembership = memberships.find((membership) => {
+        const deptId = Number(
+          membership?.department_id ??
+          membership?.department?.department_id ??
+          membership?.departmentId
+        )
+        return deptId === targetDepartmentId
+      })
+
+      if (!deptMembership) continue
+      if (deptMembership?.is_active === false) continue
+
+      const roleName = String(
+        deptMembership?.role?.role_name || deptMembership?.role_name || ''
+      ).toLowerCase()
+      const permissionLevel = Number(
+        deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
+      )
+      const isStudentRole = roleName.includes('student') || permissionLevel < 50
+      if (!isStudentRole) continue
+
+      const userId = user?.userId || user?.id || user?.user_id
+      if (!userId) continue
+
+      departmentWorkers.push({
+        user_id: userId,
+        user: {
+          fName: user?.fName || '',
+          lName: user?.lName || '',
+          email: user?.email || '',
+        },
+      })
+    }
+
+    deptWorkers.value = departmentWorkers
   } catch (err) {
     console.error('Error loading department data:', err)
   }

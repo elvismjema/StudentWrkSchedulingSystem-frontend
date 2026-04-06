@@ -23,4 +23,18 @@ export default class Utils {
       ? false
       : true;
   };
+
+  static resolveAppUrl = (target = "") => {
+    if (!target) {
+      return import.meta.env.BASE_URL || "/";
+    }
+
+    if (/^(https?:)?\/\//i.test(target)) {
+      return target;
+    }
+
+    const baseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+    const normalizedTarget = target.startsWith("/") ? target.slice(1) : target;
+    return new URL(normalizedTarget, baseUrl).toString();
+  };
 }

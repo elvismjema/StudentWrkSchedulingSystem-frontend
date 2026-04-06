@@ -53,44 +53,325 @@
       <button @click="clearAll" class="clear-all-btn">
         CLEAR ALL
       </button>
+
+    <!-- Header -->
+    <div class="page-header">
+      <h1 class="page-title">My Availability</h1>
+      <p class="page-subtitle">
+        Click on time slots to mark when you're available or unavailable to work.
+      </p>
     </div>
-    
-    <div v-if="successMessage" class="success-message">
-      {{ successMessage }}
+
+    <!-- Mode Toggle + Action Buttons -->
+    <div class="action-buttons">
+      <v-btn-toggle v-model="gridMode" mandatory color="#0D9488" rounded="lg" density="comfortable">
+        <v-btn value="available" prepend-icon="mdi-calendar-check">
+          Mark Available
+        </v-btn>
+        <v-btn value="unavailable" prepend-icon="mdi-calendar-remove" color="error">
+          Mark Unavailable
+        </v-btn>
+      </v-btn-toggle>
+      <v-spacer />
+      <v-btn
+        color="#0D9488"
+        variant="flat"
+        :loading="saving"
+        :disabled="!hasChanges"
+        @click="saveChanges"
+      >
+        Save Changes
+      </v-btn>
+      <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
+
     </div>
-    
-    <div v-if="errorMessage" class="error-message">
-      {{ errorMessage }}
+
+    <!-- Loading Indicator -->
+    <v-progress-linear v-if="loading" indeterminate color="#8B1538" class="mb-4" />
+
+    <!-- Weekly Grid -->
+    <div class="grid-card">
+      <table class="availability-grid">
+        <thead>
+          <tr>
+            <th class="time-header">Time</th>
+            <th v-for="day in days" :key="day.value" class="day-header">{{ day.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="hour in timeSlots" :key="hour.value">
+            <td class="time-cell">{{ hour.label }}</td>
+            <td
+              v-for="day in days"
+              :key="`${day.value}-${hour.value}`"
+              class="slot-cell"
+              :class="{
+                'available': isAvailable(day.value, hour.value),
+                'unavailable-slot': isUnavailable(day.value, hour.value),
+                disabled: hour.disabled
+              }"
+              @click="hour.disabled ? null : openTimeRangeDialog(day, hour.value)"
+            />
+          </tr>
+        </tbody>
+      </table>
     </div>
+
+    <!-- Time Range Dialog -->
+    <v-dialog v-model="showTimeRangeDialog" max-width="420">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-clock-outline" class="mr-2" />
+          {{ gridMode === 'available' ? 'Set Availability' : 'Set Unavailability' }} — {{ timeRangeForm.dayLabel }}
+        </v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey mb-4">
+            Choose the time range you are
+            <strong>{{ gridMode === 'available' ? 'available' : 'unavailable' }}</strong>
+            on <strong>{{ timeRangeForm.dayLabel }}</strong>.
+          </p>
+          <v-row>
+            <v-col cols="6">
+              <v-text-field
+                v-model="timeRangeForm.startTime"
+                type="time"
+                label="Start Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field
+                v-model="timeRangeForm.endTime"
+                type="time"
+                label="End Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+          <p v-if="timeRangeForm.startTime && timeRangeForm.endTime" class="text-body-2 mt-1">
+            <v-icon icon="mdi-check-circle" color="#0D9488" size="16" class="mr-1" />
+            {{ formatTimeLabel(timeRangeForm.startTime) }} – {{ formatTimeLabel(timeRangeForm.endTime) }}
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" color="error" @click="clearDaySlots">Clear Day</v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showTimeRangeDialog = false">Cancel</v-btn>
+          <v-btn color="#0D9488" variant="flat" @click="applyTimeRange">Apply</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Time Off Requests (formerly Availability Exceptions) -->
+    <div class="exceptions-section">
+      <h2 class="exceptions-title">Time Off Requests</h2>
+      <p class="exceptions-subtitle">
+        Request specific dates when you are unavailable — your manager will review and approve.
+      </p>
+
+      <!-- Existing exceptions list -->
+      <div v-if="exceptions.length" class="exceptions-list">
+        <v-card
+          v-for="exc in exceptions"
+          :key="exc.id"
+          variant="outlined"
+          class="exception-card"
+        >
+          <v-card-text class="d-flex align-center justify-space-between pa-3">
+            <div>
+              <strong>{{ formatDate(exc.specificDate) }}</strong>
+              <span class="ml-2 text-grey">
+                {{ formatTimeLabel(exc.startTime) }} – {{ formatTimeLabel(exc.endTime) }}
+              </span>
+              <v-chip size="x-small" class="ml-2" :color="exc.availabilityType === 'unavailable' ? 'error' : 'success'" variant="tonal">
+                {{ exc.availabilityType }}
+              </v-chip>
+            </div>
+            <v-btn icon="mdi-close" size="small" variant="text" color="error" @click="removeException(exc)" />
+          </v-card-text>
+        </v-card>
+      </div>
+
+      <v-btn variant="outlined" size="small" class="mt-3" prepend-icon="mdi-calendar-plus" @click="showExceptionDialog = true">
+        Request Time Off
+      </v-btn>
+    </div>
+
+    <!-- Exception Dialog -->
+    <v-dialog v-model="showExceptionDialog" max-width="480">
+      <v-card>
+        <v-card-title>Request Time Off</v-card-title>
+        <v-card-text>
+          <v-form ref="exceptionFormRef" v-model="exceptionFormValid">
+            <v-text-field
+              v-model="exceptionForm.specificDate"
+              type="date"
+              label="Date"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
+              :rules="[requiredRule]"
+            />
+            <v-row>
+              <v-col cols="6">
+                <v-text-field
+                  v-model="exceptionForm.startTime"
+                  type="time"
+                  label="Start Time"
+                  variant="outlined"
+                  density="comfortable"
+                  :rules="[requiredRule]"
+                />
+              </v-col>
+              <v-col cols="6">
+                <v-text-field
+                  v-model="exceptionForm.endTime"
+                  type="time"
+                  label="End Time"
+                  variant="outlined"
+                  density="comfortable"
+                  :rules="[requiredRule]"
+                />
+              </v-col>
+            </v-row>
+            <v-select
+              v-model="exceptionForm.availabilityType"
+              :items="['available', 'unavailable']"
+              label="Type"
+              variant="outlined"
+              density="comfortable"
+            />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showExceptionDialog = false">Cancel</v-btn>
+          <v-btn color="#0D9488" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
+      {{ snackbar.text }}
+    </v-snackbar>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
 
+import { computed, onMounted, ref } from "vue";
+import Utils from "../config/utils.js";
+import availabilityService from "../services/availabilityService.js";
+
+const currentUser = Utils.getStore("user") || {};
+const userId = currentUser.userId || currentUser.id;
+
+// --- State ---
+const loading = ref(false);
+const saving = ref(false);
+const savingException = ref(false);
+const gridMode = ref('available'); // 'available' | 'unavailable'
+const selectedSlots = ref(new Set()); // available (green)
+const unavailableSlots = ref(new Set()); // unavailable (red)
+const initialSlots = ref(new Set());
+const initialUnavailableSlots = ref(new Set());
+const existingRecords = ref([]);
+const showExceptionDialog = ref(false);
+const exceptionFormRef = ref(null);
+const exceptionFormValid = ref(false);
+const snackbar = ref({ show: false, text: "", color: "success" });
+const showTimeRangeDialog = ref(false);
+const timeRangeForm = ref({ dayValue: null, dayLabel: "", startTime: "", endTime: "" });
+
+// --- Days and Time Slots ---
 const days = [
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-  { value: 0, label: 'Sunday' }
-]
+  { label: "Mon", value: 1 },
+  { label: "Tue", value: 2 },
+  { label: "Wed", value: 3 },
+  { label: "Thu", value: 4 },
+  { label: "Fri", value: 5 },
+  { label: "Sat", value: 6 },
+  { label: "Sun", value: 0 },
+];
 
-const generateTimeSlots = () => {
-  const slots = []
-  for (let hour = 0; hour < 24; hour++) {
-    const timeStr = hour.toString().padStart(2, '0') + ':00'
-    const label = hour === 0 ? '12:00 AM' : 
-                  hour < 12 ? `${hour}:00 AM` :
-                  hour === 12 ? '12:00 PM' :
-                  `${hour - 12}:00 PM`
-    slots.push({ time: timeStr, label, hour })
-  }
-  return slots
+const timeSlots = [];
+for (let h = 6; h <= 24; h++) {
+  const normalizedHour = h === 24 ? 0 : h;
+  const period = normalizedHour >= 12 ? "PM" : "AM";
+  const display = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour;
+  timeSlots.push({ label: `${display}:00 ${period}`, value: h, disabled: h === 24 });
 }
+
+// --- Exception Form ---
+const exceptionForm = ref({
+  specificDate: "",
+  startTime: "",
+  endTime: "",
+  availabilityType: "unavailable",
+});
+
+const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
+
+// --- Computed ---
+const hasChanges = computed(() => {
+  if (selectedSlots.value.size !== initialSlots.value.size) return true;
+  for (const key of selectedSlots.value) {
+    if (!initialSlots.value.has(key)) return true;
+  }
+  if (unavailableSlots.value.size !== initialUnavailableSlots.value.size) return true;
+  for (const key of unavailableSlots.value) {
+    if (!initialUnavailableSlots.value.has(key)) return true;
+  }
+  return false;
+});
+
+const exceptions = computed(() =>
+  existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
+);
+
+// --- Helpers ---
+const slotKey = (day, hour) => `${day}-${hour}`;
+
+const isAvailable = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
+const isUnavailable = (day, hour) => unavailableSlots.value.has(slotKey(day, hour));
+
+const notify = (text, color = "success") => {
+  snackbar.value = { show: true, text, color };
+};
+
+const formatTimeLabel = (value) => {
+  if (!value) return "";
+  const [hStr, mStr] = String(value).split(":");
+  const h = parseInt(hStr, 10);
+  const period = h >= 12 ? "PM" : "AM";
+  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${display}:${mStr} ${period}`;
+};
+
+const formatDate = (value) => {
+  if (!value) return "";
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const pad = (n) => String(n).padStart(2, "0");
+
+// --- Grid Interactions ---
+const openTimeRangeDialog = (day, hour) => {
+  const existingHours = [];
+  for (const key of selectedSlots.value) {
+    const [d, h] = key.split("-").map(Number);
+    if (d === day.value) existingHours.push(h);
+  }
+  existingHours.sort((a, b) => a - b);
 
 const timeSlots = ref(generateTimeSlots())
 const selectedSlots = ref(new Set())
@@ -115,52 +396,55 @@ const isSlotUnavailable = (day, time) => {
   return unavailableSlots.value.has(`${day}-${time}`)
 }
 
-const isSlotSelecting = (day, time) => {
-  return currentSelection.value.has(`${day}-${time}`)
-}
-
-const startSelection = (day, time) => {
-  isSelecting.value = true
-  selectionStart.value = { day, time }
-  currentSelection.value.clear()
-  currentSelection.value.add(`${day}-${time}`)
-  
-  document.addEventListener('mouseup', endSelection)
-}
-
-const continueSelection = (day, time) => {
-  if (!isSelecting.value || !selectionStart.value) return
-  
-  const startDay = selectionStart.value.day
-  const startTime = selectionStart.value.time
-  
-  currentSelection.value.clear()
-  
-  const minDay = Math.min(startDay, day)
-  const maxDay = Math.max(startDay, day)
-  
-  const startHour = parseInt(startTime.split(':')[0])
-  const endHour = parseInt(time.split(':')[0])
-  const minHour = Math.min(startHour, endHour)
-  const maxHour = Math.max(startHour, endHour)
-  
-  for (let d = minDay; d <= maxDay; d++) {
-    for (let h = minHour; h <= maxHour; h++) {
-      const timeStr = h.toString().padStart(2, '0') + ':00'
-      currentSelection.value.add(`${d}-${timeStr}`)
-    }
+  let startH = hour;
+  let endH = hour + 1;
+  if (existingHours.length > 0) {
+    startH = existingHours[0];
+    endH = existingHours[existingHours.length - 1] + 1;
   }
-}
+
+
+  timeRangeForm.value = {
+    dayValue: day.value,
+    dayLabel: days.find((d) => d.value === day.value)?.label || "",
+    startTime: `${pad(startH)}:00`,
+    endTime: `${pad(endH)}:00`,
+  };
+  showTimeRangeDialog.value = true;
+};
+
+const applyTimeRange = () => {
+  const { dayValue, startTime, endTime } = timeRangeForm.value;
+  if (!startTime || !endTime) return;
+
+  const startH = parseInt(startTime.split(":")[0], 10);
+  const startM = parseInt(startTime.split(":")[1], 10);
+  const endH = parseInt(endTime.split(":")[0], 10);
+  const endM = parseInt(endTime.split(":")[1], 10);
+
+  if (startH > endH || (startH === endH && startM >= endM)) {
+    notify("End time must be after start time.", "error");
+    return;
+  }
+
+  const targetSet = gridMode.value === 'available' ? selectedSlots : unavailableSlots;
+  const otherSet = gridMode.value === 'available' ? unavailableSlots : selectedSlots;
+
+  const updated = new Set(targetSet.value);
+  const updatedOther = new Set(otherSet.value);
+
 
 const endSelection = () => {
   if (isSelecting.value) {
     // Keep currentSelection for marking operations
+
+  // Clear existing slots for this day in both sets
+  for (const key of [...updated]) {
+    if (key.startsWith(`${dayValue}-`)) updated.delete(key);
   }
-  
-  isSelecting.value = false
-  selectionStart.value = null
-  document.removeEventListener('mouseup', endSelection)
-}
+  for (const key of [...updatedOther]) {
+    if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
+  }
 
 const markAsAvailable = () => {
   currentSelection.value.forEach(slot => {
@@ -214,13 +498,77 @@ const hasChanges = computed(() => {
   if (unavailableSlots.value.size !== existingUnavailable.size) return true
   for (const slot of unavailableSlots.value) {
     if (!existingUnavailable.has(slot)) return true
-  }
-  
-  return false
-})
 
-const saveAvailability = async () => {
+  // Fill slots for the range (round to full hours)
+  const effectiveStart = startH;
+  const effectiveEnd = endM > 0 ? endH + 1 : endH;
+  for (let h = effectiveStart; h < effectiveEnd && h <= 24; h++) {
+    if (h >= 6) updated.add(slotKey(dayValue, h));
+  }
+
+  targetSet.value = updated;
+  otherSet.value = updatedOther;
+  showTimeRangeDialog.value = false;
+};
+
+const clearDaySlots = () => {
+  const { dayValue } = timeRangeForm.value;
+  const updatedAvail = new Set(selectedSlots.value);
+  const updatedUnavail = new Set(unavailableSlots.value);
+  for (const key of [...updatedAvail]) {
+    if (key.startsWith(`${dayValue}-`)) updatedAvail.delete(key);
+  }
+  for (const key of [...updatedUnavail]) {
+    if (key.startsWith(`${dayValue}-`)) updatedUnavail.delete(key);
+  }
+  selectedSlots.value = updatedAvail;
+  unavailableSlots.value = updatedUnavail;
+  showTimeRangeDialog.value = false;
+};
+
+const clearAll = () => {
+  selectedSlots.value = new Set();
+  unavailableSlots.value = new Set();
+};
+
+// --- API ---
+const loadAvailabilities = async () => {
+  if (!userId) return;
+  loading.value = true;
   try {
+    const response = await availabilityService.listForUser(userId);
+    const records = response.data || [];
+    existingRecords.value = records;
+
+    const availSlots = new Set();
+    const unavailSlots = new Set();
+    for (const rec of records) {
+      if (rec.specificDate && !rec.isRecurring) continue;
+      if (rec.dayOfWeek == null) continue;
+      const startHour = parseInt(String(rec.startTime).split(":")[0], 10);
+      const endHour = parseInt(String(rec.endTime).split(":")[0], 10);
+      const targetSet = rec.availabilityType === 'unavailable' ? unavailSlots : availSlots;
+      for (let h = startHour; h < endHour; h++) {
+        targetSet.add(slotKey(rec.dayOfWeek, h));
+      }
+    }
+    selectedSlots.value = new Set(availSlots);
+    unavailableSlots.value = new Set(unavailSlots);
+    initialSlots.value = new Set(availSlots);
+    initialUnavailableSlots.value = new Set(unavailSlots);
+  } catch (error) {
+    notify(error?.response?.data?.message || "Failed to load availability.", "error");
+  } finally {
+    loading.value = false;
+
+  }
+};
+
+const saveChanges = async () => {
+  if (!userId) return;
+  saving.value = true;
+  try {
+
     successMessage.value = ''
     errorMessage.value = ''
     
@@ -287,23 +635,71 @@ const saveAvailability = async () => {
       successMessage.value = ''
     }, 3000)
     
+
+    const recurringRecords = existingRecords.value.filter(
+      (r) => !r.specificDate || r.isRecurring
+    );
+    for (const rec of recurringRecords) {
+      await availabilityService.remove(rec.id);
+    }
+
+    const buildRanges = (slotsSet, type) => {
+      const slotsByDay = {};
+      for (const key of slotsSet) {
+        const [day, hour] = key.split("-").map(Number);
+        if (!slotsByDay[day]) slotsByDay[day] = [];
+        slotsByDay[day].push(hour);
+      }
+      const payloads = [];
+      for (const [day, hours] of Object.entries(slotsByDay)) {
+        hours.sort((a, b) => a - b);
+        let start = hours[0];
+        let end = hours[0];
+        for (let i = 1; i < hours.length; i++) {
+          if (hours[i] === end + 1) {
+            end = hours[i];
+          } else {
+            payloads.push({ day, start, end: end + 1 });
+            start = hours[i];
+            end = hours[i];
+          }
+        }
+        payloads.push({ day, start, end: end + 1 });
+      }
+      return payloads.map(({ day, start, end }) =>
+        availabilityService.create({
+          userId,
+          dayOfWeek: parseInt(day, 10),
+          startTime: `${pad(start)}:00`,
+          endTime: `${pad(end)}:00`,
+          availabilityType: type,
+          isRecurring: true,
+        })
+      );
+    };
+
+    await Promise.all([
+      ...buildRanges(selectedSlots.value, 'available'),
+      ...buildRanges(unavailableSlots.value, 'unavailable'),
+    ]);
+
+    notify("Availability saved successfully.");
+    await loadAvailabilities();
+
   } catch (error) {
-    console.error('Error saving availability:', error)
-    errorMessage.value = 'Error saving availability. Please try again.'
-    
-    setTimeout(() => {
-      errorMessage.value = ''
-    }, 5000)
+    notify(error?.response?.data?.message || "Failed to save availability.", "error");
+  } finally {
+    saving.value = false;
   }
-}
+};
 
-const getCurrentUserId = () => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
-  return user.id || 1
-}
+const saveException = async () => {
+  const valid = await exceptionFormRef.value?.validate();
+  if (!valid?.valid) return;
 
-const loadExistingAvailability = async () => {
+  savingException.value = true;
   try {
+
     const userId = getCurrentUserId()
     const response = await axios.get(`/api/availability/user/${userId}`)
     existingAvailability.value = response.data
@@ -325,115 +721,131 @@ const loadExistingAvailability = async () => {
       }
     })
     
-  } catch (error) {
-    console.error('Error loading availability:', error)
-  }
-}
 
-onMounted(() => {
-  loadExistingAvailability()
-})
+    await availabilityService.create({
+      userId,
+      startTime: exceptionForm.value.startTime,
+      endTime: exceptionForm.value.endTime,
+      availabilityType: exceptionForm.value.availabilityType,
+      specificDate: exceptionForm.value.specificDate,
+      isRecurring: false,
+    });
+    notify("Exception added.");
+    showExceptionDialog.value = false;
+    exceptionForm.value = { specificDate: "", startTime: "", endTime: "", availabilityType: "unavailable" };
+    await loadAvailabilities();
+
+  } catch (error) {
+    notify(error?.response?.data?.message || "Failed to add exception.", "error");
+  } finally {
+    savingException.value = false;
+  }
+};
+
+const removeException = async (exc) => {
+  try {
+    await availabilityService.remove(exc.id);
+    notify("Exception removed.");
+    await loadAvailabilities();
+  } catch (error) {
+    notify(error?.response?.data?.message || "Failed to remove exception.", "error");
+  }
+};
+
+onMounted(loadAvailabilities);
+
 </script>
 
 <style scoped>
 .availability-container {
   padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
-h1 {
+.page-header {
+  margin-bottom: 16px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
   color: #333;
-  margin-bottom: 24px;
-  text-align: center;
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.grid-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  margin-bottom: 32px;
 }
 
 .availability-grid {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: auto;
-  margin-bottom: 24px;
-}
-
-.time-slots-header {
-  display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
-  background: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.day-label {
-  padding: 12px 8px;
-  text-align: center;
-  font-weight: 600;
-  color: #495057;
-  border-right: 1px solid #dee2e6;
-  font-size: 14px;
-}
-
-.day-label:first-child {
-  background: #e9ecef;
-  font-weight: 700;
-}
-
-.time-slots-grid {
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.time-row {
-  display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
-  border-bottom: 1px solid #f1f3f4;
-}
-
-.time-row:hover {
-  background: #f8f9fa;
-}
-
-.time-label {
-  padding: 8px;
-  text-align: center;
-  font-size: 12px;
-  color: #6c757d;
-  border-right: 1px solid #dee2e6;
-  background: #f8f9fa;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.time-slot {
-  border-right: 1px solid #e9ecef;
-  border-bottom: 1px solid #e9ecef;
-  cursor: pointer;
+  width: 100%;
+  border-collapse: collapse;
   user-select: none;
-  transition: all 0.2s ease;
-  min-height: 40px;
-  position: relative;
 }
 
-.time-slot:hover {
-  background: #e3f2fd;
+.availability-grid th,
+.availability-grid td {
+  border: 1px solid #e8e8e8;
+  text-align: center;
 }
 
-.time-slot.selected {
-  background: #2196f3;
+.time-header {
+  width: 100px;
+  padding: 14px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  background: #fafafa;
 }
 
-.time-slot.selected:hover {
-  background: #1976d2;
+.day-header {
+  padding: 14px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #fafafa;
 }
 
-.time-slot.selecting {
-  background: #64b5f6;
-  opacity: 0.7;
+.time-cell {
+  padding: 10px 8px;
+  font-size: 12px;
+  color: #666;
+  background: #fafafa;
+  white-space: nowrap;
+  width: 100px;
 }
+
 
 .time-slot.available {
   background: #4caf50;
@@ -503,17 +915,29 @@ h1 {
   border-color: #bbb;
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.slot-cell {
+  height: 44px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  background-color: white;
 }
 
-.save-btn {
-  background: #28a745;
-  color: white;
+.slot-cell.disabled {
+  cursor: default;
+  background-color: #fafafa;
 }
 
-.save-btn:hover:not(:disabled) {
-  background: #218838;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+.slot-cell:hover {
+  background-color: #e0f2f1;
+
+}
+
+.slot-cell.disabled:hover {
+  background-color: #fafafa;
+}
+
+.slot-cell.available {
+  background-color: #0D9488;
 }
 
 .save-btn:disabled, .mark-available-btn:disabled, .mark-unavailable-btn:disabled {
@@ -535,64 +959,45 @@ h1 {
   border-color: #bbb;
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  
+.slot-cell.available:hover {
+  background-color: #0f766e;
 }
 
-.success-message, .error-message {
-  padding: 12px 16px;
-  border-radius: 6px;
-  text-align: center;
-  font-weight: 500;
-  margin-bottom: 16px;
-  animation: slideIn 0.3s ease;
+.slot-cell.unavailable-slot {
+  background-color: #ef5350;
 }
 
-.success-message {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+.slot-cell.unavailable-slot:hover {
+  background-color: #c62828;
 }
 
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+/* Exceptions Section */
+.exceptions-section {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 24px;
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.exceptions-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 6px 0;
 }
 
-@media (max-width: 768px) {
-  .availability-container {
-    padding: 16px;
-  }
-  
-  .time-slots-header {
-    grid-template-columns: 60px repeat(7, 1fr);
-  }
-  
-  .time-row {
-    grid-template-columns: 60px repeat(7, 1fr);
-  }
-  
-  .day-label, .time-label {
-    font-size: 11px;
-    padding: 6px 4px;
-  }
-  
-  .time-slot {
-    min-height: 30px;
-  }
-  
-  .slot-content {
-    min-height: 30px;
-  }
+.exceptions-subtitle {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 12px 0;
+}
+
+.exceptions-list {
+  margin-bottom: 8px;
+}
+
+.exception-card {
+  margin-bottom: 8px;
 }
 </style>

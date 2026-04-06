@@ -14,8 +14,7 @@
           OC
         </div>
         <div v-if="!rail" class="logo-text">
-          <div class="main-title">Oklahoma Christian</div>
-          <div class="sub-title">Student Worker Scheduling</div>
+          <div class="main-title">{{ bannerTitle }}</div>
         </div>
       </div>
     </div>
@@ -48,13 +47,8 @@
             </v-avatar>
           </template>
           <div v-if="!rail" class="user-info">
-
-            <div class="user-name">User</div>
-            <div class="user-role">{{ isManagerRoute ? 'Manager' : 'Student' }}</div>
-
             <div class="user-name">{{ displayName }}</div>
             <div class="user-role">{{ displayRole }}</div>
-
           </div>
         </v-list-item>
       </div>
@@ -63,14 +57,24 @@
 </template>
 
 <script setup>
+
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+
+import { computed, onMounted, ref } from 'vue'
+
 import Utils from '../config/utils'
+import UserRoleServices from '../services/userRoleServices.js'
 
 const drawer = ref(true)
+
 const rail = ref(false)
 const route = useRoute()
+
+const rail = ref(true)
+
 const user = ref(Utils.getStore("user") || {})
+const resolvedDepartmentName = ref('')
 
 const displayName = computed(() => {
   const first = user.value?.fName || ''
@@ -84,34 +88,56 @@ const displayRole = computed(() => {
   return role === 'manager' ? 'Manager' : 'Student'
 })
 
+const bannerTitle = computed(() => {
+  if (resolvedDepartmentName.value) return resolvedDepartmentName.value
+
+  const context = Utils.getStore('currentDepartmentContext')
+  if (context?.department_name) return context.department_name
+
+  const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name
+  return membershipDepartment || user.value?.department_name || 'Department'
+})
+
 const displayInitial = computed(() => {
   const first = user.value?.fName?.[0] || ''
   const last = user.value?.lName?.[0] || ''
   return `${first}${last}`.toUpperCase() || 'U'
 })
 
-
-// Check if we're on a manager route
-const isManagerRoute = computed(() => route.path.startsWith('/manager'))
-
-const studentNavItems = [
+const navItems = [
   { title: 'My Schedule', icon: 'mdi-home', route: '/student/schedule' },
-  { title: 'Departments', icon: 'mdi-domain', route: '/student/departments' },
   { title: 'Availability', icon: 'mdi-calendar', route: '/student/availability' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board' },
-  { title: 'Clock In/Out', icon: 'mdi-clock', route: '/student/clock' },
   { title: 'Notifications', icon: 'mdi-bell', route: '/student/notifications' }
 ]
 
-const managerNavItems = [
-  { title: 'Dashboard', icon: 'mdi-view-dashboard', route: '/manager' },
-  { title: 'Student Qualifications', icon: 'mdi-account-check', route: '/manager/qualifications' },
-  { title: 'Shift Management', icon: 'mdi-calendar-clock', route: '/manager/shifts' },
-  { title: 'Reports', icon: 'mdi-chart-bar', route: '/manager/reports' }
-]
+onMounted(async () => {
+  const context = Utils.getStore('currentDepartmentContext')
+  if (context?.department_name) {
+    resolvedDepartmentName.value = context.department_name
+    return
+  }
 
-const navItems = computed(() => {
-  return isManagerRoute.value ? managerNavItems : studentNavItems
+  const userId = user.value?.userId || user.value?.id
+  if (!userId) return
+
+  try {
+    const response = await UserRoleServices.getUserDepartments(userId)
+    const memberships = response?.data || []
+    const activeMembership = memberships.find((membership) => membership.is_active) || memberships[0]
+    const departmentName = activeMembership?.department?.department_name
+    if (!departmentName) return
+
+    resolvedDepartmentName.value = departmentName
+    Utils.setStore('currentDepartmentContext', {
+      department_id: activeMembership.department_id,
+      department_name: departmentName,
+      role_name: activeMembership.role?.role_name || 'Student',
+      role_id: activeMembership.role_id,
+    })
+  } catch (err) {
+    // Keep existing fallback behavior when department context request fails.
+  }
 })
 
 defineExpose({

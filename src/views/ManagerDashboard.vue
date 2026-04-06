@@ -1,344 +1,457 @@
 <template>
-  <div class="manager-dashboard">
-    <div class="dashboard-top">
-      <div>
-        <h1 class="dashboard-title">Dashboard</h1>
-        <p class="dashboard-date">{{ todayLabel }}</p>
+  <div class="dashboard-page">
+    <section class="page-header">
+      <div class="header-text">
+        <h1 class="page-title">{{ managerHeading }}</h1>
+        <p class="page-subtitle">{{ todayLabel }}</p>
       </div>
-
-      <div class="dashboard-actions">
-        <v-btn class="create-shift-btn" size="x-large" prepend-icon="mdi-plus">
+      <div class="header-actions">
+        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="openCreateShiftDialog">
           Create Shift
         </v-btn>
-        <v-btn class="export-btn" size="x-large" prepend-icon="mdi-file-document-outline" variant="outlined">
-          Export Schedule
+        <v-btn variant="outlined" prepend-icon="mdi-calendar-month-outline" @click="router.push('/manager/schedule')">
+          View Schedule
         </v-btn>
       </div>
-    </div>
+    </section>
 
-    <div class="stats-grid">
-      <v-card class="stat-card" elevation="0">
-        <div class="stat-icon stat-green">
-          <v-icon size="30">mdi-account-group-outline</v-icon>
-        </div>
-        <div>
-          <div class="stat-count">0</div>
-          <div class="stat-label">Working Now</div>
-        </div>
-      </v-card>
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
+      {{ error }}
+    </v-alert>
 
-      <v-card class="stat-card" elevation="0">
-        <div class="stat-icon stat-blue">
-          <v-icon size="30">mdi-clock-outline</v-icon>
-        </div>
-        <div>
-          <div class="stat-count">0</div>
-          <div class="stat-label">Shifts Today</div>
-        </div>
-      </v-card>
+    <v-row class="mb-4">
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="summary-card">
+          <v-card-text>
+            <div class="summary-label">Working Now</div>
+            <div class="summary-value">{{ workingNowCount }}</div>
+            <div class="summary-caption">Currently clocked-in workers</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="summary-card">
+          <v-card-text>
+            <div class="summary-label">Coming Up</div>
+            <div class="summary-value">{{ comingUpCount }}</div>
+            <div class="summary-caption">Upcoming shifts today</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
 
-      <v-card class="stat-card" elevation="0">
-        <div class="stat-icon stat-gold">
-          <v-icon size="30">mdi-calendar-alert-outline</v-icon>
-        </div>
-        <div>
-          <div class="stat-count">2</div>
-          <div class="stat-label">Unfilled Shifts</div>
-        </div>
-      </v-card>
+    <v-row class="mb-4">
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="content-card">
+          <v-card-text>
+            <div class="card-head">
+              <div>
+                <h2 class="card-title">Pending Approvals</h2>
+                <div class="card-subtitle">{{ pendingApprovals.length }} waiting</div>
+              </div>
+              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/approvals')">
+                View All
+                <v-icon end>mdi-arrow-right</v-icon>
+              </v-btn>
+            </div>
 
-      <v-card class="stat-card" elevation="0">
-        <div class="stat-icon stat-red">
-          <v-icon size="30">mdi-alert-outline</v-icon>
-        </div>
-        <div>
-          <div class="stat-count">2</div>
-          <div class="stat-label">Alerts</div>
-        </div>
-      </v-card>
-    </div>
+            <div v-if="pendingPreview.length === 0" class="empty-state">
+              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
+              <span>All caught up!</span>
+            </div>
 
-    <v-card class="panel-card" elevation="0">
-      <div class="panel-header">
-        <div>
-          <h2 class="panel-title">Who's Working Now</h2>
-          <p class="panel-subtitle">Currently clocked-in workers</p>
-        </div>
-        <span class="panel-dot" />
-      </div>
-      <div class="panel-empty">No one is currently working</div>
-    </v-card>
+            <div v-else class="list-wrap">
+              <div v-for="item in pendingPreview" :key="item.id" class="pending-item">
+                <div class="pending-top-row">
+                  <v-chip size="small" variant="outlined">{{ item.type }}</v-chip>
+                  <v-chip size="small" color="warning" variant="outlined">{{ item.status }}</v-chip>
+                </div>
+                <div class="worker-name">{{ item.workerName }}</div>
+                <div class="meta-line">{{ item.dateLabel }} · {{ item.timeRange }}</div>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
 
-    <v-card class="panel-card" elevation="0">
-      <div class="panel-header panel-header-tight">
-        <div>
-          <h2 class="panel-title">Alerts</h2>
-          <p class="panel-subtitle">Issues needing attention</p>
-        </div>
-      </div>
+      <v-col cols="12" md="6">
+        <v-card elevation="0" class="content-card">
+          <v-card-text>
+            <div class="card-head">
+              <div>
+                <h2 class="card-title">Unfilled Shifts</h2>
+                <div class="card-subtitle">Shifts needing coverage</div>
+              </div>
+              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/schedule')">
+                View All
+                <v-icon end>mdi-arrow-right</v-icon>
+              </v-btn>
+            </div>
 
-      <v-alert variant="tonal" color="error" class="alert-item">
-        <template #prepend>
-          <v-icon>mdi-clock-alert-outline</v-icon>
-        </template>
-        <div class="alert-text">
-          <div class="alert-main">Michael Chen is 8 minutes late for their shift</div>
-          <div class="alert-time">10 min ago</div>
-        </div>
-      </v-alert>
-    </v-card>
+            <div v-if="unfilledPreview.length === 0" class="empty-state">
+              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
+              <span>All shifts are filled!</span>
+            </div>
+
+            <div v-else class="list-wrap">
+              <div v-for="shift in unfilledPreview" :key="shift.shift_id" class="unfilled-item">
+                <div class="unfilled-top-row">
+                  <v-chip size="small" color="warning" variant="outlined">{{ shift.departmentName }}</v-chip>
+                  <div class="position-name">{{ shift.positionName }}</div>
+                  <v-spacer />
+                  <v-chip size="small" color="warning" variant="outlined">Open</v-chip>
+                </div>
+                <div class="meta-line">{{ shift.dateLabel }} · {{ shift.timeRange }}</div>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row>
+      <v-col cols="12" sm="6">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
+          <div class="quick-content">
+            <v-icon size="24">mdi-clock-outline</v-icon>
+            <span>Time &amp; Pay</span>
+          </div>
+        </v-btn>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/workers')">
+          <div class="quick-content">
+            <v-icon size="24">mdi-account-group-outline</v-icon>
+            <span>Student Workers</span>
+          </div>
+        </v-btn>
+      </v-col>
+    </v-row>
+
+    <CreateShiftModal
+      v-model="createShiftModal.open"
+      @shift-created="onShiftCreated"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
+import apiClient from "../services/services.js";
+import shiftService from "../services/shiftService.js";
+import Utils from "../config/utils.js";
+import CreateShiftModal from "../components/CreateShiftModal.vue";
+
+const router = useRouter();
+const currentUser = Utils.getStore("user") || {};
+const error = ref("");
+const allShifts = ref([]);
+const swapRequests = ref([]);
+const createShiftModal = reactive({ open: false });
+
+const deptContext = Utils.getStore("currentDepartmentContext") || {};
+const currentDeptId = deptContext.department_id || null;
+
+const managerHeading = computed(() => {
+  const firstName = currentUser?.fName || "";
+  return firstName ? `Hi, ${firstName}!` : "Hi, Manager!";
+});
 
 const todayLabel = computed(() =>
   new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
-    year: "numeric"
-  })
+    year: "numeric",
+  }),
 );
+
+const toDateTime = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return null;
+  const [year, month, day] = String(dateValue).split("-").map(Number);
+  const [hour, minute] = String(timeValue).split(":").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0, 0);
+};
+
+const formatDateShort = (dateValue) => {
+  if (!dateValue) return "—";
+  const date = new Date(`${dateValue}T00:00:00`);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const formatTime = (timeValue) => {
+  if (!timeValue) return "—";
+  const [hour, minute] = String(timeValue).split(":");
+  const date = new Date();
+  date.setHours(Number(hour || 0), Number(minute || 0), 0, 0);
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
+const formatRange = (startTime, endTime) => `${formatTime(startTime)} – ${formatTime(endTime)}`;
+
+const sameDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const workingNowCount = computed(() => {
+  const now = new Date();
+  return allShifts.value.filter((shift) => {
+    const start = toDateTime(shift.shift_date, shift.start_time);
+    const end = toDateTime(shift.shift_date, shift.end_time);
+    if (!start || !end) return false;
+    return !!shift.assigned_user_id && now >= start && now <= end;
+  }).length;
+});
+
+const comingUpCount = computed(() => {
+  const now = new Date();
+  return allShifts.value.filter((shift) => {
+    const start = toDateTime(shift.shift_date, shift.start_time);
+    if (!start) return false;
+    return !!shift.assigned_user_id && sameDay(start, now) && start > now;
+  }).length;
+});
+
+const pendingApprovals = computed(() =>
+  (swapRequests.value || [])
+    .filter((item) => String(item.status || "").toLowerCase() === "pending")
+    .map((item) => {
+      const userName =
+        item.requestedBy ||
+        `${item.user?.fName || ""} ${item.user?.lName || ""}`.trim() ||
+        "Unknown Worker";
+
+      const shiftDate = item.shift?.shift_date || item.shift_date || item.date || null;
+      const startTime = item.shift?.start_time || item.start_time || null;
+      const endTime = item.shift?.end_time || item.end_time || null;
+
+      return {
+        id: item.id || `${userName}-${shiftDate || ""}-${startTime || ""}`,
+        type: item.requestType || item.type || "Swap",
+        status: "Pending",
+        workerName: userName,
+        dateLabel: shiftDate ? formatDateShort(shiftDate) : "—",
+        timeRange: startTime && endTime ? formatRange(startTime, endTime) : "—",
+      };
+    }),
+);
+
+const pendingPreview = computed(() => pendingApprovals.value.slice(0, 3));
+
+const unfilledShifts = computed(() => {
+  const today = new Date();
+  const sorted = (allShifts.value || [])
+    .filter((shift) => !shift.assigned_user_id)
+    .filter((shift) => {
+      const shiftStart = toDateTime(shift.shift_date, shift.start_time);
+      return shiftStart ? shiftStart >= new Date(today.getFullYear(), today.getMonth(), today.getDate()) : false;
+    })
+    .sort((a, b) => {
+      const aStart = toDateTime(a.shift_date, a.start_time)?.getTime() || 0;
+      const bStart = toDateTime(b.shift_date, b.start_time)?.getTime() || 0;
+      return aStart - bStart;
+    });
+
+  return sorted.map((shift) => ({
+    ...shift,
+    departmentName: shift.department?.department_name || deptContext.department_name || "Department",
+    positionName: shift.position?.position_name || "Position",
+    dateLabel: formatDateShort(shift.shift_date),
+    timeRange: formatRange(shift.start_time, shift.end_time),
+  }));
+});
+
+const unfilledPreview = computed(() => unfilledShifts.value.slice(0, 3));
+
+const openCreateShiftDialog = () => {
+  createShiftModal.open = true;
+};
+
+const onShiftCreated = async () => {
+  await loadDashboardData();
+};
+
+const loadDashboardData = async () => {
+  error.value = "";
+  try {
+    const [shiftsRes, swapsRes] = await Promise.all([
+      shiftService.listShifts({ department_id: currentDeptId, is_published: true }),
+      apiClient.get(`/shift-acknowledgements?type=swap&departmentId=${currentDeptId || ""}`),
+    ]);
+
+    allShifts.value = shiftsRes?.data || [];
+    swapRequests.value = swapsRes?.data?.data || swapsRes?.data || [];
+  } catch (err) {
+    error.value = err?.response?.data?.message || "Failed to load dashboard data.";
+  }
+};
+
+onMounted(loadDashboardData);
 </script>
 
 <style scoped>
-.manager-dashboard {
-  padding: 28px 36px 36px;
-  background: #f4f5f7;
-  min-height: calc(100vh - 76px);
+.dashboard-page {
+  padding: 24px;
 }
 
-.dashboard-top {
+.page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
-.dashboard-title {
-  font-size: 52px;
-  font-weight: 700;
-  line-height: 1;
-  color: #1f2328;
-  margin: 0;
-}
-
-.dashboard-date {
-  margin: 10px 0 0;
-  font-size: 26px;
-  line-height: 1.1;
-  color: #667085;
-}
-
-.dashboard-actions {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.create-shift-btn {
-  background: #930033;
-  color: #fff;
-  font-size: 16px;
-  text-transform: none;
-  font-weight: 600;
-  padding: 0 20px;
-  border-radius: 12px;
-}
-
-.export-btn {
-  text-transform: none;
-  font-size: 16px;
-  font-weight: 500;
-  border-color: #d3d5d8;
-  color: #24292f;
-  border-radius: 12px;
-}
-
-.stats-grid {
-  margin-top: 24px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 18px;
-}
-
-.stat-card {
-  border: 1px solid #d8dade;
-  border-radius: 14px;
-  background: #fff;
-  padding: 22px;
-  display: flex;
+  gap: 12px;
   align-items: center;
-  gap: 14px;
-}
-
-.stat-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.stat-green {
-  background: #e8f8ef;
-  color: #17a85d;
-}
-
-.stat-blue {
-  background: #e8f0ff;
-  color: #2d6ceb;
-}
-
-.stat-gold {
-  background: #fff4de;
-  color: #e19412;
-}
-
-.stat-red {
-  background: #fdeceb;
-  color: #e23c3c;
-}
-
-.stat-count {
-  color: #1f2328;
-  font-size: 48px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.stat-label {
-  margin-top: 6px;
-  color: #586173;
-  font-size: 16px;
-  line-height: 1.1;
-}
-
-.panel-card {
-  margin-top: 18px;
-  border: 1px solid #d8dade;
-  border-radius: 14px;
-  background: #fff;
-  padding: 28px;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.panel-header-tight {
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
-.panel-title {
+.header-text {
+  min-width: 260px;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.page-title {
   margin: 0;
-  color: #1f2328;
-  font-size: 22px;
+  font-size: 52px;
+  line-height: 1.05;
   font-weight: 700;
-  line-height: 1;
+  color: #101828;
 }
 
-.panel-subtitle {
-  margin: 12px 0 0;
+.page-subtitle {
+  margin: 6px 0 0;
   color: #667085;
   font-size: 16px;
-  line-height: 1.1;
 }
 
-.panel-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #79cf96;
-}
-
-.panel-empty {
-  margin: 88px 0 70px;
-  text-align: center;
-  color: #6b7280;
-  font-size: 20px;
-}
-
-.alert-item {
-  border: 1px solid #f4b2b2;
+.summary-card,
+.content-card {
+  border: 1px solid #e3e5e8;
   border-radius: 14px;
-  background: #fff8f8;
 }
 
-.alert-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.alert-main {
-  color: #24292f;
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.alert-time {
+.summary-label {
   color: #667085;
   font-size: 14px;
+  font-weight: 500;
 }
 
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(170px, 1fr));
-  }
+.summary-value {
+  margin-top: 2px;
+  font-size: 34px;
+  line-height: 1.1;
+  color: #101828;
+  font-weight: 700;
+}
+
+.summary-caption {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 24px;
+  color: #101828;
+  font-weight: 700;
+}
+
+.card-subtitle {
+  color: #667085;
+  font-size: 15px;
+  margin-top: 2px;
+}
+
+.ghost-btn {
+  color: #1f2937;
+}
+
+.list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending-item {
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.pending-top-row,
+.unfilled-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worker-name {
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.15;
+  color: #101828;
+  font-weight: 500;
+}
+
+.meta-line {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 16px;
+}
+
+.unfilled-item {
+  border: 1px solid #f2c48a;
+  background: #fff9f2;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.position-name {
+  color: #101828;
+  font-weight: 500;
+  font-size: 18px;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #667085;
+  min-height: 64px;
+}
+
+.quick-btn {
+  height: 104px;
+  min-height: 104px;
+  border-color: #d9dde3;
+}
+
+.quick-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #1f2937;
+  font-size: 17px;
 }
 
 @media (max-width: 960px) {
-  .manager-dashboard {
-    padding: 18px;
-  }
-
-  .dashboard-title {
-    font-size: 36px;
-  }
-
-  .dashboard-date {
-    font-size: 24px;
-  }
-
-  .stat-count {
-    font-size: 32px;
-  }
-
-  .stat-label {
-    font-size: 16px;
-  }
-
-  .panel-title {
-    font-size: 22px;
-  }
-
-  .panel-subtitle {
-    font-size: 16px;
-  }
-
-  .panel-empty {
-    font-size: 20px;
-    margin: 48px 0;
-  }
-
-  .alert-main {
-    font-size: 18px;
-  }
-
-  .alert-time {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 700px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
+  .page-title {
+    font-size: 40px;
   }
 }
 </style>

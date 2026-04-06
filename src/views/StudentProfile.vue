@@ -85,21 +85,76 @@
             <p>Your work assignments</p>
           </div>
 
-          <div class="assignment-stack">
-            <div>
-              <div class="field-label">Departments</div>
-              <div class="assignment-value">{{ departmentDisplay }}</div>
-            </div>
+          <v-progress-linear v-if="loadingDepts" indeterminate color="#8B1538" class="mb-4" />
 
-            <div>
-              <div class="field-label">Positions</div>
-              <div class="assignment-value">{{ positionDisplay }}</div>
+          <div v-if="!loadingDepts && memberships.length" class="membership-list">
+            <div
+              v-for="m in memberships"
+              :key="m.ud_id"
+              class="membership-item"
+            >
+              <div class="membership-header">
+                <span class="membership-dept">{{ m.department?.department_name || 'Department' }}</span>
+                <v-chip
+                  size="x-small"
+                  :color="m.request_status === 'approved' ? 'success' : m.request_status === 'pending' ? 'warning' : 'error'"
+                  variant="flat"
+                >
+                  {{ m.request_status === 'approved' ? 'Active' : m.request_status === 'pending' ? 'Pending' : 'Rejected' }}
+                </v-chip>
+              </div>
+              <div class="membership-meta">
+                <span v-if="m.role" class="membership-role">{{ m.role.role_name }}</span>
+                <span v-else class="membership-role text-grey">No role assigned</span>
+                <span v-if="m.position" class="membership-position"> · {{ m.position.position_name }}</span>
+              </div>
             </div>
+          </div>
+
+          <div v-else-if="!loadingDepts" class="text-grey" style="font-size: 0.95rem;">
+            Not assigned to any department yet.
           </div>
 
           <p class="assignment-note">
             Contact your manager to update your department or positions.
           </p>
+        </v-card>
+
+        <v-card class="profile-card compact-card" elevation="0">
+          <div class="section-header">
+            <h2>Documents</h2>
+            <p>Upload a document for your student profile</p>
+          </div>
+
+          <div class="upload-row">
+            <v-file-input
+              v-model="profileDocument"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-file-upload-outline"
+              label="Select document"
+              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              show-size
+              hide-details
+              bg-color="white"
+            />
+            <v-btn color="#8B1538" variant="outlined" @click="uploadDocument" :disabled="!profileDocument">
+              Upload
+            </v-btn>
+          </div>
+          <p v-if="uploadedDocumentName" class="upload-note">
+            Uploaded: {{ uploadedDocumentName }}
+          </p>
+          <v-btn
+            v-if="uploadedDocumentName"
+            variant="text"
+            color="error"
+            prepend-icon="mdi-delete-outline"
+            class="mt-2"
+            @click="deleteDocument"
+          >
+            Delete document
+          </v-btn>
         </v-card>
 
         <v-card class="profile-card compact-card" elevation="0">
@@ -171,8 +226,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, onMounted } from "vue";
 import Utils from "../config/utils";
+import apiClient from "../services/services.js";
 
 const storedUser = Utils.getStore("user") || {};
 const storedProfile = Utils.getStore("studentProfile") || {};
@@ -193,6 +249,26 @@ const preferences = reactive({
 });
 
 const saveNoticeOpen = ref(false);
+const loadingDepts = ref(false);
+const memberships = ref([]);
+const profileDocument = ref(null);
+const uploadedDocumentName = ref(storedProfile.uploadedDocumentName || "");
+
+const fetchMemberships = async () => {
+  const userId = storedUser?.id;
+  if (!userId) return;
+  loadingDepts.value = true;
+  try {
+    const res = await apiClient.get(`/user-departments/user/${userId}`);
+    memberships.value = Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    console.error("Failed to load department memberships:", err);
+  } finally {
+    loadingDepts.value = false;
+  }
+};
+
+onMounted(fetchMemberships);
 
 const displayInitials = computed(() => {
   const parts = profile.fullName.trim().split(/\s+/).filter(Boolean);
@@ -201,21 +277,6 @@ const displayInitials = computed(() => {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 });
 
-const departmentDisplay = computed(() => {
-  const departments = storedUser.departments || storedProfile.departments;
-  if (Array.isArray(departments) && departments.length) {
-    return departments.join(", ");
-  }
-  return "Not assigned";
-});
-
-const positionDisplay = computed(() => {
-  const positions = storedUser.positions || storedProfile.positions;
-  if (Array.isArray(positions) && positions.length) {
-    return positions.join(", ");
-  }
-  return "Not assigned";
-});
 
 const saveProfile = () => {
   const nameParts = profile.fullName.trim().split(/\s+/).filter(Boolean);
@@ -231,6 +292,7 @@ const saveProfile = () => {
     fullName: profile.fullName,
     email: profile.email,
     phone: profile.phone,
+    uploadedDocumentName: uploadedDocumentName.value || null,
     departments: storedProfile.departments || storedUser.departments || [],
     positions: storedProfile.positions || storedUser.positions || [],
   });
@@ -242,12 +304,24 @@ const saveProfile = () => {
 
   saveNoticeOpen.value = true;
 };
+
+const uploadDocument = () => {
+  if (!profileDocument.value) return;
+  const file = Array.isArray(profileDocument.value) ? profileDocument.value[0] : profileDocument.value;
+  uploadedDocumentName.value = file?.name || "";
+  saveNoticeOpen.value = true;
+};
+
+const deleteDocument = () => {
+  uploadedDocumentName.value = "";
+  profileDocument.value = null;
+  saveNoticeOpen.value = true;
+};
 </script>
 
 <style scoped>
 .profile-page {
-  max-width: 1240px;
-  margin: 0 auto;
+  width: 100%;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -388,6 +462,43 @@ const saveProfile = () => {
   font-size: 0.98rem;
 }
 
+.membership-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.membership-item {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.membership-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.membership-dept {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #24242b;
+}
+
+.membership-meta {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: #6d7586;
+}
+
+.membership-role {
+  font-weight: 500;
+}
+
 .assignment-note {
   margin-top: 28px;
   color: #6d7586;
@@ -441,6 +552,19 @@ const saveProfile = () => {
   padding-bottom: 12px;
 }
 
+.upload-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.upload-note {
+  margin-top: 12px;
+  color: #6d7586;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 960px) {
   .profile-page {
     padding: 18px;
@@ -478,6 +602,11 @@ const saveProfile = () => {
 
   .reminder-input {
     min-width: 0;
+  }
+
+  .upload-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

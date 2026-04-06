@@ -1,410 +1,475 @@
 <template>
-  <div class="schedule-container">
-    <!-- Header with Month/Year Navigation -->
-    <div class="calendar-header">
-      <div class="header-left">
-        <h1 class="month-year">{{ currentMonthYear }}</h1>
-      </div>
-      <div class="header-controls">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-chevron-left"
-          @click="previousMonth"
-          class="nav-btn"
-        >
-          Previous
-        </v-btn>
-        <v-btn
-          variant="flat"
-          color="#8B1538"
-          @click="goToToday"
-          class="today-btn"
-        >
-          Today
-        </v-btn>
-        <v-btn
-          variant="outlined"
-          append-icon="mdi-chevron-right"
-          @click="nextMonth"
-          class="nav-btn"
-        >
-          Next
-        </v-btn>
-      </div>
+  <div class="student-schedule pa-6">
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div class="text-h4 font-weight-bold">Schedule</div>
+      <v-btn-toggle v-model="activeTab" density="compact" mandatory color="primary">
+        <v-btn value="mine" size="small" aria-label="My Schedule">My Schedule</v-btn>
+        <v-btn value="open" size="small" aria-label="Open Shifts">Open Shifts</v-btn>
+      </v-btn-toggle>
     </div>
 
-    <!-- Next Shift Card -->
-    <v-card class="next-shift-card" elevation="2">
-      <div class="shift-header">
-        <div class="shift-badges">
-          <v-chip size="small" color="success" class="shift-badge">Open</v-chip>
-          <v-chip size="small" color="warning" class="shift-badge">Needs Acknowledgement</v-chip>
-        </div>
-        <v-btn icon="mdi-dots-vertical" variant="text" size="small"></v-btn>
-      </div>
-      
-      <div class="shift-content">
-        <h3 class="shift-title">Barista</h3>
-        <div class="shift-details">
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-calendar</v-icon>
-            <span>Tomorrow, Feb 11, 2026</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-clock</v-icon>
-            <span>8:00 AM - 12:00 PM</span>
-          </div>
-          <div class="detail-item">
-            <v-icon size="16" class="detail-icon">mdi-map-marker</v-icon>
-            <span>Campus Coffee Shop</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="shift-actions">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-calendar-plus"
-          class="action-btn"
-        >
-          Add to Calendar
-        </v-btn>
-        <v-btn
-          variant="flat"
-          color="#8B1538"
-          @click="acknowledgeShift"
-          class="action-btn"
-        >
-          Acknowledge
-        </v-btn>
-      </div>
-    </v-card>
+    <!-- Week Strip — full width -->
+    <WeekStrip
+      :selected-date="selectedDate"
+      :shift-dates="shiftDates"
+      class="mb-6"
+      @select-day="selectedDate = $event"
+      @change-week="handleWeekChange"
+    />
 
-    <!-- Calendar Grid -->
-    <div class="calendar-scroll-container">
-      <div class="calendar-container">
-        <div class="calendar-grid">
-          <!-- Time labels on left -->
-          <div class="time-column">
-            <div v-for="hour in timeSlots" :key="hour" class="time-slot">
-              {{ formatTime(hour) }}
-            </div>
+    <!-- Loading -->
+    <template v-if="loading">
+      <v-row>
+        <v-col v-for="n in 3" :key="n" cols="12" md="4">
+          <v-skeleton-loader type="card" />
+        </v-col>
+      </v-row>
+    </template>
+
+    <!-- Error -->
+    <v-alert v-else-if="error" type="error" variant="tonal" class="mb-4" closable>
+      {{ error }}
+      <template #append>
+        <v-btn variant="text" size="small" @click="loadShifts">Retry</v-btn>
+      </template>
+    </v-alert>
+
+    <template v-else>
+      <!-- My Schedule Tab -->
+      <div v-if="activeTab === 'mine'">
+        <!-- Selected day label -->
+        <div class="text-subtitle-1 font-weight-medium text-medium-emphasis mb-3">
+          {{ selectedDayLabel }}
+        </div>
+
+        <!-- Shifts for selected day — grid layout -->
+        <template v-if="selectedDayShifts.length">
+          <v-row>
+            <v-col
+              v-for="shift in selectedDayShifts"
+              :key="shift.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <ShiftCard
+                :shift="shift"
+                :show-actions="true"
+                class="fill-height"
+                @find-cover="openSwap($event, 'cover')"
+                @trade="openSwap($event, 'trade')"
+                @add-to-calendar="addToCalendar"
+              />
+            </v-col>
+          </v-row>
+        </template>
+
+        <!-- Empty state -->
+        <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
+          <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank-outline</v-icon>
+          <div class="text-body-1 text-medium-emphasis">No shifts on this day</div>
+          <div class="text-caption text-medium-emphasis">
+            Select a different day above, or check Open Shifts
           </div>
-          
-          <!-- Day columns -->
-          <div class="days-container">
-            <div v-for="day in weekDays" :key="day.date" class="day-column">
-              <div class="day-header">
-                <div class="day-name">{{ day.name }}</div>
-                <div class="day-date" :class="{ 'today': day.isToday }">
-                  {{ day.date }}
-                </div>
-              </div>
-              
-              <!-- Hour slots for this day -->
-              <div class="hour-slots">
-                <div v-for="hour in timeSlots" :key="`${day.date}-${hour}`" class="hour-slot">
-                  <!-- Mock shift for Tuesday 8AM-12PM -->
-                  <div
-                    v-if="day.name === 'Tue' && hour === 8"
-                    class="shift-block"
-                  >
-                    <div class="shift-block-title">Barista</div>
-                    <div class="shift-block-time">8 AM - 12 PM</div>
+        </v-card>
+
+        <!-- Pending Acknowledgements -->
+        <div v-if="pendingAcks.length" class="mt-6">
+          <div class="text-subtitle-1 font-weight-bold mb-3">
+            <v-icon size="18" class="mr-1">mdi-alert-circle-outline</v-icon>
+            Shifts to Acknowledge ({{ pendingAcks.length }})
+          </div>
+          <v-row>
+            <v-col
+              v-for="ack in pendingAcks"
+              :key="ack.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <v-card
+                elevation="0"
+                rounded="lg"
+                border
+                class="pa-4 d-flex align-center justify-space-between fill-height"
+              >
+                <div>
+                  <div class="text-body-2 font-weight-medium">
+                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ ack.shift ? formatTimeRange(ack.shift) : "" }}
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
+                <v-btn
+                  size="small"
+                  color="primary"
+                  variant="flat"
+                  :loading="ack._loading"
+                  @click="acknowledgeShift(ack)"
+                >
+                  Acknowledge
+                </v-btn>
+              </v-card>
+            </v-col>
+          </v-row>
         </div>
       </div>
-    </div>
+
+      <!-- Open Shifts Tab -->
+      <div v-else>
+        <template v-if="openShifts.length">
+          <v-row>
+            <v-col
+              v-for="shift in openShifts"
+              :key="shift.id"
+              cols="12"
+              sm="6"
+              lg="4"
+            >
+              <v-card
+                elevation="0"
+                rounded="lg"
+                border
+                class="d-flex fill-height"
+              >
+                <div class="open-shift-color" :style="{ backgroundColor: getDeptColor(shift) }"></div>
+                <div class="pa-4 flex-grow-1">
+                  <div class="text-body-1 font-weight-bold mb-1">
+                    {{ shift.department_name || shift.department?.department_name || "Open Shift" }}
+                  </div>
+                  <div class="text-body-2 text-medium-emphasis mb-1">
+                    {{ formatDate(shift.shift_date || shift.date) }} · {{ formatTimeRange(shift) }}
+                  </div>
+                  <div v-if="shift.location" class="text-caption text-medium-emphasis mb-3">
+                    <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>{{ shift.location }}
+                  </div>
+                  <v-btn
+                    color="primary"
+                    variant="flat"
+                    size="small"
+                    block
+                    :loading="shift._claiming"
+                    @click="claimShift(shift)"
+                  >
+                    Pick Up
+                  </v-btn>
+                  <v-alert
+                    v-if="shift._conflict"
+                    type="warning"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-2"
+                  >
+                    {{ shift._conflict }}
+                  </v-alert>
+                </div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+
+        <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
+          <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-briefcase-off</v-icon>
+          <div class="text-body-1 text-medium-emphasis">No open shifts available</div>
+          <div class="text-caption text-medium-emphasis">
+            Check back later — new shifts get posted regularly
+          </div>
+        </v-card>
+      </div>
+    </template>
+
+    <!-- Swap Dialog -->
+    <SwapDialog
+      v-model="swapDialogOpen"
+      :shift="swapTarget"
+      :mode="swapMode"
+      :coworkers="coworkers"
+      @submitted="handleSwapSubmit"
+    />
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
+      {{ snackbar.text }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
+      </template>
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, reactive, onMounted } from "vue";
+import { useRoute } from "vue-router";
+import Utils from "../config/utils.js";
+import studentService from "../services/studentService.js";
+import WeekStrip from "../components/student/WeekStrip.vue";
+import ShiftCard from "../components/student/ShiftCard.vue";
+import SwapDialog from "../components/student/SwapDialog.vue";
 
-const currentDate = ref(new Date())
+const route = useRoute();
+const user = ref(Utils.getStore("user") || {});
 
-const currentMonthYear = computed(() => {
-  return currentDate.value.toLocaleDateString('en-US', { 
-    month: 'long', 
-    year: 'numeric' 
-  })
-})
+// State
+const loading = ref(true);
+const error = ref(null);
+const selectedDate = ref(new Date().toISOString().slice(0, 10));
+const activeTab = ref(route.query.tab === "open" ? "open" : "mine");
+const allShifts = ref([]);
+const openShifts = ref([]);
+const pendingAcks = ref([]);
+const coworkers = ref([]);
 
-const timeSlots = Array.from({ length: 15 }, (_, i) => i + 6) // 6 AM to 8 PM
+// Swap dialog
+const swapDialogOpen = ref(false);
+const swapTarget = ref(null);
+const swapMode = ref("cover");
 
-const weekDays = computed(() => {
-  const days = []
-  const startOfWeek = new Date(currentDate.value)
-  const day = startOfWeek.getDay()
-  const diff = startOfWeek.getDate() - day
-  startOfWeek.setDate(diff)
+// Snackbar
+const snackbar = reactive({ show: false, text: "", color: "success" });
 
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(startOfWeek)
-    date.setDate(startOfWeek.getDate() + i)
-    
-    const today = new Date()
-    const isToday = date.toDateString() === today.toDateString()
-    
-    days.push({
-      name: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i],
-      date: date.getDate(),
-      isToday
-    })
+function showSnack(text, color = "success") {
+  snackbar.text = text;
+  snackbar.color = color;
+  snackbar.show = true;
+}
+
+function normalizeOpenShiftPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    if (Array.isArray(payload.shifts)) return payload.shifts;
+    if (Array.isArray(payload.preview)) return payload.preview;
   }
-  
-  return days
-})
-
-const formatTime = (hour) => {
-  const period = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-  return `${displayHour} ${period}`
+  return [];
 }
 
-const previousMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1)
+// Computed
+const shiftDates = computed(() =>
+  [...new Set(allShifts.value.map((s) => {
+    // Prefer shift_date directly (already YYYY-MM-DD)
+    if (s.shift_date) return s.shift_date;
+    const d = shiftStartDT(s);
+    if (!d) return null;
+    const dt = new Date(d);
+    return isNaN(dt) ? null : dt.toISOString().slice(0, 10);
+  }).filter(Boolean))]
+);
+
+const selectedDayShifts = computed(() => {
+  return allShifts.value
+    .filter((s) => {
+      if (s.shift_date) return s.shift_date === selectedDate.value;
+      const d = shiftStartDT(s);
+      if (!d) return false;
+      const dt = new Date(d);
+      return !isNaN(dt) && dt.toISOString().slice(0, 10) === selectedDate.value;
+    })
+    .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
+});
+
+const selectedDayLabel = computed(() => {
+  const d = new Date(selectedDate.value + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+});
+
+// Data loading
+async function loadShifts() {
+  loading.value = true;
+  error.value = null;
+  const userId = user.value?.userId || user.value?.id;
+
+  try {
+    const [shiftsRes, openRes, acksRes] = await Promise.allSettled([
+      studentService.getShifts({ assigned_user_id: userId, is_published: true }),
+      studentService.getOpenShifts(),
+      studentService.getPendingAcknowledgements(),
+    ]);
+
+    if (shiftsRes.status === "fulfilled") {
+      allShifts.value = shiftsRes.value?.data?.data || shiftsRes.value?.data || [];
+    }
+    if (openRes.status === "fulfilled") {
+      openShifts.value = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data).map((s) => ({
+        ...s,
+        _claiming: false,
+        _conflict: null,
+      }));
+    }
+    if (acksRes.status === "fulfilled") {
+      pendingAcks.value = (acksRes.value?.data?.data || acksRes.value?.data || [])
+        .filter((a) => !a.acknowledged_at)
+        .map((a) => ({ ...a, _loading: false }));
+    }
+  } catch (err) {
+    error.value = "Failed to load schedule. Please try again.";
+    console.error("Schedule load failed:", err);
+  } finally {
+    loading.value = false;
+  }
 }
 
-const nextMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1)
+function handleWeekChange({ monday }) {
+  selectedDate.value = monday;
 }
 
-const goToToday = () => {
-  currentDate.value = new Date()
+// Watch for tab changes to reload open shifts if needed
+watch(activeTab, (tab) => {
+  if (tab === "open" && !openShifts.value.length) {
+    loadOpenShifts();
+  }
+});
+
+async function loadOpenShifts() {
+  try {
+    const res = await studentService.getOpenShifts();
+    openShifts.value = normalizeOpenShiftPayload(res?.data?.data || res?.data).map((s) => ({
+      ...s,
+      _claiming: false,
+      _conflict: null,
+    }));
+  } catch (err) {
+    showSnack("Failed to load open shifts", "error");
+  }
 }
 
-const acknowledgeShift = () => {
-  console.log('Shift acknowledged')
+async function claimShift(shift) {
+  shift._claiming = true;
+  try {
+    await studentService.claimOpenShift(shift.id);
+    openShifts.value = openShifts.value.filter((s) => s.id !== shift.id);
+    showSnack("Shift claimed!");
+    // Reload my shifts
+    const userId = user.value?.userId || user.value?.id;
+    const res = await studentService.getShifts({ assigned_user_id: userId, is_published: true });
+    allShifts.value = res?.data?.data || res?.data || [];
+  } catch (err) {
+    const msg = err?.response?.data?.message;
+    if (msg?.toLowerCase().includes("conflict")) {
+      shift._conflict = msg;
+    } else {
+      showSnack(msg || "Failed to claim shift", "error");
+    }
+  } finally {
+    shift._claiming = false;
+  }
 }
+
+async function acknowledgeShift(ack) {
+  ack._loading = true;
+  try {
+    await studentService.acknowledgeShift(ack.id);
+    pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
+    showSnack("Shift acknowledged!");
+  } catch (err) {
+    showSnack("Failed to acknowledge shift", "error");
+  } finally {
+    ack._loading = false;
+  }
+}
+
+// Swap
+function openSwap(shift, mode) {
+  swapTarget.value = shift;
+  swapMode.value = mode;
+  swapDialogOpen.value = true;
+}
+
+async function handleSwapSubmit(data) {
+  try {
+    if (data.type === "pool") {
+      await studentService.findCover(data.shift.id, { notes: data.notes });
+    } else {
+      await studentService.requestSwap(data.shift.id, {
+        targetUserId: data.coworker?.id,
+        notes: data.notes,
+      });
+    }
+    swapDialogOpen.value = false;
+    showSnack("Request submitted!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Request failed", "error");
+  }
+}
+
+function addToCalendar(shift) {
+  const start = new Date(shiftStartDT(shift));
+  const end = new Date(shiftEndDT(shift));
+  const dept = shift.department_name || shift.department?.department_name || "Work Shift";
+  const loc = shift.department_name || shift.location || "";
+
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(dept)}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(loc)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// Helpers
+
+/** Combine separate shift_date + time fields into a parseable datetime string */
+function buildDateTime(shift, timeField) {
+  const time = shift[timeField];
+  if (!time) return null;
+  // If time is already a full datetime (contains 'T' or '-'), use as-is
+  if (time.includes("T") || time.includes("-")) return time;
+  // Combine with shift_date
+  const date = shift.shift_date || shift.date;
+  if (date) return date + "T" + time;
+  return null;
+}
+
+function shiftStartDT(shift) {
+  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
+}
+
+function shiftEndDT(shift) {
+  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
+}
+
+function shiftDateStr(shift) {
+  return shift.shift_date || shift.date || shift.start_time || shift.shift_start;
+}
+
+function formatTimeRange(shift) {
+  if (!shift) return "";
+  const fmt = (d) => {
+    if (!d) return "";
+    const dt = new Date(d);
+    if (isNaN(dt)) return "";
+    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
+  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function getDeptColor(shift) {
+  const name = (shift.department_name || shift.department?.department_name || "").toLowerCase();
+  const colors = {
+    barista: "#6F4E37", library: "#196CA2", dining: "#E85D04",
+    maintenance: "#2D6A4F", tutoring: "#7B2D8E", athletics: "#1B4332",
+  };
+  for (const [k, v] of Object.entries(colors)) {
+    if (name.includes(k)) return v;
+  }
+  return shift.department_color || "#80162B";
+}
+
+onMounted(loadShifts);
 </script>
 
 <style scoped>
-.schedule-container {
-  padding: 20px;
-  background-color: #fafafa;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+.student-schedule {
+  width: 100%;
 }
 
-/* Calendar Header */
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.month-year {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
-}
-
-.header-controls {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.nav-btn {
-  border-color: #e0e0e0;
-  color: #666;
-}
-
-.today-btn {
-  background-color: #8B1538;
-  color: white;
-}
-
-/* Next Shift Card */
-.next-shift-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1px solid #e0e0e0;
-}
-
-.shift-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.shift-badges {
-  display: flex;
-  gap: 8px;
-}
-
-.shift-badge {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.shift-content {
-  margin-bottom: 20px;
-}
-
-.shift-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 12px 0;
-}
-
-.shift-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #666;
-  font-size: 13px;
-}
-
-.detail-icon {
-  color: #8B1538;
-}
-
-.shift-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.action-btn {
-  flex: 1;
-}
-
-/* Calendar Scroll Container */
-.calendar-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0; /* Important for flexbox scrolling */
-}
-
-/* Calendar Grid */
-.calendar-container {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-  min-height: 600px;
-}
-
-.calendar-grid {
-  display: flex;
-  min-height: 600px;
-}
-
-.time-column {
-  width: 80px;
-  border-right: 1px solid #e0e0e0;
-  background-color: #fafafa;
-}
-
-.time-slot {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #666;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.days-container {
-  flex: 1;
-  display: flex;
-}
-
-.day-column {
-  flex: 1;
-  border-right: 1px solid #e0e0e0;
-}
-
-.day-column:last-child {
-  border-right: none;
-}
-
-.day-header {
-  height: 80px;
-  padding: 16px 8px;
-  text-align: center;
-  border-bottom: 1px solid #e0e0e0;
-  background-color: #fafafa;
-}
-
-.day-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.day-date {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-top: 4px;
-}
-
-.day-date.today {
-  color: #8B1538;
-  background-color: #f8e6ea;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-}
-
-.hour-slots {
-  height: calc(100% - 80px);
-}
-
-.hour-slot {
-  height: 40px;
-  border-bottom: 1px solid #f0f0f0;
-  position: relative;
-}
-
-.shift-block {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 0;
-  height: 160px; /* 4 hours * 40px per hour */
-  background-color: #8B1538;
-  color: white;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 12px;
-  overflow: hidden;
-}
-
-.shift-block-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.shift-block-time {
-  opacity: 0.9;
-  font-size: 11px;
+.open-shift-color {
+  width: 4px;
+  flex-shrink: 0;
+  border-radius: 4px 0 0 4px;
 }
 </style>

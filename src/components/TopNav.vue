@@ -19,14 +19,22 @@
 
     <!-- Right side - Notifications and User -->
     <div class="nav-actions">
+      <v-tooltip text="My Tasks" location="bottom">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            icon
+            variant="text"
+            class="tasks-btn"
+            @click="goToTasks"
+          >
+            <v-icon size="24">mdi-clipboard-text-outline</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+
       <!-- Notifications -->
-      <v-btn
-        icon
-        variant="text"
-        class="notification-btn"
-      >
-        <v-icon size="24">mdi-bell</v-icon>
-      </v-btn>
+      <NotificationDropdown @notification-click="handleNotificationClick" />
 
       <!-- User Avatar with Dropdown -->
       <v-menu
@@ -102,6 +110,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Utils from '../config/utils'
+import NotificationDropdown from './NotificationDropdown.vue'
 
 const emit = defineEmits(['toggle-sidebar'])
 const router = useRouter()
@@ -131,10 +140,19 @@ const toggleSidebar = () => {
   emit('toggle-sidebar')
 }
 
+const goToTasks = () => {
+  router.push('/student/tasks')
+}
+
 const handleSignOut = () => {
   menuOpen.value = false
   Utils.removeItem('user')
   router.push('/login')
+}
+
+const handleNotificationClick = (notification) => {
+  // Handle notification click logic here
+  console.log('Notification clicked:', notification)
 }
 </script>
 
@@ -158,6 +176,10 @@ const handleSignOut = () => {
   margin-right: 8px;
 }
 
+.tasks-btn {
+  color: #4b5563;
+}
+
 .nav-user-avatar {
   background-color: #8B1538; /* OC Maroon */
 }
@@ -170,6 +192,7 @@ const handleSignOut = () => {
 
 /* Button hover effects */
 .menu-btn:hover,
+.tasks-btn:hover,
 .notification-btn:hover,
 .user-menu-btn:hover {
   background-color: #f5f5f5;

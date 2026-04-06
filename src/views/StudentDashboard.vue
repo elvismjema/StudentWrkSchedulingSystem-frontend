@@ -75,7 +75,7 @@
           </div>
           <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1">
             <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
-            {{ nextShift.location || "TBD" }}
+            {{ nextShift.position_name || nextShift.location || nextShift.department_name || "TBD" }}
           </div>
           <div v-if="nextShift.supervisor_name" class="d-flex align-center text-body-2 text-medium-emphasis mb-3">
             <v-icon size="16" class="mr-1">mdi-account-tie</v-icon>
@@ -298,16 +298,19 @@ const todayLabel = computed(() => {
 
 const shiftDates = computed(() => {
   return [...new Set(weekShifts.value.map((s) => {
-    const d = s.shift_date || s.start_time || s.shift_start;
-    return d ? new Date(d).toISOString().slice(0, 10) : null;
+    if (s.shift_date) return s.shift_date;
+    const d = shiftStartDT(s);
+    if (!d) return null;
+    const dt = new Date(d);
+    return isNaN(dt) ? null : dt.toISOString().slice(0, 10);
   }).filter(Boolean))];
 });
 
 const nextShiftLabel = computed(() => {
   if (!nextShift.value) return "";
-  const start = new Date(nextShift.value.start_time || nextShift.value.shift_start);
+  const start = new Date(shiftStartDT(nextShift.value));
   const now = new Date();
-  if (start <= now) return "Current Shift";
+  if (!isNaN(start) && start <= now) return "Current Shift";
   return "Next Shift";
 });
 
@@ -326,17 +329,39 @@ const nextShiftColor = computed(() => {
 const canClockIn = computed(() => {
   if (clockStatus.isClockedIn) return false;
   if (!nextShift.value) return false;
-  const start = new Date(nextShift.value.start_time || nextShift.value.shift_start);
+  const start = new Date(shiftStartDT(nextShift.value));
+  if (isNaN(start)) return false;
   const now = new Date();
   const diffMin = (start - now) / 60000;
   return diffMin <= 15 && diffMin >= -60; // within 15 min before to 60 min after
 });
 
+/** Combine separate shift_date + time fields into a parseable datetime string */
+function buildDateTime(shift, timeField) {
+  const time = shift[timeField];
+  if (!time) return null;
+  if (time.includes("T") || time.includes("-")) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return date + "T" + time;
+  return null;
+}
+
+function shiftStartDT(shift) {
+  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
+}
+
+function shiftEndDT(shift) {
+  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
+}
+
 function formatTimeRange(shift) {
-  const fmt = (d) => new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const start = shift.start_time || shift.shift_start;
-  const end = shift.end_time || shift.shift_end;
-  return `${fmt(start)} – ${fmt(end)}`;
+  const fmt = (d) => {
+    if (!d) return "";
+    const dt = new Date(d);
+    if (isNaN(dt)) return "";
+    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
+  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
 }
 
 function showSnack(text, color = "success") {
@@ -453,19 +478,23 @@ async function loadFromIndividualEndpoints() {
     weekEnd.setDate(weekEnd.getDate() + 7);
 
     weekShifts.value = allShifts.filter((s) => {
-      const d = new Date(s.shift_date || s.start_time || s.shift_start);
-      return d >= weekStart && d < weekEnd;
+      const d = new Date(shiftStartDT(s) || s.shift_date);
+      return !isNaN(d) && d >= weekStart && d < weekEnd;
     });
 
     const upcoming = allShifts
-      .filter((s) => new Date(s.start_time || s.shift_start) >= new Date(now.getTime() - 3600000))
-      .sort((a, b) => new Date(a.start_time || a.shift_start) - new Date(b.start_time || b.shift_start));
+      .filter((s) => {
+        const d = new Date(shiftStartDT(s));
+        return !isNaN(d) && d >= new Date(now.getTime() - 3600000);
+      })
+      .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
     nextShift.value = upcoming[0] || null;
 
     weeklyShifts.value = weekShifts.value.length;
     weeklyHours.value = weekShifts.value.reduce((sum, s) => {
-      const start = new Date(s.start_time || s.shift_start);
-      const end = new Date(s.end_time || s.shift_end);
+      const start = new Date(shiftStartDT(s));
+      const end = new Date(shiftEndDT(s));
+      if (isNaN(start) || isNaN(end)) return sum;
       return sum + Math.max(0, (end - start) / 3600000);
     }, 0).toFixed(1);
     estimatedEarnings.value = (parseFloat(weeklyHours.value) * (user.value?.hourlyRate || 10)).toFixed(2);

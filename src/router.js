@@ -129,7 +129,17 @@ const router = createRouter({
           name: "student-settings",
           component: () => import("./views/StudentSettings.vue"),
         },
+        {
+          path: "shifts/:id",
+          name: "student-shift-detail",
+          redirect: { name: "student-schedule" },
+        },
       ],
+    },
+    // Top-level /shifts/:id → redirect to student schedule
+    {
+      path: "/shifts/:id",
+      redirect: { name: "student-schedule" },
     },
     {
       path: "/manager",

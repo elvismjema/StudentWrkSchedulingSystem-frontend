@@ -96,10 +96,10 @@
               >
                 <div>
                   <div class="text-body-2 font-weight-medium">
-                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.start_time || ack.shift?.shift_start) }}
+                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    {{ formatTimeRange(ack.shift) }}
+                    {{ ack.shift ? formatTimeRange(ack.shift) : "" }}
                   </div>
                 </div>
                 <v-btn
@@ -140,7 +140,7 @@
                     {{ shift.department_name || shift.department?.department_name || "Open Shift" }}
                   </div>
                   <div class="text-body-2 text-medium-emphasis mb-1">
-                    {{ formatDate(shift.shift_date || shift.start_time) }} · {{ formatTimeRange(shift) }}
+                    {{ formatDate(shift.shift_date || shift.date) }} · {{ formatTimeRange(shift) }}
                   </div>
                   <div v-if="shift.location" class="text-caption text-medium-emphasis mb-3">
                     <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>{{ shift.location }}
@@ -247,18 +247,25 @@ function normalizeOpenShiftPayload(payload) {
 // Computed
 const shiftDates = computed(() =>
   [...new Set(allShifts.value.map((s) => {
-    const d = s.shift_date || s.start_time || s.shift_start;
-    return d ? new Date(d).toISOString().slice(0, 10) : null;
+    // Prefer shift_date directly (already YYYY-MM-DD)
+    if (s.shift_date) return s.shift_date;
+    const d = shiftStartDT(s);
+    if (!d) return null;
+    const dt = new Date(d);
+    return isNaN(dt) ? null : dt.toISOString().slice(0, 10);
   }).filter(Boolean))]
 );
 
 const selectedDayShifts = computed(() => {
   return allShifts.value
     .filter((s) => {
-      const d = s.shift_date || s.start_time || s.shift_start;
-      return d && new Date(d).toISOString().slice(0, 10) === selectedDate.value;
+      if (s.shift_date) return s.shift_date === selectedDate.value;
+      const d = shiftStartDT(s);
+      if (!d) return false;
+      const dt = new Date(d);
+      return !isNaN(dt) && dt.toISOString().slice(0, 10) === selectedDate.value;
     })
-    .sort((a, b) => new Date(a.start_time || a.shift_start) - new Date(b.start_time || b.shift_start));
+    .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
 });
 
 const selectedDayLabel = computed(() => {
@@ -386,10 +393,10 @@ async function handleSwapSubmit(data) {
 }
 
 function addToCalendar(shift) {
-  const start = new Date(shift.start_time || shift.shift_start);
-  const end = new Date(shift.end_time || shift.shift_end);
+  const start = new Date(shiftStartDT(shift));
+  const end = new Date(shiftEndDT(shift));
   const dept = shift.department_name || shift.department?.department_name || "Work Shift";
-  const loc = shift.location || "";
+  const loc = shift.department_name || shift.location || "";
 
   const fmt = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(dept)}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(loc)}`;
@@ -397,15 +404,47 @@ function addToCalendar(shift) {
 }
 
 // Helpers
+
+/** Combine separate shift_date + time fields into a parseable datetime string */
+function buildDateTime(shift, timeField) {
+  const time = shift[timeField];
+  if (!time) return null;
+  // If time is already a full datetime (contains 'T' or '-'), use as-is
+  if (time.includes("T") || time.includes("-")) return time;
+  // Combine with shift_date
+  const date = shift.shift_date || shift.date;
+  if (date) return date + "T" + time;
+  return null;
+}
+
+function shiftStartDT(shift) {
+  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
+}
+
+function shiftEndDT(shift) {
+  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
+}
+
+function shiftDateStr(shift) {
+  return shift.shift_date || shift.date || shift.start_time || shift.shift_start;
+}
+
 function formatTimeRange(shift) {
   if (!shift) return "";
-  const fmt = (d) => new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${fmt(shift.start_time || shift.shift_start)} – ${fmt(shift.end_time || shift.shift_end)}`;
+  const fmt = (d) => {
+    if (!d) return "";
+    const dt = new Date(d);
+    if (isNaN(dt)) return "";
+    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
+  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const d = new Date(dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
 function getDeptColor(shift) {

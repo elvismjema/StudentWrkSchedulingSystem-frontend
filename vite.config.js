@@ -11,17 +11,14 @@ const baseURL =
 
 export default defineConfig({
   plugins: [vue(), vuetify({ autoImport: true })],
-
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
     },
   },
-
   server: {
     host: "localhost",
     port: 8081,
   },
-
   base: baseURL,
 });

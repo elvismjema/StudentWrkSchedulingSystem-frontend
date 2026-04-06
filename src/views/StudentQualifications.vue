@@ -247,6 +247,37 @@
                             </v-chip>
                           </div>
                         </div>
+
+                        <div
+                          v-if="qual.approval_status?.toLowerCase() === 'pending'"
+                          class="ml-4 d-flex flex-column gap-2"
+                        >
+                          <v-btn
+                            color="success"
+                            size="small"
+                            variant="elevated"
+                            :loading="reviewingQualificationId === qual.user_qualification_id && reviewAction === 'approved'"
+                            @click="approveQualification(qual)"
+                          >
+                            Approve
+                          </v-btn>
+                          <v-btn
+                            color="error"
+                            size="small"
+                            variant="outlined"
+                            :loading="reviewingQualificationId === qual.user_qualification_id && reviewAction === 'rejected'"
+                            @click="openRejectDialog(qual)"
+                          >
+                            Reject
+                          </v-btn>
+                        </div>
+                      </div>
+
+                      <div
+                        v-if="qual.approval_status?.toLowerCase() === 'rejected' && qual.rejection_reason"
+                        class="text-body-2 text-error mt-3"
+                      >
+                        Rejection reason: {{ qual.rejection_reason }}
                       </div>
                     </v-card-text>
                   </v-card>
@@ -293,6 +324,49 @@
         <v-btn @click="showError = false" icon="mdi-close"></v-btn>
       </template>
     </v-snackbar>
+
+    <v-snackbar
+      v-model="showSuccess"
+      color="success"
+      timeout="3500"
+    >
+      {{ successMessage }}
+      <template v-slot:actions>
+        <v-btn @click="showSuccess = false" icon="mdi-close"></v-btn>
+      </template>
+    </v-snackbar>
+
+    <v-dialog v-model="showRejectDialog" max-width="520">
+      <v-card>
+        <v-card-title class="text-h6">Reject Qualification</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            Please provide a reason for rejecting
+            <span class="font-weight-medium">{{ rejectingQualification?.qualification_name }}</span>.
+          </div>
+          <v-textarea
+            v-model="rejectReason"
+            label="Rejection reason"
+            variant="outlined"
+            rows="4"
+            auto-grow
+            counter="500"
+            :error-messages="rejectReasonError"
+          ></v-textarea>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="closeRejectDialog">Cancel</v-btn>
+          <v-btn
+            color="error"
+            :loading="reviewingQualificationId === rejectingQualification?.user_qualification_id && reviewAction === 'rejected'"
+            @click="submitReject"
+          >
+            Confirm Reject
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -316,10 +390,19 @@ const selectedQualification = ref(null)
 const studentsLoading = ref(false)
 const studentQualificationsLoading = ref(false)
 const qualificationsLoading = ref(false)
+const reviewingQualificationId = ref(null)
+const reviewAction = ref('')
 
 // Error handling
 const showError = ref(false)
 const errorMessage = ref('')
+const showSuccess = ref(false)
+const successMessage = ref('')
+
+const showRejectDialog = ref(false)
+const rejectingQualification = ref(null)
+const rejectReason = ref('')
+const rejectReasonError = ref('')
 
 // Computed
 const currentUser = computed(() => store.getters.getLoginUserInfo)
@@ -432,6 +515,89 @@ const loadStudentQualifications = async (userId) => {
 const refreshStudentQualifications = async () => {
   if (selectedStudent.value) {
     await loadStudentQualifications(selectedStudent.value.user_id)
+  }
+}
+
+const applyQualificationReviewUpdate = (updatedQualification) => {
+  if (!updatedQualification?.user_qualification_id) return
+
+  studentQualifications.value = studentQualifications.value.map((qualification) => {
+    if (qualification.user_qualification_id === updatedQualification.user_qualification_id) {
+      return {
+        ...qualification,
+        ...updatedQualification,
+      }
+    }
+    return qualification
+  })
+}
+
+const approveQualification = async (qualification) => {
+  try {
+    reviewingQualificationId.value = qualification.user_qualification_id
+    reviewAction.value = 'approved'
+
+    const response = await qualificationService.reviewUserQualification(
+      qualification.user_qualification_id,
+      'approved'
+    )
+
+    applyQualificationReviewUpdate(response.data?.data)
+    successMessage.value = 'Qualification approved successfully.'
+    showSuccess.value = true
+  } catch (error) {
+    showError.value = true
+    errorMessage.value = error.response?.data?.message || 'Failed to approve qualification. Please try again.'
+    console.error('Error approving qualification:', error)
+  } finally {
+    reviewingQualificationId.value = null
+    reviewAction.value = ''
+  }
+}
+
+const openRejectDialog = (qualification) => {
+  rejectingQualification.value = qualification
+  rejectReason.value = ''
+  rejectReasonError.value = ''
+  showRejectDialog.value = true
+}
+
+const closeRejectDialog = () => {
+  showRejectDialog.value = false
+  rejectingQualification.value = null
+  rejectReason.value = ''
+  rejectReasonError.value = ''
+}
+
+const submitReject = async () => {
+  const reason = rejectReason.value.trim()
+  if (!reason) {
+    rejectReasonError.value = 'Rejection reason is required.'
+    return
+  }
+
+  try {
+    reviewingQualificationId.value = rejectingQualification.value.user_qualification_id
+    reviewAction.value = 'rejected'
+
+    const response = await qualificationService.reviewUserQualification(
+      rejectingQualification.value.user_qualification_id,
+      'rejected',
+      reason
+    )
+
+    applyQualificationReviewUpdate(response.data?.data)
+    successMessage.value = 'Qualification rejected successfully.'
+    showSuccess.value = true
+    closeRejectDialog()
+  } catch (error) {
+    rejectReasonError.value = error.response?.data?.message || ''
+    showError.value = true
+    errorMessage.value = error.response?.data?.message || 'Failed to reject qualification. Please try again.'
+    console.error('Error rejecting qualification:', error)
+  } finally {
+    reviewingQualificationId.value = null
+    reviewAction.value = ''
   }
 }
 

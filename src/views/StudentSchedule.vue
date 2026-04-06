@@ -96,21 +96,32 @@
               >
                 <div>
                   <div class="text-body-2 font-weight-medium">
-                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
+                    {{ ack.shift?.department?.department_name || ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
                     {{ ack.shift ? formatTimeRange(ack.shift) : "" }}
                   </div>
                 </div>
-                <v-btn
-                  size="small"
-                  color="primary"
-                  variant="flat"
-                  :loading="ack._loading"
-                  @click="acknowledgeShift(ack)"
-                >
-                  Acknowledge
-                </v-btn>
+                <div class="d-flex ga-2">
+                  <v-btn
+                    size="small"
+                    color="primary"
+                    variant="flat"
+                    :loading="ack._loading"
+                    @click="acknowledgeShift(ack)"
+                  >
+                    Accept
+                  </v-btn>
+                  <v-btn
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    :loading="ack._declining"
+                    @click="declineShift(ack)"
+                  >
+                    Decline
+                  </v-btn>
+                </div>
               </v-card>
             </v-col>
           </v-row>
@@ -299,7 +310,7 @@ async function loadShifts() {
     if (acksRes.status === "fulfilled") {
       pendingAcks.value = (acksRes.value?.data?.data || acksRes.value?.data || [])
         .filter((a) => !a.acknowledged_at)
-        .map((a) => ({ ...a, _loading: false }));
+        .map((a) => ({ ...a, _loading: false, _declining: false }));
     }
   } catch (err) {
     error.value = "Failed to load schedule. Please try again.";
@@ -360,11 +371,24 @@ async function acknowledgeShift(ack) {
   try {
     await studentService.acknowledgeShift(ack.id);
     pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
-    showSnack("Shift acknowledged!");
+    showSnack("Shift accepted!");
   } catch (err) {
-    showSnack("Failed to acknowledge shift", "error");
+    showSnack("Failed to accept shift", "error");
   } finally {
     ack._loading = false;
+  }
+}
+
+async function declineShift(ack) {
+  ack._declining = true;
+  try {
+    await studentService.declineShift(ack.id);
+    pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
+    showSnack("Shift declined.");
+  } catch (err) {
+    showSnack("Failed to decline shift", "error");
+  } finally {
+    ack._declining = false;
   }
 }
 
@@ -409,11 +433,16 @@ function addToCalendar(shift) {
 function buildDateTime(shift, timeField) {
   const time = shift[timeField];
   if (!time) return null;
+  // Handle Date objects
+  if (time instanceof Date) return time.toISOString();
   // If time is already a full datetime (contains 'T' or '-'), use as-is
-  if (time.includes("T") || time.includes("-")) return time;
-  // Combine with shift_date
+  if (typeof time === "string" && (time.includes("T") || (time.includes("-") && time.length > 10))) return time;
+  // Bare time — combine with shift_date
   const date = shift.shift_date || shift.date;
-  if (date) return date + "T" + time;
+  if (date) {
+    const dateStr = date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10);
+    return dateStr + "T" + time;
+  }
   return null;
 }
 
@@ -442,7 +471,7 @@ function formatTimeRange(shift) {
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
+  const d = dateStr instanceof Date ? dateStr : new Date(typeof dateStr === "string" && dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
   if (isNaN(d)) return "";
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }

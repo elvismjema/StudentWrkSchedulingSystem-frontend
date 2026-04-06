@@ -340,9 +340,16 @@ const canClockIn = computed(() => {
 function buildDateTime(shift, timeField) {
   const time = shift[timeField];
   if (!time) return null;
-  if (time.includes("T") || time.includes("-")) return time;
+  // Handle Date objects
+  if (time instanceof Date) return time.toISOString();
+  // If time is already a full datetime (contains 'T' or '-'), use as-is
+  if (typeof time === "string" && (time.includes("T") || (time.includes("-") && time.length > 10))) return time;
+  // Bare time — combine with shift_date
   const date = shift.shift_date || shift.date;
-  if (date) return date + "T" + time;
+  if (date) {
+    const dateStr = date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10);
+    return dateStr + "T" + time;
+  }
   return null;
 }
 

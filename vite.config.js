@@ -2,26 +2,26 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import vuetify from "vite-plugin-vuetify";
 import { resolve } from "path";
-
 import dns from "dns";
+
 dns.setDefaultResultOrder("verbatim");
 
-export default () => {
-  const baseURL =
-    process.env.APP_ENV === "development" ? "/" : "/sev2026/t2/";
+const baseURL =
+  process.env.APP_ENV === "development" ? "/" : "/sev2026/t2/";
 
-  return defineConfig({
-    plugins: [vue(), vuetify({ autoImport: true })],
-    resolve: {
-      alias: {
-        "@": resolve(__dirname, "src"),
-      },
-    },
-    server: {
-      host: "localhost",
-      port: 8081,
-    },
+export default defineConfig({
+  plugins: [vue(), vuetify({ autoImport: true })],
 
-    base: baseURL,
-  });
-};
+  resolve: {
+    alias: {
+      "@": resolve(__dirname, "src"),
+    },
+  },
+
+  server: {
+    host: "localhost",
+    port: 8081,
+  },
+
+  base: baseURL,
+});

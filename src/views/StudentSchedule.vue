@@ -309,7 +309,7 @@ async function loadShifts() {
     }
     if (acksRes.status === "fulfilled") {
       pendingAcks.value = (acksRes.value?.data?.data || acksRes.value?.data || [])
-        .filter((a) => !a.acknowledged_at)
+        .filter((a) => !a.acknowledged && !a.acknowledgedAt && !a.acknowledged_at)
         .map((a) => ({ ...a, _loading: false, _declining: false }));
     }
   } catch (err) {

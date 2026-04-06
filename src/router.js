@@ -169,15 +169,6 @@ const router = createRouter({
           component: () => import("./views/ManagerCreateShift.vue"),
         },
         {
-          path: "availability",
-          name: "manager-availability",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Availability",
-            description: "Review worker availability and constraints.",
-          },
-        },
-        {
           path: "approvals",
           name: "manager-approvals",
           component: () => import("./views/ManagerApprovals.vue"),
@@ -187,8 +178,8 @@ const router = createRouter({
           name: "manager-time-attendance",
           component: () => import("./views/ManagerPlaceholder.vue"),
           props: {
-            title: "Time & Attendance",
-            description: "Track clock-in activity and attendance records.",
+            title: "Time & Pay",
+            description: "Track clock-in activity and payroll-related records.",
           },
         },
         {

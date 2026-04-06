@@ -119,9 +119,8 @@ const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
-  { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
-  { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
+  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
   { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 

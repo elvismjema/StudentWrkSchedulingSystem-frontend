@@ -215,6 +215,7 @@ import { ref, computed, watch, reactive, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+import { buildDateTime, shiftStartDT, shiftEndDT, shiftDateStr, formatTimeRange, formatShiftDate as formatDate } from "../utils/shiftDateTime.js";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
@@ -429,52 +430,6 @@ function addToCalendar(shift) {
 
 // Helpers
 
-/** Combine separate shift_date + time fields into a parseable datetime string */
-function buildDateTime(shift, timeField) {
-  const time = shift[timeField];
-  if (!time) return null;
-  // Handle Date objects
-  if (time instanceof Date) return time.toISOString();
-  // If time is already a full datetime (contains 'T' or '-'), use as-is
-  if (typeof time === "string" && (time.includes("T") || (time.includes("-") && time.length > 10))) return time;
-  // Bare time — combine with shift_date
-  const date = shift.shift_date || shift.date;
-  if (date) {
-    const dateStr = date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10);
-    return dateStr + "T" + time;
-  }
-  return null;
-}
-
-function shiftStartDT(shift) {
-  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
-}
-
-function shiftEndDT(shift) {
-  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
-}
-
-function shiftDateStr(shift) {
-  return shift.shift_date || shift.date || shift.start_time || shift.shift_start;
-}
-
-function formatTimeRange(shift) {
-  if (!shift) return "";
-  const fmt = (d) => {
-    if (!d) return "";
-    const dt = new Date(d);
-    if (isNaN(dt)) return "";
-    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return "";
-  const d = dateStr instanceof Date ? dateStr : new Date(typeof dateStr === "string" && dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
-  if (isNaN(d)) return "";
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
 
 function getDeptColor(shift) {
   const name = (shift.department_name || shift.department?.department_name || "").toLowerCase();

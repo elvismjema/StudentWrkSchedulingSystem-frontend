@@ -246,6 +246,7 @@ import { ref, computed, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
 import NotificationBell from "../components/student/NotificationBell.vue";
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
@@ -336,40 +337,6 @@ const canClockIn = computed(() => {
   return diffMin <= 15 && diffMin >= -60; // within 15 min before to 60 min after
 });
 
-/** Combine separate shift_date + time fields into a parseable datetime string */
-function buildDateTime(shift, timeField) {
-  const time = shift[timeField];
-  if (!time) return null;
-  // Handle Date objects
-  if (time instanceof Date) return time.toISOString();
-  // If time is already a full datetime (contains 'T' or '-'), use as-is
-  if (typeof time === "string" && (time.includes("T") || (time.includes("-") && time.length > 10))) return time;
-  // Bare time — combine with shift_date
-  const date = shift.shift_date || shift.date;
-  if (date) {
-    const dateStr = date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10);
-    return dateStr + "T" + time;
-  }
-  return null;
-}
-
-function shiftStartDT(shift) {
-  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
-}
-
-function shiftEndDT(shift) {
-  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
-}
-
-function formatTimeRange(shift) {
-  const fmt = (d) => {
-    if (!d) return "";
-    const dt = new Date(d);
-    if (isNaN(dt)) return "";
-    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
-}
 
 function showSnack(text, color = "success") {
   snackbar.text = text;

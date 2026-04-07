@@ -210,6 +210,7 @@ import { useRouter } from 'vue-router'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 
 const router = useRouter()
@@ -400,11 +401,30 @@ const loadShifts = async () => {
 const loadDepartmentWorkers = async () => {
   if (!currentDeptId) return
   try {
-    const response = await apiClient.get(`/user-departments?departmentId=${currentDeptId}&status=approved`)
-    const assignments = response?.data?.data || response?.data || []
-    departmentWorkers.value = assignments
-      .map(a => a.user || a)
-      .filter(u => u && u.userId)
+    const response = await UserRoleServices.getAllUsersWithRoles(true)
+    const users = response?.data || []
+
+    const departmentMembers = users.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) => Number(membership.department_id) === Number(currentDeptId),
+      ),
+    )
+
+    const studentMembers = departmentMembers.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) =>
+          Number(membership.department_id) === Number(currentDeptId) &&
+          String(membership?.role?.role_name || '').toLowerCase().includes('student'),
+      ),
+    )
+
+    const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers
+    departmentWorkers.value = candidateUsers.map((user) => ({
+      userId: user.id,
+      fName: user.fName,
+      lName: user.lName,
+      email: user.email,
+    }))
   } catch (error) {
     console.error('Error loading department workers:', error)
   }

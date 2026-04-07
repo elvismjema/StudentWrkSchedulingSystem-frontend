@@ -75,9 +75,60 @@
           <v-icon>mdi-bell-outline</v-icon>
         </v-badge>
       </v-btn>
-      <v-avatar size="32" class="ml-2 user-avatar-top">
-        <span class="user-initial-top">{{ displayInitial }}</span>
-      </v-avatar>
+      <v-menu
+        v-model="menuOpen"
+        :close-on-content-click="false"
+        location="bottom end"
+        offset="8"
+      >
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon variant="text" class="ml-2">
+            <v-avatar size="32" class="user-avatar-top">
+              <span class="user-initial-top">{{ displayInitial }}</span>
+            </v-avatar>
+          </v-btn>
+        </template>
+
+        <v-card class="profile-menu" min-width="264">
+          <div class="profile-header">
+            <v-avatar size="44" class="header-avatar">
+              <span class="header-initial">{{ displayInitial }}</span>
+            </v-avatar>
+            <div class="header-info">
+              <div class="header-name">{{ displayName }}</div>
+              <div class="header-email">{{ displayEmail }}</div>
+            </div>
+          </div>
+
+          <v-divider />
+
+          <v-list>
+            <v-list-item :to="'/student/profile'" @click="menuOpen = false" class="menu-item">
+              <template #prepend>
+                <v-icon icon="mdi-account" size="20" />
+              </template>
+              <v-list-item-title>Profile</v-list-item-title>
+            </v-list-item>
+            <v-list-item :to="'/student/settings'" @click="menuOpen = false" class="menu-item">
+              <template #prepend>
+                <v-icon icon="mdi-cog-outline" size="20" />
+              </template>
+              <v-list-item-title>Settings</v-list-item-title>
+            </v-list-item>
+          </v-list>
+
+          <v-divider />
+
+          <v-list>
+            <v-list-item @click="handleSignOut" class="sign-out-item">
+              <template #prepend>
+                <v-icon icon="mdi-logout" size="20" color="#d32f2f" />
+              </template>
+              <v-list-item-title class="sign-out-text">Sign out</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </v-menu>
     </v-app-bar>
 
     <!-- Main content area -->
@@ -91,17 +142,19 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import studentService from '../services/studentService.js';
 
 const route = useRoute();
+const router = useRouter();
 const drawer = ref(true);
 const rail = ref(false);
 const user = ref(Utils.getStore('user') || {});
 const resolvedDepartmentName = ref('');
 const unreadCount = ref(0);
+const menuOpen = ref(false);
 
 const displayName = computed(() => {
   const first = user.value?.fName || '';
@@ -114,6 +167,7 @@ const displayInitial = computed(() => {
   const last = user.value?.lName?.[0] || '';
   return `${first}${last}`.toUpperCase() || 'S';
 });
+const displayEmail = computed(() => user.value?.email || '');
 
 const departmentName = computed(() => {
   if (resolvedDepartmentName.value) return resolvedDepartmentName.value;
@@ -130,7 +184,6 @@ const navItems = [
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board', name: 'student-trade-board' },
   { title: 'Notifications', icon: 'mdi-bell-outline', route: '/student/notifications', name: 'student-notifications' },
   { title: 'Availability', icon: 'mdi-calendar-edit', route: '/student/availability', name: 'student-availability' },
-  { title: 'Settings', icon: 'mdi-cog-outline', route: '/student/settings', name: 'student-settings' },
 ];
 
 const isActiveRoute = (item) => {
@@ -173,6 +226,12 @@ onMounted(async () => {
     // ignore
   }
 });
+
+const handleSignOut = () => {
+  menuOpen.value = false;
+  Utils.removeItem('user');
+  router.push('/login');
+};
 </script>
 
 <style scoped>
@@ -286,6 +345,61 @@ onMounted(async () => {
   color: white;
   font-weight: 500;
   font-size: 12px;
+}
+
+.profile-menu {
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.profile-header {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-avatar {
+  background-color: #8B1538;
+}
+
+.header-initial {
+  color: white;
+  font-weight: 600;
+}
+
+.header-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.header-email {
+  font-size: 13px;
+  color: #666;
+}
+
+.menu-item {
+  margin: 0 8px;
+  border-radius: 8px;
+}
+
+.menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.sign-out-item {
+  margin: 0 8px;
+  border-radius: 8px;
+}
+
+.sign-out-item:hover {
+  background-color: #ffebee;
+}
+
+.sign-out-text {
+  color: #d32f2f;
+  font-weight: 500;
 }
 
 .main-content {

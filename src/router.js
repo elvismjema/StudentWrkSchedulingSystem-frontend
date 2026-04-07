@@ -10,7 +10,7 @@ import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
 import Student from "./views/Student.vue";
 import Manager from "./views/Manager.vue";
-import Admin from "./views/AdminDashboard.vue";
+import Admin from "./views/Admin.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
 
 const getStoredRole = () => {
@@ -129,7 +129,17 @@ const router = createRouter({
           name: "student-settings",
           component: () => import("./views/StudentSettings.vue"),
         },
+        {
+          path: "shifts/:id",
+          name: "student-shift-detail",
+          redirect: { name: "student-schedule" },
+        },
       ],
+    },
+    // Top-level /shifts/:id → redirect to student schedule
+    {
+      path: "/shifts/:id",
+      redirect: { name: "student-schedule" },
     },
     {
       path: "/manager",
@@ -137,6 +147,17 @@ const router = createRouter({
       component: Manager,
       redirect: { name: "manager-dashboard" },
       children: [
+
+        {
+          path: "qualifications",
+          name: "manager-qualifications",
+          component: () => import("./views/StudentQualifications.vue")
+        },
+        {
+          path: "shifts",
+          name: "manager-shifts",
+          component: ShiftManagement
+        },
         {
           path: "dashboard",
           name: "manager-dashboard",
@@ -158,32 +179,18 @@ const router = createRouter({
           component: () => import("./views/ManagerCreateShift.vue"),
         },
         {
-          path: "availability",
-          name: "manager-availability",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Availability",
-            description: "Review worker availability and constraints.",
-          },
-        },
-        {
           path: "approvals",
           name: "manager-approvals",
           component: () => import("./views/ManagerApprovals.vue"),
         },
         {
-          path: "time-attendance",
-          name: "manager-time-attendance",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Time & Attendance",
-            description: "Track clock-in activity and attendance records.",
-          },
+          path: "time-pay",
+          name: "manager-time-pay",
+          component: () => import("./views/ManagerTimePay.vue"),
         },
         {
-          path: "workers",
-          name: "manager-workers",
-          component: () => import("./views/UserManagement.vue"),
+          path: "time-attendance",
+          redirect: { name: "manager-time-pay" },
         },
         {
           path: "tasks",
@@ -219,6 +226,16 @@ const router = createRouter({
           component: () => import("./views/DepartmentSettings.vue"),
         },
         // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "workers",
+          name: "manager-student-workers",
+          component: () => import("./views/ManagerStudentWorkers.vue"),
+        },
+        {
+          path: "positions",
+          name: "manager-positions",
+          component: () => import("./views/ManagerPositions.vue"),
+        },
         {
           path: "admin/users",
           name: "manager-admin-users",
@@ -262,8 +279,15 @@ const router = createRouter({
               "View system-wide staffing and operations reports.",
           },
         },
-      ],
-    },
+
+        {
+          path: "settings",
+          name: "admin-settings",
+          component: () => import("./views/ManagerPlaceholder.vue"),
+          props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
+        }
+      ]
+    }
   ],
 });
 
@@ -282,7 +306,7 @@ router.beforeEach((to) => {
 
   // Require authentication for all other routes
   if (!role || !token) {
-    return { name: "login" };
+    return { name: "login", query: { redirect: to.fullPath } };
   }
 
   // Role-based access control

@@ -104,7 +104,10 @@ const menuItems = computed(() => {
     return [];
   }
 
-  return [{ title: "Profile", icon: "mdi-account", route: "/manager/profile" }];
+  return [
+    { title: "Profile", icon: "mdi-account", route: "/manager/profile" },
+    { title: "Settings", icon: "mdi-cog-outline", route: "/manager/settings" },
+  ];
 });
 
 const handleSignOut = () => {

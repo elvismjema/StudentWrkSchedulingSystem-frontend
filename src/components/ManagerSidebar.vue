@@ -20,18 +20,27 @@
     <v-divider />
 
     <v-list nav class="nav-list">
-      <v-list-item
+      <v-tooltip
         v-for="item in navItems"
         :key="item.title"
-        :to="item.route"
-        class="nav-item"
-        active-class="active-nav-item"
+        :text="item.title"
+        :disabled="!rail"
+        location="end"
       >
-        <template #prepend>
-          <v-icon :icon="item.icon" size="20" />
+        <template #activator="{ props: tooltipProps }">
+          <v-list-item
+            v-bind="tooltipProps"
+            :to="item.route"
+            class="nav-item"
+            active-class="active-nav-item"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="20" />
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
         </template>
-        <v-list-item-title>{{ item.title }}</v-list-item-title>
-      </v-list-item>
+      </v-tooltip>
 
       <!-- Admin-only section -->
       <template v-if="isAdmin">
@@ -39,18 +48,27 @@
         <div v-if="!rail" class="section-label">
           Admin
         </div>
-        <v-list-item
+        <v-tooltip
           v-for="item in adminNavItems"
           :key="item.title"
-          :to="item.route"
-          class="nav-item"
-          active-class="active-nav-item"
+          :text="item.title"
+          :disabled="!rail"
+          location="end"
         >
-          <template #prepend>
-            <v-icon :icon="item.icon" size="20" />
+          <template #activator="{ props: tooltipProps }">
+            <v-list-item
+              v-bind="tooltipProps"
+              :to="item.route"
+              class="nav-item"
+              active-class="active-nav-item"
+            >
+              <template #prepend>
+                <v-icon :icon="item.icon" size="20" />
+              </template>
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+            </v-list-item>
           </template>
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
-        </v-list-item>
+        </v-tooltip>
       </template>
     </v-list>
 
@@ -74,8 +92,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import Utils from "../config/utils";
+import UserRoleServices from "../services/userRoleServices";
 
 const drawer = ref(true);
 const rail = ref(true);
@@ -118,16 +137,51 @@ const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
-  { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
-  { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
-  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
+  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-pay" },
+  { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 
 const adminNavItems = [
   { title: "Manage Users", icon: "mdi-account-cog", route: "/manager/admin/users" },
   { title: "Manage Departments", icon: "mdi-office-building-cog", route: "/manager/admin/departments" },
 ];
+
+// Initialise department context on mount so every manager view has a valid
+// department_id in localStorage.  Skipped when already present.
+onMounted(async () => {
+  const existing = Utils.getStore("currentDepartmentContext");
+  if (existing?.department_id) return;
+
+  const userId = user.value?.userId || user.value?.id;
+  if (!userId) return;
+
+  try {
+    const response = await UserRoleServices.getUserDepartments(userId);
+    const memberships = response?.data || [];
+    // Prefer an active manager-level membership, fall back to any active one.
+    const managerMembership = memberships.find(
+      (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+    );
+    const membership =
+      managerMembership ||
+      memberships.find((m) => m.is_active) ||
+      memberships[0];
+    if (!membership) return;
+
+    const ctx = {
+      department_id: membership.department_id,
+      department_name: membership.department?.department_name,
+      role_name: membership.role?.role_name || "Manager",
+      role_id: membership.role_id,
+    };
+    Utils.setStore("currentDepartmentContext", ctx);
+    // Notify other components (e.g. ScheduleTemplates) on the same tab
+    window.dispatchEvent(new CustomEvent("departmentContextReady", { detail: ctx }));
+  } catch {
+    // Non-fatal: context will just remain unset.
+  }
+});
 
 defineExpose({
   rail,

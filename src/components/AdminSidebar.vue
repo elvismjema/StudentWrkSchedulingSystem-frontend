@@ -19,18 +19,27 @@
 
     <v-divider />
     <v-list nav class="nav-list">
-      <v-list-item
+      <v-tooltip
         v-for="item in navItems"
         :key="item.title"
-        :to="item.route"
-        class="nav-item"
-        active-class="active-nav-item"
+        :text="item.title"
+        :disabled="!rail"
+        location="end"
       >
-        <template #prepend>
-          <v-icon :icon="item.icon" size="20" />
+        <template #activator="{ props: tooltipProps }">
+          <v-list-item
+            v-bind="tooltipProps"
+            :to="item.route"
+            class="nav-item"
+            active-class="active-nav-item"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="20" />
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
         </template>
-        <v-list-item-title>{{ item.title }}</v-list-item-title>
-      </v-list-item>
+      </v-tooltip>
     </v-list>
 
     <template #append>
@@ -120,6 +129,67 @@ defineExpose({
   font-size: 15px;
   border-radius: 4px;
   flex-shrink: 0;
+}
+
+.brand-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1f2328;
+}
+
+.brand-subtitle {
+  font-size: 14px;
+  color: #667085;
+}
+
+.admin-nav {
+  padding: 8px 12px;
+}
+
+.admin-nav-item {
+  border-radius: 12px;
+  min-height: 66px;
+}
+
+.admin-active-nav-item {
+  background: #f0f6ff;
+  color: #0969da;
+}
+
+.admin-user-wrap {
+  padding: 8px 12px;
+}
+
+.admin-user-item {
+  border-radius: 12px;
+  min-height: 66px;
+}
+
+.admin-user-avatar {
+  background: #b71c1c;
+}
+
+.admin-user-initial {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.admin-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2328;
+}
+
+.admin-user-role {
+  font-size: 14px;
+  color: #667085;
 }
 
 .logo-text {

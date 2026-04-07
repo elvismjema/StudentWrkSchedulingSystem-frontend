@@ -239,6 +239,7 @@ import { useRouter } from 'vue-router'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 
 const router = useRouter()
@@ -441,40 +442,30 @@ const loadShifts = async () => {
 const loadDepartmentWorkers = async () => {
   if (!currentDeptId) return
   try {
-    const response = await apiClient.get('/user-departments/admin/users-with-roles?activeOnly=true')
-    const users = response?.data?.data || response?.data || []
-    const targetDepartmentId = Number(currentDeptId)
+    const response = await UserRoleServices.getAllUsersWithRoles(true)
+    const users = response?.data || []
 
-    departmentWorkers.value = users
-      .map((user) => {
-        const memberships = Array.isArray(user?.userDepartments) ? user.userDepartments : []
-        const deptMembership = memberships.find((membership) => {
-          const deptId = Number(
-            membership?.department_id ??
-            membership?.department?.department_id ??
-            membership?.departmentId
-          )
-          return deptId === targetDepartmentId
-        })
-        if (!deptMembership || deptMembership?.is_active === false) return null
+    const departmentMembers = users.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) => Number(membership.department_id) === Number(currentDeptId),
+      ),
+    )
 
-        const roleName = String(
-          deptMembership?.role?.role_name || deptMembership?.role_name || ''
-        ).toLowerCase()
-        const permissionLevel = Number(
-          deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
-        )
-        const isStudentRole = roleName.includes('student') || permissionLevel < 50
-        if (!isStudentRole) return null
+    const studentMembers = departmentMembers.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) =>
+          Number(membership.department_id) === Number(currentDeptId) &&
+          String(membership?.role?.role_name || '').toLowerCase().includes('student'),
+      ),
+    )
 
-        return {
-          userId: user?.userId || user?.id,
-          fName: user?.fName || '',
-          lName: user?.lName || '',
-          email: user?.email || '',
-        }
-      })
-      .filter((user) => user && user.userId)
+    const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers
+    departmentWorkers.value = candidateUsers.map((user) => ({
+      userId: user.id,
+      fName: user.fName,
+      lName: user.lName,
+      email: user.email,
+    }))
   } catch (error) {
     console.error('Error loading department workers:', error)
   }

@@ -1057,10 +1057,10 @@ const loadAssignDeptRoles = async () => {
   }
   try {
     const [rolesRes, posRes] = await Promise.all([
-      UserRoleServices.getAllRoles(departmentId),
+      AdminServices.getDepartmentRoles(departmentId),
       apiClient.get(`/positions?department_id=${departmentId}`),
     ]);
-    // Filter out admin-level roles so the admin can only assign manager/student roles here
+    // getDepartmentRoles already excludes admin-level; filter again for safety
     const allRoles = rolesRes?.data?.data || [];
     assignDeptRoles.value = allRoles.filter((r) => Number(r.permission_level || 0) < 90);
     assignDeptPositions.value = posRes?.data?.data || [];

@@ -112,15 +112,6 @@
                   >
                     Accept
                   </v-btn>
-                  <v-btn
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    :loading="ack._declining"
-                    @click="declineShift(ack)"
-                  >
-                    Decline
-                  </v-btn>
                 </div>
               </v-card>
             </v-col>
@@ -347,8 +338,8 @@ async function loadOpenShifts() {
 async function claimShift(shift) {
   shift._claiming = true;
   try {
-    await studentService.claimOpenShift(shift.id);
-    openShifts.value = openShifts.value.filter((s) => s.id !== shift.id);
+    await studentService.claimOpenShift(shift.shift_id || shift.id);
+    openShifts.value = openShifts.value.filter((s) => (s.shift_id || s.id) !== (shift.shift_id || shift.id));
     showSnack("Shift claimed!");
     // Reload my shifts
     const userId = user.value?.userId || user.value?.id;
@@ -379,19 +370,6 @@ async function acknowledgeShift(ack) {
   }
 }
 
-async function declineShift(ack) {
-  ack._declining = true;
-  try {
-    await studentService.declineShift(ack.id);
-    pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
-    showSnack("Shift declined.");
-  } catch (err) {
-    showSnack("Failed to decline shift", "error");
-  } finally {
-    ack._declining = false;
-  }
-}
-
 // Swap
 function openSwap(shift, mode) {
   swapTarget.value = shift;
@@ -399,21 +377,10 @@ function openSwap(shift, mode) {
   swapDialogOpen.value = true;
 }
 
-async function handleSwapSubmit(data) {
-  try {
-    if (data.type === "pool") {
-      await studentService.findCover(data.shift.id, { notes: data.notes });
-    } else {
-      await studentService.requestSwap(data.shift.id, {
-        targetUserId: data.coworker?.id,
-        notes: data.notes,
-      });
-    }
-    swapDialogOpen.value = false;
-    showSnack("Request submitted!");
-  } catch (err) {
-    showSnack(err?.response?.data?.message || "Request failed", "error");
-  }
+async function handleSwapSubmit() {
+  swapDialogOpen.value = false;
+  showSnack("Request submitted!");
+  await loadAll();
 }
 
 function addToCalendar(shift) {

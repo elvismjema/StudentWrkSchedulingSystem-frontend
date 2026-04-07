@@ -178,10 +178,6 @@ export default {
     return apiClient.patch(`/shift-acknowledgements/${acknowledgementId}/acknowledge`, {});
   },
 
-  declineShift(acknowledgementId) {
-    return apiClient.delete(`/shift-acknowledgements/${acknowledgementId}`);
-  },
-
   // ─── Departments ─────────────────────────────────────────────────
   getUserDepartments() {
     const userId = getUserId();

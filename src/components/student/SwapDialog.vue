@@ -139,7 +139,7 @@ watch(() => props.modelValue, async (open) => {
 const loadCoworkers = async () => {
   loadingCoworkers.value = true;
   try {
-    const res = await studentService.getCoworkers(props.shift.id);
+    const res = await studentService.getCoworkers(props.shift.shift_id || props.shift.id);
     const data = res?.data?.data || res?.data || [];
     coworkers.value = data.map(c => ({
       id: c.id || c.userId,
@@ -152,10 +152,24 @@ const loadCoworkers = async () => {
   }
 };
 
+const buildDT = (shift, field) => {
+  const time = shift[field];
+  if (!time) return null;
+  if (typeof time === 'string' && (time.includes('T') || (time.includes('-') && time.length > 10))) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return String(date).slice(0, 10) + 'T' + time;
+  return null;
+};
+
 const formatShiftTime = (s) => {
-  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const start = s.start_time || s.startTime || s.shift_start;
-  const end = s.end_time || s.endTime || s.shift_end;
+  const fmt = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const start = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
+  const end = buildDT(s, 'end_time') || s.end_time || s.endTime || s.shift_end;
   return fmt(start) + ' – ' + fmt(end);
 };
 
@@ -164,14 +178,16 @@ const submit = async () => {
   errorMsg.value = '';
   try {
     if (props.mode === 'cover') {
-      await studentService.findCover(props.shift.id, { notes: notes.value });
+      const sid = props.shift.shift_id || props.shift.id;
+      await studentService.findCover(sid, { notes: notes.value });
     } else {
-      await studentService.requestSwap(props.shift.id, {
+      const sid = props.shift.shift_id || props.shift.id;
+      await studentService.requestSwap(sid, {
         targetUserId: selectedCoworker.value,
         notes: notes.value,
       });
     }
-    emit('submitted', { mode: props.mode, shiftId: props.shift.id });
+    emit('submitted', { mode: props.mode, shiftId: props.shift.shift_id || props.shift.id });
     close();
   } catch (err) {
     errorMsg.value = err?.response?.data?.message || err?.message || 'Request failed. Please try again.';

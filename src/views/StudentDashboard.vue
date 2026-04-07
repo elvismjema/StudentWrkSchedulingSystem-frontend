@@ -564,21 +564,10 @@ function onWeekChange({ monday }) {
   selectedDate.value = monday;
 }
 
-async function handleSwapSubmit(data) {
-  try {
-    if (data.type === "pool") {
-      await studentService.findCover(data.shift.id, { notes: data.notes });
-    } else {
-      await studentService.requestSwap(data.shift.id, {
-        targetUserId: data.coworker?.id,
-        notes: data.notes,
-      });
-    }
-    swapDialogOpen.value = false;
-    showSnack("Request submitted!");
-  } catch (err) {
-    showSnack(err?.response?.data?.message || "Failed to submit request", "error");
-  }
+function handleSwapSubmit() {
+  swapDialogOpen.value = false;
+  showSnack("Request submitted!");
+  loadDashboard();
 }
 
 function goToNotifications() {

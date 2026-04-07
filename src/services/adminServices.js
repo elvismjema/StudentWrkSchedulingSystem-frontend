@@ -73,6 +73,14 @@ const AdminServices = {
   },
 
   /**
+   * Get roles for a specific department, excluding admin-level roles.
+   * Used to populate the role dropdown in the Assign to Department dialog.
+   */
+  getDepartmentRoles(departmentId) {
+    return apiClient.get(`/admin/departments/${departmentId}/roles`);
+  },
+
+  /**
    * Assign a manager or student worker to a single department.
    * Enforces the one-department rule: all existing non-admin memberships (and future
    * shifts in those departments) are removed before the new assignment is created.

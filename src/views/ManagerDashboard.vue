@@ -128,27 +128,21 @@
       </v-col>
     </v-row>
 
-    <CreateShiftModal
-      v-model="createShiftModal.open"
-      @shift-created="onShiftCreated"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
-import CreateShiftModal from "../components/CreateShiftModal.vue";
 
 const router = useRouter();
 const currentUser = Utils.getStore("user") || {};
 const error = ref("");
 const allShifts = ref([]);
 const swapRequests = ref([]);
-const createShiftModal = reactive({ open: false });
 
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 const currentDeptId = deptContext.department_id || null;
@@ -266,11 +260,7 @@ const unfilledShifts = computed(() => {
 const unfilledPreview = computed(() => unfilledShifts.value.slice(0, 3));
 
 const openCreateShiftDialog = () => {
-  createShiftModal.open = true;
-};
-
-const onShiftCreated = async () => {
-  await loadDashboardData();
+  router.push('/manager/create-shift');
 };
 
 const loadDashboardData = async () => {

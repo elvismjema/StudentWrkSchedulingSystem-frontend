@@ -150,6 +150,20 @@
                     </template>
                   </v-tooltip>
 
+                  <!-- Assign to Department (single-department flow for managers & students) -->
+                  <v-tooltip
+                    v-if="getHighestRole(item) !== 'Admin'"
+                    text="Assign to Department"
+                    location="top"
+                  >
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="teal" variant="text"
+                        @click="openAssignDeptDialog(item)">
+                        <v-icon>mdi-office-building-marker</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+
                   <v-tooltip v-if="item.is_active !== false" text="Deactivate Account" location="top">
                     <template #activator="{ props }">
                       <v-btn v-bind="props" icon size="small" color="warning" variant="text"
@@ -488,6 +502,113 @@
       </v-card>
     </v-dialog>
 
+    <!-- ═══ ASSIGN TO DEPARTMENT DIALOG ════════════════════════════════════ -->
+    <v-dialog v-model="assignDeptDialog" max-width="600px">
+      <v-card>
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-2">
+          <v-icon color="teal">mdi-office-building-marker</v-icon>
+          Assign to Department — {{ assignDeptUser?.fName }} {{ assignDeptUser?.lName }}
+        </v-card-title>
+        <v-card-subtitle class="px-5 pb-4 text-medium-emphasis">
+          {{ assignDeptUser?.email }}
+        </v-card-subtitle>
+
+        <v-card-text class="px-5">
+          <!-- Warning about existing assignments -->
+          <v-alert
+            v-if="assignDeptCurrentAssignments.length > 0"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            <strong>Warning:</strong> This person is currently assigned to:
+            <ul class="mt-1 ml-4">
+              <li v-for="ud in assignDeptCurrentAssignments" :key="ud.ud_id">
+                {{ ud.department?.department_name }}: {{ ud.role?.role_name || 'No Role' }}
+              </li>
+            </ul>
+            Assigning them to a new department will <strong>remove all other assignments</strong>
+            and <strong>unassign them from future shifts</strong> in those departments.
+          </v-alert>
+
+          <v-form ref="assignDeptForm" v-model="assignDeptFormValid">
+            <v-select
+              v-model="assignDeptData.department_id"
+              :items="departments"
+              item-title="department_name"
+              item-value="department_id"
+              label="Department"
+              prepend-inner-icon="mdi-office-building"
+              variant="outlined"
+              density="comfortable"
+              :rules="[rules.required]"
+              @update:modelValue="loadAssignDeptRoles"
+              class="mb-3"
+            />
+            <v-select
+              v-model="assignDeptData.role_id"
+              :items="assignDeptRoles"
+              item-title="role_name"
+              item-value="role_id"
+              label="Role"
+              prepend-inner-icon="mdi-shield-account"
+              variant="outlined"
+              density="comfortable"
+              :rules="[rules.required]"
+              :disabled="!assignDeptData.department_id"
+              class="mb-3"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template #subtitle>Permission Level: {{ item.raw.permission_level }}</template>
+                </v-list-item>
+              </template>
+            </v-select>
+            <v-select
+              v-model="assignDeptData.position_id"
+              :items="assignDeptPositions"
+              item-title="position_name"
+              item-value="position_id"
+              label="Position (Optional)"
+              prepend-inner-icon="mdi-briefcase"
+              variant="outlined"
+              density="comfortable"
+              clearable
+              :disabled="!assignDeptData.department_id"
+            />
+          </v-form>
+
+          <!-- Confirmation checkbox when user already has assignments -->
+          <v-checkbox
+            v-if="assignDeptCurrentAssignments.length > 0"
+            v-model="assignDeptConfirmed"
+            label="I understand their current assignments and future shifts will be removed."
+            color="teal"
+            class="mt-2"
+          />
+        </v-card-text>
+
+        <v-card-actions class="px-5 pb-5">
+          <v-spacer />
+          <v-btn variant="text" @click="closeAssignDeptDialog">Cancel</v-btn>
+          <v-btn
+            color="teal"
+            :loading="assigningDept"
+            :disabled="
+              !assignDeptFormValid ||
+              !assignDeptData.department_id ||
+              !assignDeptData.role_id ||
+              (assignDeptCurrentAssignments.length > 0 && !assignDeptConfirmed)
+            "
+            @click="submitAssignDept"
+          >
+            Assign to Department
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Future shifts deactivation override -->
     <v-dialog v-model="futureShiftDialog" max-width="640">
       <v-card>
@@ -574,6 +695,17 @@ const futureShiftData = ref(null);
 
 const deleteDialog = ref(false);
 const selectedDeleteUser = ref(null);
+
+// ─── Assign to Department dialog ─────────────────────────────────────────────
+const assignDeptDialog = ref(false);
+const assignDeptFormValid = ref(false);
+const assignDeptForm = ref(null);
+const assignDeptUser = ref(null);
+const assignDeptRoles = ref([]);
+const assignDeptPositions = ref([]);
+const assigningDept = ref(false);
+const assignDeptConfirmed = ref(false);
+const assignDeptData = ref({ department_id: null, role_id: null, position_id: null });
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 const rules = {
@@ -888,6 +1020,77 @@ const removeRole = async (udId) => {
     error.value = 'Failed to remove role: ' + (err.response?.data?.message || err.message);
   } finally {
     saving.value = false;
+  }
+};
+
+// ─── Assign to Department ────────────────────────────────────────────────────
+// Current non-admin department assignments for the user being assigned
+const assignDeptCurrentAssignments = computed(() => {
+  if (!assignDeptUser.value) return [];
+  return (assignDeptUser.value.userDepartments || []).filter(
+    (ud) => Number(ud.role?.permission_level || 0) < 90,
+  );
+});
+
+const openAssignDeptDialog = (user) => {
+  assignDeptUser.value = user;
+  assignDeptData.value = { department_id: null, role_id: null, position_id: null };
+  assignDeptRoles.value = [];
+  assignDeptPositions.value = [];
+  assignDeptConfirmed.value = false;
+  assignDeptDialog.value = true;
+};
+
+const closeAssignDeptDialog = () => {
+  assignDeptDialog.value = false;
+  assignDeptUser.value = null;
+};
+
+const loadAssignDeptRoles = async () => {
+  const departmentId = assignDeptData.value.department_id;
+  assignDeptData.value.role_id = null;
+  assignDeptData.value.position_id = null;
+  if (!departmentId) {
+    assignDeptRoles.value = [];
+    assignDeptPositions.value = [];
+    return;
+  }
+  try {
+    const [rolesRes, posRes] = await Promise.all([
+      UserRoleServices.getAllRoles(departmentId),
+      apiClient.get(`/positions?department_id=${departmentId}`),
+    ]);
+    // Filter out admin-level roles so the admin can only assign manager/student roles here
+    const allRoles = rolesRes?.data?.data || [];
+    assignDeptRoles.value = allRoles.filter((r) => Number(r.permission_level || 0) < 90);
+    assignDeptPositions.value = posRes?.data?.data || [];
+  } catch (err) {
+    error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
+  }
+};
+
+const submitAssignDept = async () => {
+  if (!assignDeptUser.value) return;
+  if (!assignDeptData.value.department_id || !assignDeptData.value.role_id) {
+    error.value = 'Please select both a department and a role.';
+    return;
+  }
+  try {
+    assigningDept.value = true;
+    error.value = null;
+    const response = await AdminServices.assignDepartment({
+      user_id: assignDeptUser.value.id,
+      department_id: assignDeptData.value.department_id,
+      role_id: assignDeptData.value.role_id,
+      position_id: assignDeptData.value.position_id || null,
+    });
+    successMessage.value = response.data?.message || 'User assigned to department successfully.';
+    closeAssignDeptDialog();
+    await loadUsers();
+  } catch (err) {
+    error.value = 'Failed to assign department: ' + (err.response?.data?.message || err.message);
+  } finally {
+    assigningDept.value = false;
   }
 };
 

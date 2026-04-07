@@ -119,6 +119,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { buildDateTime } from '../../utils/shiftDateTime.js';
 
 const props = defineProps({
   shift: { type: Object, required: true },
@@ -147,16 +148,6 @@ const departmentColor = computed(() => {
   }
   return props.shift.department_color || props.shift.departmentColor || DEPARTMENT_COLORS.default;
 });
-
-/** Combine separate shift_date + time fields into a parseable datetime string */
-const buildDateTime = (shift, timeField) => {
-  const time = shift[timeField];
-  if (!time) return null;
-  if (time.includes('T') || time.includes('-')) return time;
-  const date = shift.shift_date || shift.date;
-  if (date) return date + 'T' + time;
-  return null;
-};
 
 const formatTime = (dateStr) => {
   if (!dateStr) return '';

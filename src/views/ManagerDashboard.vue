@@ -6,7 +6,7 @@
         <p class="page-subtitle">{{ todayLabel }}</p>
       </div>
       <div class="header-actions">
-        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="router.push('/manager/create-shift')">
+        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="openCreateShiftPopup">
           Create Shift
         </v-btn>
         <v-btn variant="outlined" prepend-icon="mdi-calendar-month-outline" @click="router.push('/manager/schedule')">
@@ -265,6 +265,10 @@ const loadDashboardData = async () => {
   } catch (err) {
     error.value = err?.response?.data?.message || "Failed to load dashboard data.";
   }
+};
+
+const openCreateShiftPopup = () => {
+  router.push({ name: "manager-schedule", query: { createShift: "1" } });
 };
 
 onMounted(loadDashboardData);

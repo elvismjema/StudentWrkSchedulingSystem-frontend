@@ -20,7 +20,7 @@
         <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
-        <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
+        <v-btn color="primary" variant="elevated" @click="showCreateDialog = true" prepend-icon="mdi-plus">
           Add to Schedule
         </v-btn>
       </div>
@@ -114,22 +114,156 @@
                 ></v-text-field>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="newShift.start_time"
-                  type="time"
-                  label="Start Time"
-                  variant="outlined"
-                  :rules="[v => !!v || 'Start time is required']"
-                ></v-text-field>
+                <v-menu
+                  v-model="startTimeMenu"
+                  :close-on-content-click="false"
+                  location="bottom"
+                  offset="8"
+                >
+                  <template #activator="{ props }">
+                    <v-text-field
+                      v-bind="props"
+                      :model-value="formatTimeDisplay(newShift.start_time)"
+                      label="Start Time"
+                      variant="outlined"
+                      readonly
+                      prepend-inner-icon="mdi-clock-outline"
+                      :rules="[v => !!v || 'Start time is required']"
+                    />
+                  </template>
+                  <v-card class="time-picker-card" min-width="320">
+                    <v-card-text class="pa-3">
+                      <div class="time-picker-grid">
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Hour</div>
+                          <v-btn
+                            v-for="hour in hourOptions"
+                            :key="`start-hour-${hour}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="startTimeParts.hour === hour ? '#1976d2' : undefined"
+                            @click="updateTimePart('start', 'hour', hour)"
+                          >
+                            {{ hour }}
+                          </v-btn>
+                        </div>
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Minute</div>
+                          <v-btn
+                            v-for="minute in minuteOptions"
+                            :key="`start-minute-${minute}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="startTimeParts.minute === minute ? '#1976d2' : undefined"
+                            @click="updateTimePart('start', 'minute', minute)"
+                          >
+                            {{ minute }}
+                          </v-btn>
+                        </div>
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Period</div>
+                          <v-btn
+                            v-for="period in periodOptions"
+                            :key="`start-period-${period}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="startTimeParts.period === period ? '#1976d2' : undefined"
+                            @click="updateTimePart('start', 'period', period)"
+                          >
+                            {{ period }}
+                          </v-btn>
+                        </div>
+                      </div>
+                      <div class="time-picker-actions">
+                        <v-btn variant="text" size="small" @click="clearTime('start')">Clear</v-btn>
+                        <v-btn variant="text" size="small" @click="startTimeMenu = false">Done</v-btn>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-menu>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="newShift.end_time"
-                  type="time"
-                  label="End Time"
-                  variant="outlined"
-                  :rules="[v => !!v || 'End time is required']"
-                ></v-text-field>
+                <v-menu
+                  v-model="endTimeMenu"
+                  :close-on-content-click="false"
+                  location="bottom"
+                  offset="8"
+                  :disabled="!newShift.start_time"
+                >
+                  <template #activator="{ props }">
+                    <v-text-field
+                      v-bind="props"
+                      :model-value="formatTimeDisplay(newShift.end_time)"
+                      label="End Time"
+                      variant="outlined"
+                      readonly
+                      prepend-inner-icon="mdi-clock-outline"
+                      :disabled="!newShift.start_time"
+                      :rules="[v => !!v || 'End time is required']"
+                    />
+                  </template>
+                  <v-card class="time-picker-card" min-width="320">
+                    <v-card-text class="pa-3">
+                      <div class="time-picker-grid">
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Hour</div>
+                          <v-btn
+                            v-for="hour in hourOptions"
+                            :key="`end-hour-${hour}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="endTimeParts.hour === hour ? '#1976d2' : undefined"
+                            @click="updateTimePart('end', 'hour', hour)"
+                          >
+                            {{ hour }}
+                          </v-btn>
+                        </div>
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Minute</div>
+                          <v-btn
+                            v-for="minute in minuteOptions"
+                            :key="`end-minute-${minute}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="endTimeParts.minute === minute ? '#1976d2' : undefined"
+                            @click="updateTimePart('end', 'minute', minute)"
+                          >
+                            {{ minute }}
+                          </v-btn>
+                        </div>
+                        <div class="time-picker-col">
+                          <div class="time-picker-col-title">Period</div>
+                          <v-btn
+                            v-for="period in periodOptions"
+                            :key="`end-period-${period}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="endTimeParts.period === period ? '#1976d2' : undefined"
+                            @click="updateTimePart('end', 'period', period)"
+                          >
+                            {{ period }}
+                          </v-btn>
+                        </div>
+                      </div>
+                      <div class="time-picker-actions">
+                        <v-btn variant="text" size="small" @click="clearTime('end')">Clear</v-btn>
+                        <v-btn variant="text" size="small" @click="endTimeMenu = false">Done</v-btn>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-menu>
               </v-col>
               <!-- Optional: Assign Worker -->
               <v-col cols="12">
@@ -205,8 +339,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
@@ -214,6 +348,7 @@ import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 
 const router = useRouter()
+const route = useRoute()
 
 // Department context (auto-determined from stored context)
 const deptContext = Utils.getStore('currentDepartmentContext') || {}
@@ -232,6 +367,13 @@ const filters = ref({
 
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
+const startTimeMenu = ref(false)
+const endTimeMenu = ref(false)
+const startTimeParts = reactive({ hour: '09', minute: '00', period: 'AM' })
+const endTimeParts = reactive({ hour: '10', minute: '00', period: 'AM' })
+const hourOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
+const minuteOptions = ['00', '30']
+const periodOptions = ['AM', 'PM']
 
 const createFormRef = ref(null)
 const createFormValid = ref(false)
@@ -312,6 +454,82 @@ const parseHour = (timeValue) => {
   const minute = Number(rawMinute || 0)
   if (Number.isNaN(hour) || Number.isNaN(minute)) return null
   return hour + minute / 60
+}
+
+const toMinutes = (timeValue) => {
+  if (!timeValue) return null
+  const [hour, minute] = String(timeValue).split(':').map(Number)
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+  return hour * 60 + minute
+}
+
+const parseTimeToParts = (timeValue) => {
+  if (!timeValue) return { hour: '09', minute: '00', period: 'AM' }
+  const [rawHour, rawMinute] = String(timeValue).split(':')
+  const hour24 = Number(rawHour || 0)
+  const minute = String(rawMinute || '00').padStart(2, '0')
+  const period = hour24 >= 12 ? 'PM' : 'AM'
+  const hour12 = hour24 % 12 || 12
+  return {
+    hour: String(hour12).padStart(2, '0'),
+    minute,
+    period,
+  }
+}
+
+const partsToTime = (parts) => {
+  const hour12 = Number(parts.hour)
+  const minute = Number(parts.minute)
+  if (Number.isNaN(hour12) || Number.isNaN(minute)) return ''
+
+  let hour24 = hour12 % 12
+  if (parts.period === 'PM') hour24 += 12
+
+  return `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+const formatTimeDisplay = (timeValue) => {
+  if (!timeValue) return ''
+  const [rawHour, rawMinute] = String(timeValue).split(':')
+  const hour = Number(rawHour || 0)
+  const minute = String(rawMinute || '00').padStart(2, '0')
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const hour12 = hour % 12 || 12
+  return `${String(hour12).padStart(2, '0')}:${minute} ${period}`
+}
+
+const syncTimePartsFromForm = (target, timeValue) => {
+  const next = parseTimeToParts(timeValue)
+  if (target === 'start') {
+    startTimeParts.hour = next.hour
+    startTimeParts.minute = next.minute
+    startTimeParts.period = next.period
+    return
+  }
+  endTimeParts.hour = next.hour
+  endTimeParts.minute = next.minute
+  endTimeParts.period = next.period
+}
+
+const updateTimePart = (target, part, value) => {
+  const parts = target === 'start' ? startTimeParts : endTimeParts
+  parts[part] = value
+  const nextTime = partsToTime(parts)
+  if (target === 'start') {
+    newShift.value.start_time = nextTime
+    return
+  }
+  newShift.value.end_time = nextTime
+}
+
+const clearTime = (target) => {
+  if (target === 'start') {
+    newShift.value.start_time = ''
+    startTimeMenu.value = false
+    return
+  }
+  newShift.value.end_time = ''
+  endTimeMenu.value = false
 }
 
 const getShiftDurationHours = (shift) => {
@@ -504,6 +722,27 @@ const createShift = async () => {
   }
 }
 
+watch(
+  () => newShift.value.start_time,
+  (start) => {
+    syncTimePartsFromForm('start', start)
+    if (!start) {
+      newShift.value.end_time = ''
+      return
+    }
+    if (newShift.value.end_time && toMinutes(newShift.value.end_time) <= toMinutes(start)) {
+      newShift.value.end_time = ''
+    }
+  },
+)
+
+watch(
+  () => newShift.value.end_time,
+  (end) => {
+    syncTimePartsFromForm('end', end)
+  },
+)
+
 const onShiftAssigned = (assignmentData) => {
   successMessage.value = `Shift assigned to ${assignmentData.userName} successfully!`
   showSuccess.value = true
@@ -524,6 +763,10 @@ onMounted(() => {
     loadPositions(),
     loadDepartmentWorkers()
   ])
+
+  if (String(route.query?.createShift || '') === '1') {
+    showCreateDialog.value = true
+  }
 })
 </script>
 
@@ -573,6 +816,38 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.time-picker-card {
+  border: 1px solid #d0d5dd;
+}
+
+.time-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 280px;
+}
+
+.time-picker-col {
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.time-picker-col-title {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  font-size: 12px;
+  color: #667085;
+  padding-bottom: 6px;
+}
+
+.time-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .nav-btn {

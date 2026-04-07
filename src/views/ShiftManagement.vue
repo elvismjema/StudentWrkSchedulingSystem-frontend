@@ -21,7 +21,7 @@
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
         <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
-          Add to Schedule
+          Create Shift
         </v-btn>
       </div>
     </div>
@@ -328,6 +328,112 @@
       />
     </v-dialog>
 
+    <v-dialog v-model="showEditDialog" max-width="640px">
+      <v-card>
+        <v-card-title>
+          <v-icon class="mr-2">mdi-pencil</v-icon>
+          Edit Shift
+        </v-card-title>
+        <v-divider></v-divider>
+        <v-card-text>
+          <v-form ref="editFormRef" v-model="editFormValid">
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="editShift.position_id"
+                  :items="positions"
+                  item-title="position_name"
+                  item-value="position_id"
+                  label="Position"
+                  variant="outlined"
+                  :rules="[v => !!v || 'Position is required']"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="editShift.shift_date"
+                  type="date"
+                  label="Date"
+                  variant="outlined"
+                  :rules="[v => !!v || 'Date is required']"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="editShift.start_time"
+                  type="time"
+                  label="Start Time"
+                  variant="outlined"
+                  :rules="[v => !!v || 'Start time is required']"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="editShift.end_time"
+                  type="time"
+                  label="End Time"
+                  variant="outlined"
+                  :rules="[v => !!v || 'End time is required']"
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-select
+                  v-model="editShift.assigned_user_id"
+                  :items="departmentWorkers"
+                  :item-title="w => `${w.fName} ${w.lName}`"
+                  item-value="userId"
+                  label="Assign Worker (optional)"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  prepend-inner-icon="mdi-account-outline"
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-checkbox
+                  v-model="editShift.is_published"
+                  label="Published"
+                  hide-details
+                />
+              </v-col>
+            </v-row>
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="error" variant="text" @click="showDeleteConfirmDialog = true">
+            Delete Shift
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            variant="elevated"
+            :loading="editing"
+            :disabled="!editFormValid"
+            @click="saveShiftEdits"
+          >
+            Save Changes
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showDeleteConfirmDialog" max-width="420px">
+      <v-card>
+        <v-card-title>Delete Shift?</v-card-title>
+        <v-card-text>
+          This action cannot be undone.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="showDeleteConfirmDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="elevated" :loading="deleting" @click="deleteSelectedShift">
+            Delete
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="showSuccess" color="success" timeout="4000">
       <v-icon start>mdi-check-circle</v-icon>
       {{ successMessage }}
@@ -369,6 +475,8 @@ const filters = ref({
 
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
+const showEditDialog = ref(false)
+const showDeleteConfirmDialog = ref(false)
 const startTimeMenu = ref(false)
 const endTimeMenu = ref(false)
 const startTimeParts = reactive({ hour: '09', minute: '00', period: 'AM' })
@@ -379,6 +487,8 @@ const periodOptions = ['AM', 'PM']
 
 const createFormRef = ref(null)
 const createFormValid = ref(false)
+const editFormRef = ref(null)
+const editFormValid = ref(false)
 const newShift = ref({
   department_id: currentDeptId,
   position_id: null,
@@ -391,9 +501,20 @@ const newShift = ref({
 })
 
 const selectedShift = ref(null)
+const editShift = ref({
+  shift_id: null,
+  position_id: null,
+  shift_date: '',
+  start_time: '',
+  end_time: '',
+  assigned_user_id: null,
+  is_published: false,
+})
 
 const shiftsLoading = ref(false)
 const creating = ref(false)
+const editing = ref(false)
+const deleting = ref(false)
 
 const showSuccess = ref(false)
 const showError = ref(false)
@@ -575,6 +696,16 @@ const getShiftBlockStyle = (shift, idx) => {
 
 const selectShift = (shift) => {
   selectedShift.value = shift
+  editShift.value = {
+    shift_id: shift.shift_id,
+    position_id: shift.position_id || null,
+    shift_date: shift.shift_date || '',
+    start_time: shift.start_time || '',
+    end_time: shift.end_time || '',
+    assigned_user_id: shift.assigned_user_id || null,
+    is_published: !!shift.is_published,
+  }
+  showEditDialog.value = true
 }
 
 const previousWeek = () => {
@@ -721,6 +852,55 @@ const createShift = async () => {
     showError.value = true
   } finally {
     creating.value = false
+  }
+}
+
+const saveShiftEdits = async () => {
+  if (!editFormValid.value || !editShift.value.shift_id) return
+
+  try {
+    editing.value = true
+    await shiftService.updateShift(editShift.value.shift_id, {
+      department_id: currentDeptId,
+      position_id: editShift.value.position_id,
+      shift_date: editShift.value.shift_date,
+      start_time: editShift.value.start_time,
+      end_time: editShift.value.end_time,
+      assigned_user_id: editShift.value.assigned_user_id || null,
+      is_published: editShift.value.is_published,
+    })
+
+    successMessage.value = 'Shift updated successfully!'
+    showSuccess.value = true
+    showEditDialog.value = false
+    await loadShifts()
+  } catch (error) {
+    console.error('Error updating shift:', error)
+    errorMessage.value = error?.response?.data?.message || 'Failed to update shift'
+    showError.value = true
+  } finally {
+    editing.value = false
+  }
+}
+
+const deleteSelectedShift = async () => {
+  if (!editShift.value.shift_id) return
+
+  try {
+    deleting.value = true
+    await shiftService.deleteShift(editShift.value.shift_id)
+    showDeleteConfirmDialog.value = false
+    showEditDialog.value = false
+    selectedShift.value = null
+    successMessage.value = 'Shift deleted successfully!'
+    showSuccess.value = true
+    await loadShifts()
+  } catch (error) {
+    console.error('Error deleting shift:', error)
+    errorMessage.value = error?.response?.data?.message || 'Failed to delete shift'
+    showError.value = true
+  } finally {
+    deleting.value = false
   }
 }
 

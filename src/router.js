@@ -306,7 +306,7 @@ router.beforeEach((to) => {
 
   // Require authentication for all other routes
   if (!role || !token) {
-    return { name: "login" };
+    return { name: "login", query: { redirect: to.fullPath } };
   }
 
   // Role-based access control

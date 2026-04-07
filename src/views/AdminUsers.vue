@@ -387,7 +387,8 @@
               :items="departments"
               item-title="department_name"
               item-value="department_id"
-              label="Department (Optional)"
+              label="Department"
+              :rules="[rules.required]"
               variant="outlined"
               density="comfortable"
               @update:modelValue="loadDepartmentRoles"
@@ -398,9 +399,23 @@
               :items="availableRoles"
               item-title="role_name"
               item-value="role_id"
-              label="Role (Optional)"
+              label="Role"
+              :rules="[rules.required]"
               variant="outlined"
               density="comfortable"
+              :disabled="!roleFormData.department_id"
+              class="mb-3"
+            />
+            <v-select
+              v-model="roleFormData.position_id"
+              :items="assignPositions"
+              item-title="position_name"
+              item-value="position_id"
+              label="Position (Optional)"
+              variant="outlined"
+              density="comfortable"
+              clearable
+              :disabled="!roleFormData.department_id"
               class="mb-3"
             />
           </v-form>
@@ -412,6 +427,7 @@
           <v-btn
             color="primary"
             :loading="saving"
+            :disabled="!roleFormValid || !roleFormData.department_id || !roleFormData.role_id"
             @click="assignRole"
           >
             Assign
@@ -518,6 +534,7 @@ const users = ref([]);
 const pendingAssignments = ref([]);
 const departments = ref([]);
 const availableRoles = ref([]);
+const assignPositions = ref([]);
 const inviteRoles = ref([]);
 const invitePositions = ref([]);
 const usersDataSource = ref('');
@@ -735,9 +752,20 @@ const loadDepartments = async () => {
 
 const loadDepartmentRoles = async () => {
   const departmentId = roleFormData.value.department_id;
+  roleFormData.value.role_id = null;
+  roleFormData.value.position_id = null;
+  if (!departmentId) {
+    availableRoles.value = [];
+    assignPositions.value = [];
+    return;
+  }
   try {
-    const rolesRes = await UserRoleServices.getAllRoles(departmentId || null);
+    const [rolesRes, posRes] = await Promise.all([
+      UserRoleServices.getAllRoles(departmentId),
+      apiClient.get(`/positions?department_id=${departmentId}`),
+    ]);
     availableRoles.value = rolesRes?.data?.data || [];
+    assignPositions.value = posRes?.data?.data || [];
   } catch (err) {
     error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
   }
@@ -806,7 +834,8 @@ const openAssignRoleDialog = (user) => {
     role_id: null,
     position_id: null,
   };
-  loadDepartmentRoles();
+  availableRoles.value = [];
+  assignPositions.value = [];
   assignRoleDialog.value = true;
 };
 
@@ -818,8 +847,8 @@ const closeAssignRoleDialog = () => {
 const assignRole = async () => {
   if (!selectedUser.value) return;
 
-  if (!roleFormData.value.department_id && !roleFormData.value.role_id) {
-    error.value = 'Select at least a department or a role before assigning.';
+  if (!roleFormData.value.department_id || !roleFormData.value.role_id) {
+    error.value = 'Please select both a department and a role before assigning.';
     return;
   }
 
@@ -827,31 +856,11 @@ const assignRole = async () => {
     saving.value = true;
     error.value = null;
 
-    let departmentId = roleFormData.value.department_id;
-    if (!departmentId) {
-      departmentId =
-        selectedUser.value?.userDepartments?.[0]?.department_id ||
-        departments.value?.[0]?.department_id ||
-        null;
-    }
-
-    let roleId = roleFormData.value.role_id;
-    if (!roleId) {
-      const rolesResponse = await UserRoleServices.getAllRoles(departmentId || null);
-      const roles = rolesResponse?.data?.data || [];
-      roleId = roles[0]?.role_id || null;
-    }
-
-    if (!departmentId || !roleId) {
-      error.value = 'Unable to assign role. Please select a department or role with available options.';
-      return;
-    }
-
     await UserRoleServices.assignUserRole({
       user_id: selectedUser.value.id,
-      department_id: departmentId,
-      role_id: roleId,
-      position_id: null,
+      department_id: roleFormData.value.department_id,
+      role_id: roleFormData.value.role_id,
+      position_id: roleFormData.value.position_id || null,
     });
     successMessage.value = 'Role assigned successfully!';
     await loadUsers();

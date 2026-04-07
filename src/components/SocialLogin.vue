@@ -25,7 +25,7 @@ const loginWithGoogle = () => {
     type: "standard",
     theme: "outline",
     size: "large",
-    text: "signup_with",
+    text: "signin_with",
     width: 400,
   });
 };

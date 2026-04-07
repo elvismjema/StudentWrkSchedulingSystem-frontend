@@ -325,8 +325,17 @@
 
           <v-text-field
             v-if="postForm.type === 'specific'"
-            v-model="postForm.coworkerId"
-            label="Coworker ID or name"
+            v-model="postForm.respondentUserId"
+            label="Coworker User ID"
+            variant="outlined"
+            density="comfortable"
+            class="mb-4"
+          />
+
+          <v-text-field
+            v-if="postForm.type === 'specific'"
+            v-model="postForm.respondentShiftId"
+            label="Coworker's Shift ID"
             variant="outlined"
             density="comfortable"
             class="mb-4"
@@ -425,7 +434,8 @@ const pendingIncoming = computed(() => {
 const postForm = reactive({
   shiftId: null,
   type: 'pool',
-  coworkerId: '',
+  respondentUserId: '',
+  respondentShiftId: '',
   notes: '',
   submitting: false,
 });
@@ -515,7 +525,7 @@ async function loadMyShifts() {
 async function pickUpRequest(req) {
   req._loading = true;
   try {
-    await studentService.respondToSwap(req.id, { status: 'accepted' });
+    await studentService.respondToSwap(req.id, { action: 'accept' });
     showSnack('Shift picked up!');
     await loadAllSwapRequests();
   } catch (err) {
@@ -528,12 +538,7 @@ async function pickUpRequest(req) {
 async function cancelRequest(req) {
   req._loading = true;
   try {
-    // Try DELETE first, fall back to status update
-    try {
-      await studentService.cancelSwapRequest(req.id);
-    } catch {
-      await studentService.respondToSwap(req.id, { status: 'cancelled' });
-    }
+    await studentService.cancelSwapRequest(req.id);
     showSnack('Request cancelled');
     await loadAllSwapRequests();
   } catch (err) {
@@ -546,7 +551,7 @@ async function cancelRequest(req) {
 async function acceptIncoming(req) {
   req._accepting = true;
   try {
-    await studentService.respondToSwap(req.id, { status: 'accepted' });
+    await studentService.respondToSwap(req.id, { action: 'accept' });
     showSnack('Swap accepted!');
     await loadAllSwapRequests();
   } catch (err) {
@@ -559,7 +564,7 @@ async function acceptIncoming(req) {
 async function declineIncoming(req) {
   req._declining = true;
   try {
-    await studentService.respondToSwap(req.id, { status: 'declined' });
+    await studentService.respondToSwap(req.id, { action: 'decline' });
     showSnack('Swap declined');
     await loadAllSwapRequests();
   } catch (err) {
@@ -570,13 +575,20 @@ async function declineIncoming(req) {
 }
 
 async function submitTradeRequest() {
+  if (postForm.type === 'specific') {
+    if (!postForm.respondentUserId || !postForm.respondentShiftId) {
+      showSnack('Both Coworker User ID and Shift ID are required for a specific swap', 'error');
+      return;
+    }
+  }
   postForm.submitting = true;
   try {
     if (postForm.type === 'pool') {
       await studentService.findCover(postForm.shiftId, { notes: postForm.notes });
     } else {
       await studentService.requestSwap(postForm.shiftId, {
-        targetUserId: postForm.coworkerId,
+        respondentUserId: postForm.respondentUserId,
+        respondentShiftId: postForm.respondentShiftId,
         notes: postForm.notes,
       });
     }
@@ -584,7 +596,8 @@ async function submitTradeRequest() {
     showPostDialog.value = false;
     postForm.shiftId = null;
     postForm.notes = '';
-    postForm.coworkerId = '';
+    postForm.respondentUserId = '';
+    postForm.respondentShiftId = '';
     await loadAllSwapRequests();
   } catch (err) {
     showSnack(err?.response?.data?.message || 'Failed to submit request', 'error');

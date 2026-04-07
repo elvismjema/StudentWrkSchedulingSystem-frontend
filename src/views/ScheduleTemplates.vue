@@ -37,24 +37,13 @@
           <!-- Card title row -->
           <v-card-title class="d-flex align-center justify-space-between pb-1">
             <span class="text-truncate mr-2">{{ tmpl.template_name }}</span>
-            <div class="d-flex gap-1 align-center">
-              <v-chip
-                v-if="templateUnpositionedCount(tmpl) > 0"
-                color="orange"
-                size="x-small"
-                variant="tonal"
-                title="Some shifts have no position — cannot publish yet"
-              >
-                Draft
-              </v-chip>
-              <v-chip
-                :color="tmpl.is_active ? 'success' : 'grey'"
-                size="x-small"
-                variant="tonal"
-              >
-                {{ tmpl.is_active ? 'Active' : 'Inactive' }}
-              </v-chip>
-            </div>
+            <v-chip
+              :color="tmpl.is_active ? 'success' : 'grey'"
+              size="x-small"
+              variant="tonal"
+            >
+              {{ tmpl.is_active ? 'Active' : 'Inactive' }}
+            </v-chip>
           </v-card-title>
 
           <v-card-subtitle class="d-flex align-center flex-wrap gap-2 pb-2">
@@ -100,6 +89,7 @@
                 v-for="(s, i) in tmpl.templateShifts.slice(0, 4)"
                 :key="i"
                 class="shift-row text-body-2 d-flex align-center"
+                :class="{ 'shift-row--unassigned': !s.assigned_user_id }"
               >
                 <!-- Coverage / conflict indicator -->
                 <v-icon
@@ -143,8 +133,8 @@
               Edit
             </v-btn>
             <v-tooltip
-              v-if="templateUnpositionedCount(tmpl) > 0"
-              :text="`${templateUnpositionedCount(tmpl)} shift(s) have no position assigned`"
+              v-if="templateUnassignedWorkerCount(tmpl) > 0"
+              :text="`${templateUnassignedWorkerCount(tmpl)} shift(s) need an assigned worker before publishing`"
               location="top"
             >
               <template #activator="{ props: ttProps }">
@@ -245,7 +235,7 @@
           — click the highlighted shift blocks to review.
         </v-alert>
 
-        <!-- Missing-position info (save is still allowed; publish is blocked) -->
+        <!-- Missing-position info (save is always allowed; informational only) -->
         <v-alert
           v-if="hasUnassignedPositions"
           type="info"
@@ -254,12 +244,25 @@
           class="ma-4 mb-0"
           icon="mdi-information-outline"
         >
-          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's have' : ' has' }} no position yet.</strong>
-          You can save this template as a draft — click the grey blocks to fill in positions before publishing.
+          <strong>{{ unassignedPositionCount }} shift{{ unassignedPositionCount > 1 ? 's have' : ' has' }} no position.</strong>
+          Position is optional — you can save and publish without one.
+        </v-alert>
+
+        <!-- Missing-worker warning (save is allowed; publish is blocked) -->
+        <v-alert
+          v-if="unassignedWorkerCount > 0"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="ma-4 mb-0"
+          icon="mdi-account-alert"
+        >
+          <strong>{{ unassignedWorkerCount }} shift{{ unassignedWorkerCount > 1 ? 's have' : ' has' }} no assigned worker.</strong>
+          You can save this template now — assign a worker to every shift before publishing.
         </v-alert>
 
         <v-card-text class="pa-4 overflow-y-auto" style="max-height: calc(100vh - 180px)">
-          <v-form ref="formRef" v-model="formValid">
+          <v-form ref="formRef">
             <!-- Template metadata row -->
             <v-row class="mb-2">
               <v-col cols="12" md="6">
@@ -317,7 +320,7 @@
             color="primary"
             variant="elevated"
             :loading="saving"
-            :disabled="!formValid"
+            :disabled="!canSaveTemplate"
             @click="saveTemplate"
           >
             {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
@@ -374,17 +377,17 @@
         </v-card-title>
         <v-divider />
         <v-card-text>
-          <!-- Block banner when the template has unpositioned shifts -->
+          <!-- Block banner when the template has shifts with no worker assigned -->
           <v-alert
-            v-if="publishTargetUnpositionedCount > 0"
+            v-if="publishTargetUnassignedCount > 0"
             type="error"
             variant="tonal"
             class="mb-4"
-            icon="mdi-cancel"
+            icon="mdi-account-alert"
           >
             <strong>Cannot publish yet.</strong>
-            {{ publishTargetUnpositionedCount }} shift{{ publishTargetUnpositionedCount > 1 ? 's require' : ' requires' }} a position before this template can be published.
-            Close this dialog and edit the template to assign positions to the grey shift blocks.
+            {{ publishTargetUnassignedCount }} shift{{ publishTargetUnassignedCount > 1 ? 's have' : ' has' }} no assigned worker.
+            Edit the template and assign a worker to every shift, then come back to publish.
           </v-alert>
 
           <p class="text-body-2 text-medium-emphasis mb-4">
@@ -405,12 +408,17 @@
                 @update:modelValue="loadPublishConflicts"
               />
             </v-col>
-            <v-col cols="12" md="6" class="d-flex align-center">
+            <v-col cols="12" md="6">
               <v-checkbox
                 v-model="publishForm.publish_immediately"
                 label="Publish immediately & notify workers"
                 hide-details
               />
+              <p class="text-caption text-medium-emphasis ml-8 mt-n1">
+                {{ publishForm.publish_immediately
+                  ? 'Shifts will be visible to student workers immediately.'
+                  : 'Shifts will be saved as drafts — students will not see them until you publish manually.' }}
+              </p>
             </v-col>
           </v-row>
 
@@ -454,7 +462,7 @@
             color="primary"
             variant="elevated"
             :loading="publishing"
-            :disabled="!publishForm.start_date || publishTargetUnpositionedCount > 0"
+            :disabled="!publishForm.start_date || publishTargetUnassignedCount > 0"
             @click="confirmPublish"
           >
             {{ publishForm.publish_immediately ? 'Publish & Notify' : 'Create Shifts (Draft)' }}
@@ -472,16 +480,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import templateService from '../services/templateService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+import UserRoleServices from '../services/userRoleServices.js'
 import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 
 // ─── Context ─────────────────────────────────────────────────────────────────
-const deptContext = Utils.getStore('currentDepartmentContext') || {}
-const currentDeptId = deptContext.department_id || null
-const currentDeptName = deptContext.department_name || ''
+const _deptCtxInit = Utils.getStore('currentDepartmentContext') || {}
+const currentDeptId = ref(_deptCtxInit.department_id || null)
+const currentDeptName = ref(_deptCtxInit.department_name || '')
 const currentUser = Utils.getStore('user') || {}
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -501,7 +510,6 @@ const templateConflictsMap = ref({})
 const showDialog = ref(false)
 const editingTemplate = ref(null)
 const formRef = ref(null)
-const formValid = ref(false)
 const editorConflicts = ref([])
 
 const showDuplicateDialog = ref(false)
@@ -523,7 +531,7 @@ const form = ref({
 
 const publishForm = ref({
   start_date: '',
-  publish_immediately: false,
+  publish_immediately: true,
 })
 
 // ─── Reference data ───────────────────────────────────────────────────────────
@@ -550,19 +558,25 @@ const formatTime12 = (t) => {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
-// ─── Calendar-editor shift validation ────────────────────────────────────────
+// ─── Template save gate (replaces formValid — unblocks button immediately) ────
+const canSaveTemplate = computed(
+  () => !!(form.value.template_name?.trim()) && !!(form.value.recurrence_type)
+)
+
+// ─── Calendar-editor shift validation (informational only — does not block save or publish) ─
 const unassignedPositionCount = computed(
   () => form.value.shifts.filter((s) => !s.position_id).length
 )
 const hasUnassignedPositions = computed(() => unassignedPositionCount.value > 0)
 
-// Count shifts without a position on a saved template (from server data)
-const templateUnpositionedCount = (tmpl) =>
-  (tmpl.templateShifts || []).filter((s) => !s.position_id).length
-
-// Count for the template currently open in the publish dialog
-const publishTargetUnpositionedCount = computed(
-  () => templateUnpositionedCount(publishTarget.value || {})
+// ─── Worker assignment validation (save allowed; publish blocked) ─────────────
+const unassignedWorkerCount = computed(
+  () => form.value.shifts.filter((s) => !s.assigned_user_id).length
+)
+const templateUnassignedWorkerCount = (tmpl) =>
+  (tmpl.templateShifts || []).filter((s) => !s.assigned_user_id).length
+const publishTargetUnassignedCount = computed(
+  () => templateUnassignedWorkerCount(publishTarget.value || {})
 )
 
 // ─── Publish date helpers ─────────────────────────────────────────────────────
@@ -604,10 +618,10 @@ const shiftHasConflict = (tmpl, shift) =>
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 const loadTemplates = async () => {
-  if (!currentDeptId) return
+  if (!currentDeptId.value) return
   loading.value = true
   try {
-    const res = await templateService.listTemplates(currentDeptId)
+    const res = await templateService.listTemplates(currentDeptId.value)
     templates.value = res?.data?.data || []
 
     // Cache editor-level conflicts for each template (no date = recurring only)
@@ -627,18 +641,101 @@ const loadTemplates = async () => {
 }
 
 const loadDeptData = async () => {
-  if (!currentDeptId) return
+  if (!currentDeptId.value) return
+
+  // ── Positions ─────────────────────────────────────────────────────────────
   try {
-    const [posRes, workerRes] = await Promise.all([
-      apiClient.get(`positions?department_id=${currentDeptId}`),
-      apiClient.get(`admin/departments/${currentDeptId}/members`),
-    ])
+    const posRes = await apiClient.get(`positions?department_id=${currentDeptId.value}`)
     positions.value = posRes?.data?.data || posRes?.data || []
-    const members = workerRes?.data?.data || workerRes?.data || []
-    // Filter to active members with user data
-    deptWorkers.value = members.filter((m) => m.is_active && m.user)
   } catch (err) {
-    console.error('Error loading department data:', err)
+    console.error('Error loading positions:', err)
+    positions.value = []
+  }
+
+  // ── Workers ───────────────────────────────────────────────────────────────
+  // Try the admin users-with-roles endpoint first; fall back to the
+  // department-members endpoint if it returns nothing usable.
+  try {
+    const usersRes = await apiClient.get('user-departments/admin/users-with-roles?activeOnly=true')
+
+    // Normalize workers to the shape expected by TemplateCalendarEditor:
+    // { user_id, user: { fName, lName, email } }
+    const users = usersRes?.data?.data || usersRes?.data || []
+    const targetDepartmentId = Number(currentDeptId.value)
+
+    const departmentWorkers = []
+    for (const u of users) {
+      // Each user object may carry its department memberships in several shapes
+      const memberships = Array.isArray(u?.userDepartments) ? u.userDepartments
+        : Array.isArray(u?.departments) ? u.departments
+        : []
+      const deptMembership = memberships.find((membership) => {
+        const deptId = Number(
+          membership?.department_id ??
+          membership?.department?.department_id ??
+          membership?.departmentId ??
+          0
+        )
+        return deptId === targetDepartmentId
+      })
+
+      if (!deptMembership) continue
+      if (deptMembership?.is_active === false) continue
+
+      const roleName = String(
+        deptMembership?.role?.role_name || deptMembership?.role_name || ''
+      ).toLowerCase()
+      const permissionLevel = Number(
+        deptMembership?.role?.permission_level ?? deptMembership?.permission_level ?? 0
+      )
+      // Include students and any role with permission_level < 50 (non-manager)
+      const isStudentRole = roleName.includes('student') || permissionLevel < 50
+      if (!isStudentRole) continue
+
+      const userId = u?.userId || u?.id || u?.user_id
+      if (!userId) continue
+
+      departmentWorkers.push({
+        user_id: userId,
+        user: {
+          fName: u?.fName || '',
+          lName: u?.lName || '',
+          email: u?.email || '',
+        },
+      })
+    }
+
+    // If the primary endpoint returned users but none matched the department,
+    // fall through to the department-members fallback.
+    if (departmentWorkers.length > 0) {
+      deptWorkers.value = departmentWorkers
+      return
+    }
+  } catch (err) {
+    console.error('Primary worker endpoint failed, trying fallback:', err)
+  }
+
+  // Fallback: department-scoped member list
+  try {
+    const membersRes = await apiClient.get(`admin/departments/${currentDeptId.value}/members`)
+    const members = membersRes?.data?.data || membersRes?.data || []
+    deptWorkers.value = members
+      .filter((m) => {
+        const roleName = String(m?.role?.role_name || m?.role_name || '').toLowerCase()
+        const permLevel = Number(m?.role?.permission_level ?? m?.permission_level ?? 0)
+        return roleName.includes('student') || permLevel < 50
+      })
+      .map((m) => {
+        const u = m.user || m
+        return {
+          user_id: u?.userId || u?.id || u?.user_id,
+          user: { fName: u?.fName || '', lName: u?.lName || '', email: u?.email || '' },
+        }
+      })
+      .filter((w) => w.user_id)
+  } catch (err) {
+    console.error('Error loading department workers:', err)
+    deptWorkers.value = []
   }
 }
 
@@ -704,7 +801,7 @@ const saveTemplate = async () => {
   saving.value = true
   try {
     const payload = {
-      department_id: currentDeptId,
+      department_id: currentDeptId.value,
       template_name: form.value.template_name,
       recurrence_type: form.value.recurrence_type,
       is_active: form.value.is_active,
@@ -764,7 +861,7 @@ const confirmDuplicate = async () => {
 const openPublishDialog = (tmpl) => {
   publishTarget.value = tmpl
   publishConflicts.value = []
-  publishForm.value = { start_date: '', publish_immediately: false }
+  publishForm.value = { start_date: '', publish_immediately: true }
   showPublishDialog.value = true
 }
 
@@ -836,10 +933,70 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
 
+// ─── Sidebar context listener ────────────────────────────────────────────────
+// If ManagerSidebar resolves the department context after this page has already
+// mounted, pick it up via the custom event instead of showing "No department".
+const onDeptContextReady = (e) => {
+  const ctx = e.detail
+  if (ctx?.department_id && !currentDeptId.value) {
+    currentDeptId.value = ctx.department_id
+    currentDeptName.value = ctx.department_name || ''
+    loadTemplates()
+    loadDeptData()
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
+  window.addEventListener('departmentContextReady', onDeptContextReady)
+
+  // If the manager sidebar hasn't set the context yet (e.g. first login or
+  // localStorage was cleared), resolve it now via the API so this page works
+  // without needing a second navigation.
+  if (!currentDeptId.value) {
+    // First, re-check localStorage — the sidebar may have written it between
+    // our initial read (top of <script setup>) and this onMounted callback.
+    const freshCtx = Utils.getStore('currentDepartmentContext')
+    if (freshCtx?.department_id) {
+      currentDeptId.value = freshCtx.department_id
+      currentDeptName.value = freshCtx.department_name || ''
+    }
+  }
+
+  if (!currentDeptId.value) {
+    const userId = currentUser?.userId || currentUser?.id
+    if (userId) {
+      try {
+        const response = await UserRoleServices.getUserDepartments(userId)
+        const memberships = response?.data || []
+        const managerMembership = memberships.find(
+          (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+        )
+        const membership =
+          managerMembership ||
+          memberships.find((m) => m.is_active) ||
+          memberships[0]
+        if (membership) {
+          currentDeptId.value = membership.department_id
+          currentDeptName.value = membership.department?.department_name || ''
+          Utils.setStore('currentDepartmentContext', {
+            department_id: membership.department_id,
+            department_name: currentDeptName.value,
+            role_name: membership.role?.role_name || 'Manager',
+            role_id: membership.role_id,
+          })
+        }
+      } catch {
+        // Non-fatal: page will show the "No department selected" warning.
+      }
+    }
+  }
   loadTemplates()
   loadDeptData()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('departmentContextReady', onDeptContextReady)
 })
 </script>
 
@@ -857,6 +1014,12 @@ onMounted(() => {
 }
 .shift-row {
   color: #555;
+}
+.shift-row--unassigned {
+  background-color: #fff3e0;
+  border-left: 3px solid #F57C00;
+  padding-left: 4px;
+  border-radius: 2px;
 }
 .gap-2 {
   gap: 8px;

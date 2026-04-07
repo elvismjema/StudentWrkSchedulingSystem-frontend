@@ -217,9 +217,9 @@ const userId = currentUser.userId || currentUser.id;
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
-const gridMode = ref('available'); // 'available' | 'unavailable'
-const selectedSlots = ref(new Set()); // available (green)
-const unavailableSlots = ref(new Set()); // unavailable (red)
+const gridMode = ref('available');
+const selectedSlots = ref(new Set());
+const unavailableSlots = ref(new Set());
 const initialSlots = ref(new Set());
 const initialUnavailableSlots = ref(new Set());
 const existingRecords = ref([]);
@@ -281,8 +281,6 @@ const slotKey = (day, hour) => `${day}-${hour}`;
 
 const isAvailable = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
 const isUnavailable = (day, hour) => unavailableSlots.value.has(slotKey(day, hour));
-// Keep isSelected as alias for backward compat
-const isSelected = isAvailable;
 
 const notify = (text, color = "success") => {
   snackbar.value = { show: true, text, color };
@@ -527,12 +525,22 @@ onMounted(loadAvailabilities);
 <style scoped>
 .availability-container {
   padding: 24px;
-  background-color: #fafafa;
-  min-height: 100%;
 }
 
 .page-header {
   margin-bottom: 16px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-title {

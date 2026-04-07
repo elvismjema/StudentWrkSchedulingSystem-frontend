@@ -31,6 +31,7 @@
               :loading="loadingPositions"
               :disabled="loadingPositions"
               hide-details="auto"
+              no-data-text="No positions available — ask an admin to add positions for this department"
             />
           </v-col>
 
@@ -245,6 +246,7 @@
               :no-data-text="loadingWorkers ? 'Loading workers...' : 'No workers available'"
               :messages="form.post_as_open ? 'Disabled when Post as Open Shift is enabled.' : undefined"
               hide-details="auto"
+              no-data-text="No workers found — check department member setup"
             />
             <div v-if="workerLoadError" class="assign-error">
               {{ workerLoadError }}
@@ -492,7 +494,7 @@ const loadPositions = async () => {
 
   loadingPositions.value = true;
   try {
-    const response = await apiClient.get(`/positions?department_id=${departmentId}`);
+    const response = await apiClient.get(`positions?department_id=${departmentId}`);
     positions.value = toItems(response);
   } catch (error) {
     positions.value = [];

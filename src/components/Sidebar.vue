@@ -57,12 +57,22 @@
 </template>
 
 <script setup>
+
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
+
 import { computed, onMounted, ref } from 'vue'
+
 import Utils from '../config/utils'
 import UserRoleServices from '../services/userRoleServices.js'
 
 const drawer = ref(true)
+
+const rail = ref(false)
+const route = useRoute()
+
 const rail = ref(true)
+
 const user = ref(Utils.getStore("user") || {})
 const resolvedDepartmentName = ref('')
 

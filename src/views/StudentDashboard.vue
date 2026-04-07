@@ -510,7 +510,7 @@ function getWeekStart(date) {
 async function handleClockIn() {
   clockingIn.value = true;
   try {
-    const payload = { shiftId: nextShift.value?.id };
+    const payload = { shiftId: nextShift.value?.shift_id || nextShift.value?.id };
     await studentService.clockIn(payload);
     clockStatus.isClockedIn = true;
     clockStatus.clockInTime = new Date().toISOString();

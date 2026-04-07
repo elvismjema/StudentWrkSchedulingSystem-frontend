@@ -98,11 +98,11 @@ export default {
 
   // ─── Clock In/Out ────────────────────────────────────────────────
   clockIn(payload) {
-    return apiClient.post("/clock-records/clock-in", payload);
+    return apiClient.post("/student/clock-in", payload);
   },
 
-  clockOut(recordId) {
-    return apiClient.patch(`/clock-records/${recordId}/clock-out`, {});
+  clockOut() {
+    return apiClient.post("/student/clock-out", {});
   },
 
   startBreak(recordId) {

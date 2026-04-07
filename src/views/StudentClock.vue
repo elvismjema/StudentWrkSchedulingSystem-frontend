@@ -230,18 +230,36 @@ const clockOutDialog = ref(false);
 const timesheetData = ref([]);
 const snackbar = ref({ show: false, text: '', color: 'success' });
 
+const buildDT = (shift, field) => {
+  const time = shift[field];
+  if (!time) return null;
+  if (typeof time === 'string' && (time.includes('T') || (time.includes('-') && time.length > 10))) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return String(date).slice(0, 10) + 'T' + time;
+  return null;
+};
+
 const canClockIn = computed(() => {
   if (clockedIn.value) return false;
   if (!activeShift.value) return false;
-  const start = new Date(activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start).getTime();
+  const raw = buildDT(activeShift.value, 'start_time') || activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start;
+  const start = new Date(raw).getTime();
+  if (isNaN(start)) return false;
   const diff = start - Date.now();
   return diff <= 15 * 60 * 1000 && diff >= -60 * 60 * 1000;
 });
 
 const formatShiftTime = (s) => {
   if (!s) return '';
-  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return fmt(s.start_time || s.startTime || s.shift_start) + ' – ' + fmt(s.end_time || s.endTime || s.shift_end);
+  const fmt = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const startDT = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
+  const endDT = buildDT(s, 'end_time') || s.end_time || s.endTime || s.shift_end;
+  return fmt(startDT) + ' – ' + fmt(endDT);
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -348,10 +366,11 @@ const fetchClockStatus = async () => {
   try {
     const res = await studentService.getOpenClockRecord();
     const record = res?.data?.data || res?.data;
-    if (record && record.id && !record.clock_out_time && !record.clockOutTime) {
+    const recId = record?.clock_id || record?.id;
+    if (record && recId && !record.clock_out && !record.clock_out_time && !record.clockOutTime) {
       clockedIn.value = true;
-      currentRecordId.value = record.id;
-      clockInTime.value = record.clock_in_time || record.clockInTime || record.createdAt;
+      currentRecordId.value = recId;
+      clockInTime.value = record.clock_in || record.clock_in_time || record.clockInTime || record.createdAt;
       onBreak.value = !!record.on_break || !!record.onBreak;
     } else {
       clockedIn.value = false;
@@ -413,11 +432,9 @@ const confirmClockIn = () => {
 const doClockIn = async () => {
   clockingIn.value = true;
   try {
-    const payload = {
-      user_id: user?.userId || user?.id,
-    };
+    const payload = {};
     if (activeShift.value) {
-      payload.shift_id = activeShift.value.id;
+      payload.shiftId = activeShift.value.shift_id || activeShift.value.id;
     }
     await studentService.clockIn(payload);
     showSnackbar('Clocked in!', 'success');
@@ -437,7 +454,7 @@ const confirmClockOut = () => {
 const doClockOut = async () => {
   clockingOut.value = true;
   try {
-    await studentService.clockOut(currentRecordId.value);
+    await studentService.clockOut();
     showSnackbar('Clocked out!', 'success');
     clockOutDialog.value = false;
     await fetchAll();

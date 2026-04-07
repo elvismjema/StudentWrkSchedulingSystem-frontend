@@ -71,9 +71,6 @@
               <h3 class="worker-name">
                 {{ `${worker.fName || ''} ${worker.lName || ''}`.trim() || 'Unknown Worker' }}
               </h3>
-              <v-chip size="small" color="#8B1538" variant="outlined" class="position-chip">
-                {{ getPositionName(worker) }}
-              </v-chip>
             </div>
           </div>
 
@@ -301,10 +298,6 @@ const getWorkerInitials = (worker) => {
   const first = (worker.fName || '').charAt(0).toUpperCase();
   const last = (worker.lName || '').charAt(0).toUpperCase();
   return first && last ? `${first}${last}` : first || 'U';
-};
-
-const getPositionName = (worker) => {
-  return worker.position?.position_name || worker.positionName || 'Not assigned';
 };
 
 const getAvailabilityForDay = (worker, dayKey) => {
@@ -698,10 +691,6 @@ watch(activeTab, (nextTab) => {
   font-weight: 600;
   color: #101828;
   line-height: 1.2;
-}
-
-.position-chip {
-  font-size: 12px;
 }
 
 .availability-section {

@@ -124,17 +124,18 @@
                     <v-text-field
                       v-bind="props"
                       :model-value="formatTimeDisplay(newShift.start_time)"
-                      label="Start Time"
+                      placeholder="Start Time"
                       variant="outlined"
                       readonly
                       prepend-inner-icon="mdi-clock-outline"
+                      persistent-placeholder
                       :rules="[v => !!v || 'Start time is required']"
                     />
                   </template>
                   <v-card class="time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
                           <v-btn
                             v-for="hour in hourOptions"
@@ -149,7 +150,7 @@
                             {{ hour }}
                           </v-btn>
                         </div>
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
                           <v-btn
                             v-for="minute in minuteOptions"
@@ -164,7 +165,7 @@
                             {{ minute }}
                           </v-btn>
                         </div>
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
                           <v-btn
                             v-for="period in periodOptions"
@@ -200,18 +201,19 @@
                     <v-text-field
                       v-bind="props"
                       :model-value="formatTimeDisplay(newShift.end_time)"
-                      label="End Time"
+                      placeholder="End Time"
                       variant="outlined"
                       readonly
                       prepend-inner-icon="mdi-clock-outline"
                       :disabled="!newShift.start_time"
+                      persistent-placeholder
                       :rules="[v => !!v || 'End time is required']"
                     />
                   </template>
                   <v-card class="time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
                           <v-btn
                             v-for="hour in hourOptions"
@@ -226,7 +228,7 @@
                             {{ hour }}
                           </v-btn>
                         </div>
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
                           <v-btn
                             v-for="minute in minuteOptions"
@@ -241,7 +243,7 @@
                             {{ minute }}
                           </v-btn>
                         </div>
-                        <div class="time-picker-col">
+                        <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
                           <v-btn
                             v-for="period in periodOptions"
@@ -824,13 +826,12 @@ onMounted(() => {
 
 .time-picker-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  max-height: 280px;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 14px;
+  max-height: 320px;
 }
 
 .time-picker-col {
-  overflow-y: auto;
   max-height: 250px;
 }
 
@@ -841,6 +842,16 @@ onMounted(() => {
   font-size: 12px;
   color: #667085;
   padding-bottom: 6px;
+}
+
+.time-picker-col-hour {
+  overflow-y: auto;
+  padding-right: 8px;
+  border-right: 1px solid #e4e7ec;
+}
+
+.time-picker-col-fixed {
+  overflow: hidden;
 }
 
 .time-picker-actions {

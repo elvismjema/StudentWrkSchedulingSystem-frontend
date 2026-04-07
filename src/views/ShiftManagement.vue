@@ -20,7 +20,7 @@
         <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
-        <v-btn color="primary" variant="elevated" @click="showCreateDialog = true" prepend-icon="mdi-plus">
+        <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
           Add to Schedule
         </v-btn>
       </div>

@@ -140,36 +140,14 @@
 
               <v-progress-linear v-if="loadingWorkerAvailability" indeterminate color="#8B1538" class="mb-4" />
 
-              <div v-else class="weekly-grid">
+              <div v-else class="weekly-lines">
                 <div
                   v-for="day in weekDays"
                   :key="`day-${day.value}`"
-                  class="weekly-day-card"
+                  class="weekly-line-item"
                 >
-                  <div class="weekly-day-title">{{ day.label }}</div>
-                  <div class="weekly-section-label available-label">Available</div>
-                  <div v-if="groupedAvailability[day.value]?.available?.length">
-                    <div
-                      v-for="slot in groupedAvailability[day.value].available"
-                      :key="`a-${day.value}-${slot}`"
-                      class="time-pill time-pill-available"
-                    >
-                      {{ slot }}
-                    </div>
-                  </div>
-                  <div v-else class="time-pill time-pill-empty">None</div>
-
-                  <div class="weekly-section-label unavailable-label mt-3">Unavailable</div>
-                  <div v-if="groupedAvailability[day.value]?.unavailable?.length">
-                    <div
-                      v-for="slot in groupedAvailability[day.value].unavailable"
-                      :key="`u-${day.value}-${slot}`"
-                      class="time-pill time-pill-unavailable"
-                    >
-                      {{ slot }}
-                    </div>
-                  </div>
-                  <div v-else class="time-pill time-pill-empty">None</div>
+                  <span class="weekly-line-day">{{ day.label }}:</span>
+                  <span class="weekly-line-value">{{ dailyAvailabilityLines[day.value] || "—" }}</span>
                 </div>
               </div>
             </v-window-item>
@@ -417,6 +395,19 @@ const selectedWorkerInitials = computed(() => {
   const first = selectedWorker.value?.fName?.[0] || "";
   const last = selectedWorker.value?.lName?.[0] || "";
   return `${first}${last}`.toUpperCase() || "SW";
+});
+
+const dailyAvailabilityLines = computed(() => {
+  return weekDays.reduce((acc, day) => {
+    const grouped = groupedAvailability.value?.[day.value] || { available: [], unavailable: [] };
+    const parts = [];
+
+    grouped.available.forEach((slot) => parts.push(`${slot} (Available)`));
+    grouped.unavailable.forEach((slot) => parts.push(`${slot} (Unavailable)`));
+
+    acc[day.value] = parts.length ? parts.join(", ") : "—";
+    return acc;
+  }, {});
 });
 
 // Methods
@@ -703,69 +694,40 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.weekly-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.weekly-day-card {
+.weekly-lines {
   border: 1px solid #eaecf0;
   border-radius: 12px;
-  padding: 12px;
-  background: #f9fafb;
+  overflow: hidden;
 }
 
-.weekly-day-title {
-  font-size: 18px;
+.weekly-line-item {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eaecf0;
+  background: #fff;
+}
+
+.weekly-line-item:last-child {
+  border-bottom: 0;
+}
+
+.weekly-line-day {
+  min-width: 58px;
+  font-size: 15px;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 8px;
 }
 
-.weekly-section-label {
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.available-label {
-  color: #067647;
-}
-
-.unavailable-label {
-  color: #b42318;
-}
-
-.time-pill {
-  font-size: 12px;
-  border-radius: 999px;
-  padding: 4px 8px;
-  margin-bottom: 6px;
-  display: inline-block;
-}
-
-.time-pill-available {
-  background: #ecfdf3;
-  color: #067647;
-  border: 1px solid #abefc6;
-}
-
-.time-pill-unavailable {
-  background: #fef3f2;
-  color: #b42318;
-  border: 1px solid #fecdca;
-}
-
-.time-pill-empty {
-  background: #f2f4f7;
-  color: #667085;
-  border: 1px solid #e4e7ec;
+.weekly-line-value {
+  font-size: 14px;
+  color: #475467;
 }
 
 @media (max-width: 1280px) {
-  .weekly-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .weekly-line-item {
+    flex-direction: column;
+    gap: 2px;
   }
 }
 
@@ -778,8 +740,8 @@ onMounted(() => {
     font-size: 16px;
   }
 
-  .weekly-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .weekly-line-day {
+    min-width: 0;
   }
 }
 </style>

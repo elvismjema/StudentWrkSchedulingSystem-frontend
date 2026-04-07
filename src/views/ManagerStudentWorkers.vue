@@ -125,12 +125,6 @@
             <v-window-item value="details">
               <div class="details-section">
                 <div class="detail-row">
-                  <span class="detail-label">Position:</span>
-                  <v-chip color="#8B1538" variant="outlined">
-                    {{ getPositionName(workerModal.selectedWorker) }}
-                  </v-chip>
-                </div>
-                <div class="detail-row">
                   <span class="detail-label">Email:</span>
                   <span class="detail-value">{{ workerModal.selectedWorker.email || 'No email' }}</span>
                 </div>
@@ -229,14 +223,6 @@
 
         <v-card-actions class="modal-actions">
           <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
-          <v-btn
-            color="#8B1538"
-            :loading="loadingSchedule"
-            @click="loadClassSchedule"
-          >
-            <v-icon start>mdi-calendar-search</v-icon>
-            View Schedule
-          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -326,13 +312,19 @@ const getAvailabilityForDay = (worker, dayKey) => {
   if (!availability || !availability[dayKey]) {
     return '—';
   }
-  
+
   const dayAvailability = availability[dayKey];
-  if (dayAvailability.available && dayAvailability.startTime && dayAvailability.endTime) {
-    return `${formatTime(dayAvailability.startTime)} – ${formatTime(dayAvailability.endTime)}`;
-  }
-  
-  return 'Not set';
+  const segments = [];
+
+  (dayAvailability.available || []).forEach((range) => {
+    segments.push(`${range} (Available)`);
+  });
+
+  (dayAvailability.unavailable || []).forEach((range) => {
+    segments.push(`${range} (Unavailable)`);
+  });
+
+  return segments.length ? segments.join(', ') : '—';
 };
 
 const formatTime = (timeString) => {
@@ -487,13 +479,31 @@ const loadWorkersAvailability = async () => {
       
       // Convert availability array to object keyed by day
       const availabilityMap = {};
+      const dayKeyByNumber = {
+        0: 'sunday',
+        1: 'monday',
+        2: 'tuesday',
+        3: 'wednesday',
+        4: 'thursday',
+        5: 'friday',
+        6: 'saturday',
+      };
+
       availabilityData.forEach((availability) => {
-        if (availability.day_of_week) {
-          availabilityMap[availability.day_of_week.toLowerCase()] = {
-            available: availability.is_available,
-            startTime: availability.start_time,
-            endTime: availability.end_time,
-          };
+        const dayNumber = Number(availability.dayOfWeek);
+        const dayKey = dayKeyByNumber[dayNumber];
+        if (!dayKey || !availability.isRecurring) return;
+
+        if (!availabilityMap[dayKey]) {
+          availabilityMap[dayKey] = { available: [], unavailable: [] };
+        }
+
+        const timeRange = `${formatTime(availability.startTime)} – ${formatTime(availability.endTime)}`;
+        const type = String(availability.availabilityType || '').toLowerCase();
+        if (type === 'unavailable' || type === 'time_off') {
+          availabilityMap[dayKey].unavailable.push(timeRange);
+        } else {
+          availabilityMap[dayKey].available.push(timeRange);
         }
       });
       
@@ -726,9 +736,10 @@ watch(activeTab, (nextTab) => {
 }
 
 .day-time {
-  font-size: 10px;
+  font-size: 11px;
   color: #1f2937;
-  line-height: 1.1;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 /* Modal Styles */

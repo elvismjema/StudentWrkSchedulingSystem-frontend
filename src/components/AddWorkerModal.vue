@@ -292,7 +292,7 @@ const checkEmailExists = async () => {
       const foundUserId = existingUser.value.userId || existingUser.value.id;
       if (foundUserId !== props.worker?.userId) {
         emailStatus.type = 'info';
-        emailStatus.message = `User exists: ${existingUser.value.fName || ''} ${existingUser.value.lName || ''}`.trim() + '. Will be added to your department.';
+        emailStatus.message = 'Email already exists. This user will be added to your department.';
       } else {
         emailStatus.type = 'success';
         emailStatus.message = 'This is the current user\'s email.';
@@ -303,7 +303,7 @@ const checkEmailExists = async () => {
     }
   } catch (error) {
     emailStatus.type = 'error';
-    emailStatus.message = 'Failed to check email availability.';
+    emailStatus.message = error?.response?.data?.message || 'Failed to check email availability.';
   } finally {
     checkingEmail.value = false;
   }

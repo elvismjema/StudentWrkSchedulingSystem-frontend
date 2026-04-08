@@ -141,9 +141,8 @@
               </td>
               <td>
                 <div class="d-flex align-center justify-center gap-1">
-                  <!-- Assign / Manage Department (enforces one-department rule for managers & students) -->
+                  <!-- Assign / Manage Department: visible for all users (admins can manage anyone) -->
                   <v-tooltip
-                    v-if="getHighestRole(item) !== 'Admin'"
                     text="Manage Department Assignment"
                     location="top"
                   >
@@ -702,7 +701,7 @@ const getHighestRole = (user) => {
   const memberships = user.userDepartments || [];
   const levels = memberships.map((ud) => Number(ud.role?.permission_level || 0));
   const max = Math.max(0, ...levels);
-  if (max >= 90) return 'Admin';
+  if (max >= 100) return 'Admin';
   if (max >= 50) return 'Manager';
   if (max > 0) return 'Student / Worker';
   return 'No Role';
@@ -858,7 +857,7 @@ const cancelPending = async (id) => {
 const assignDeptCurrentAssignments = computed(() => {
   if (!assignDeptUser.value) return [];
   return (assignDeptUser.value.userDepartments || []).filter(
-    (ud) => Number(ud.role?.permission_level || 0) < 90,
+    (ud) => Number(ud.role?.permission_level || 0) < 100,
   );
 });
 

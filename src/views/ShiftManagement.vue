@@ -45,7 +45,7 @@
           :dates-set="onCalendarDatesSet"
           :event-time-format="{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }"
           :day-header-format="{ weekday: 'short' }"
-          :height="'auto'"
+          :height="720"
         />
       </div>
     </div>
@@ -1410,6 +1410,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  height: 100%;
 }
 
 .calendar-container {
@@ -1421,6 +1422,8 @@ onMounted(() => {
 
 .fullcalendar-wrap {
   padding: 8px 10px 12px;
+  min-height: 680px;
+  height: 100%;
 }
 
 .fullcalendar-wrap :deep(.fc) {
@@ -1428,6 +1431,15 @@ onMounted(() => {
   --fc-page-bg-color: #ffffff;
   --fc-neutral-bg-color: #fafafa;
   --fc-today-bg-color: #f8e6ea;
+  min-height: 660px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-view-harness) {
+  min-height: 620px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-body) {
+  min-height: 560px;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-timegrid-axis-cushion),

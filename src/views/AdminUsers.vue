@@ -910,9 +910,9 @@ const loadAssignDeptRoles = async () => {
       AdminServices.getDepartmentRoles(departmentId),
       apiClient.get(`/positions?department_id=${departmentId}`),
     ]);
-    // getDepartmentRoles already excludes admin-level; filter again for safety
+    // getDepartmentRoles already excludes admin-level (>= 100); filter again for safety
     const allRoles = rolesRes?.data?.data || [];
-    assignDeptRoles.value = allRoles.filter((r) => Number(r.permission_level || 0) < 90);
+    assignDeptRoles.value = allRoles.filter((r) => Number(r.permission_level || 0) < 100);
     assignDeptPositions.value = posRes?.data?.data || [];
   } catch (err) {
     error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);

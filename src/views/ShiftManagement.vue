@@ -45,7 +45,9 @@
           :dates-set="onCalendarDatesSet"
           :event-time-format="{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }"
           :day-header-format="{ weekday: 'short' }"
-          :height="720"
+          :height="760"
+          :content-height="700"
+          :expand-rows="true"
         />
       </div>
     </div>
@@ -1434,6 +1436,36 @@ onMounted(() => {
   min-height: 660px;
 }
 
+/* Fallback structure styles in case injected FullCalendar styles are blocked */
+.fullcalendar-wrap :deep(.fc table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-scrollgrid),
+.fullcalendar-wrap :deep(.fc .fc-scrollgrid table) {
+  border: 1px solid #e5e7eb;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-col-header-cell) {
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
+  display: inline-block;
+  padding: 10px 4px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-axis) {
+  width: 84px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-axis-frame),
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label-frame) {
+  padding: 0 8px;
+}
+
 .fullcalendar-wrap :deep(.fc .fc-view-harness) {
   min-height: 620px;
 }
@@ -1442,10 +1474,17 @@ onMounted(() => {
   min-height: 560px;
 }
 
+.fullcalendar-wrap :deep(.fc .fc-timegrid-body table),
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slots table) {
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+}
+
 .fullcalendar-wrap :deep(.fc .fc-timegrid-axis-cushion),
 .fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label-cushion) {
   color: #666;
   font-size: 12px;
+  padding: 0 6px;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
@@ -1456,7 +1495,13 @@ onMounted(() => {
 }
 
 .fullcalendar-wrap :deep(.fc .fc-timegrid-slot) {
+  border-top: 1px solid #f0f0f0;
   height: 46px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-scroller),
+.fullcalendar-wrap :deep(.fc .fc-scroller-liquid-absolute) {
+  min-height: 560px;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event) {

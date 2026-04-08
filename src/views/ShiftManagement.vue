@@ -321,7 +321,6 @@
             color="primary"
             variant="elevated"
             :loading="creating"
-            :disabled="!createFormValid"
             @click="createShift"
           >
             <v-icon start>mdi-calendar-check</v-icon>
@@ -485,7 +484,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
@@ -856,6 +855,8 @@ const onOpenShiftToggle = () => {
   if (newShift.value.post_as_open) {
     newShift.value.assigned_user_id = null
   }
+  // Clear stale validation messages after rule change
+  nextTick(() => createFormRef.value?.resetValidation())
 }
 
 const addNewTask = () => {
@@ -1043,7 +1044,8 @@ const loadPositions = async () => {
 }
 
 const createShift = async () => {
-  if (!createFormValid.value) return
+  const { valid } = await createFormRef.value.validate()
+  if (!valid) return
 
   try {
     creating.value = true

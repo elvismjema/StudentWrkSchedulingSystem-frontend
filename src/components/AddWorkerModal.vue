@@ -143,7 +143,7 @@
           <v-btn
             color="#8B1538"
             :loading="submitting"
-            :disabled="submitting"
+            :disabled="!canSubmit"
             @click="submitForm"
           >
             {{ isEditMode ? 'Update Worker' : 'Add Worker' }}
@@ -225,6 +225,22 @@ const deptContext = Utils.getStore('currentDepartmentContext') || {};
 const isEditMode = computed(() => !!props.worker);
 const requiresNameFields = computed(() => isEditMode.value || !existingUser.value);
 const nameRules = computed(() => (requiresNameFields.value ? [rules.required] : []));
+const emailValue = computed(() => String(form.email || '').trim().toLowerCase());
+const hasValidEmail = computed(() => rules.email(emailValue.value) === true);
+const hasDepartmentContext = computed(() => !!form.departmentId);
+const hasRequiredNames = computed(
+  () => !!String(form.fName || '').trim() && !!String(form.lName || '').trim(),
+);
+const canSubmit = computed(() => {
+  if (submitting.value || checkingEmail.value) return false;
+  if (!hasValidEmail.value || !hasDepartmentContext.value) return false;
+
+  // Existing-user assignment path: email + department are enough.
+  if (!isEditMode.value && existingUser.value) return true;
+
+  // New-user creation and edit path: keep name requirements.
+  return hasRequiredNames.value;
+});
 
 // Form validation rules
 const rules = {
@@ -314,7 +330,7 @@ const checkEmailExists = async () => {
 };
 
 const submitForm = async () => {
-  if (submitting.value) return;
+  if (!canSubmit.value) return;
 
   submitting.value = true;
   try {
@@ -401,6 +417,11 @@ watch(
     emailStatus.message = '';
   },
 );
+
+watch(requiresNameFields, async () => {
+  await nextTick();
+  formRef.value?.resetValidation();
+});
 
 // Initialize department context
 resetForm();

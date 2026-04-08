@@ -272,9 +272,9 @@
                 <v-select
                   v-model="newShift.assigned_user_id"
                   :items="departmentWorkers"
-                  :item-title="w => `${w.fName} ${w.lName}`"
-                  item-value="userId"
-                  label="Assign Worker (optional)"
+                  item-title="title"
+                  item-value="value"
+                  label="Assign Worker (optional - leave blank for open shift)"
                   variant="outlined"
                   clearable
                   hide-details
@@ -380,9 +380,9 @@
                 <v-select
                   v-model="editShift.assigned_user_id"
                   :items="departmentWorkers"
-                  :item-title="w => `${w.fName} ${w.lName}`"
-                  item-value="userId"
-                  label="Assign Worker (optional)"
+                  item-title="title"
+                  item-value="value"
+                  label="Assign Worker (optional - leave blank for open shift)"
                   variant="outlined"
                   clearable
                   hide-details
@@ -621,6 +621,34 @@ const formatTimeDisplay = (timeValue) => {
   return `${String(hour12).padStart(2, '0')}:${minute} ${period}`
 }
 
+const normalizeDateInput = (dateValue) => {
+  if (!dateValue) return ''
+  const value = String(dateValue)
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
+
+const normalizeTimeInput = (timeValue) => {
+  if (!timeValue) return ''
+  const value = String(timeValue)
+  const parts = value.split(':')
+  if (parts.length < 2) return ''
+  const hour = Number(parts[0])
+  const minute = Number(parts[1])
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return ''
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+const normalizeUserId = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isNaN(numeric) ? null : numeric
+}
+
 const syncTimePartsFromForm = (target, timeValue) => {
   const next = parseTimeToParts(timeValue)
   if (target === 'start') {
@@ -699,10 +727,10 @@ const selectShift = (shift) => {
   editShift.value = {
     shift_id: shift.shift_id,
     position_id: shift.position_id || null,
-    shift_date: shift.shift_date || '',
-    start_time: shift.start_time || '',
-    end_time: shift.end_time || '',
-    assigned_user_id: shift.assigned_user_id || null,
+    shift_date: normalizeDateInput(shift.shift_date),
+    start_time: normalizeTimeInput(shift.start_time),
+    end_time: normalizeTimeInput(shift.end_time),
+    assigned_user_id: normalizeUserId(shift.assigned_user_id),
     is_published: !!shift.is_published,
   }
   showEditDialog.value = true
@@ -771,9 +799,8 @@ const loadDepartmentWorkers = async () => {
 
     const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers
     departmentWorkers.value = candidateUsers.map((user) => ({
-      userId: user.id,
-      fName: user.fName,
-      lName: user.lName,
+      title: `${user.fName || ''} ${user.lName || ''}`.trim() || user.email || 'Unnamed Worker',
+      value: Number(user.id),
       email: user.email,
     }))
   } catch (error) {

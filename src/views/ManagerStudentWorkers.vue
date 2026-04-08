@@ -219,7 +219,32 @@
         </v-card-text>
 
         <v-card-actions class="modal-actions">
+          <v-btn
+            color="error"
+            variant="text"
+            :disabled="deletingWorker"
+            @click="openDeleteWorkerDialog"
+          >
+            Delete Worker
+          </v-btn>
+          <v-spacer />
           <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteWorkerDialog" max-width="420px">
+      <v-card>
+        <v-card-title class="text-h6">Delete Worker Permanently?</v-card-title>
+        <v-card-text>
+          This permanently deletes the user account and cannot be undone.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="deletingWorker" @click="deleteWorkerDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="elevated" :loading="deletingWorker" @click="confirmDeleteWorker">
+            Delete
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -255,6 +280,8 @@ const classSchedule = ref([]);
 const loadingSchedule = ref(false);
 const scheduleError = ref('');
 const activeTab = ref('details');
+const deletingWorker = ref(false);
+const deleteWorkerDialog = ref(false);
 
 // Department context
 const deptContext = Utils.getStore('currentDepartmentContext') || {};
@@ -373,6 +400,31 @@ const closeWorkerModal = () => {
   workerModal.selectedWorker = null;
   classSchedule.value = [];
   scheduleError.value = '';
+  deleteWorkerDialog.value = false;
+};
+
+const openDeleteWorkerDialog = () => {
+  if (!workerModal.selectedWorker) return;
+  deleteWorkerDialog.value = true;
+};
+
+const confirmDeleteWorker = async () => {
+  const worker = workerModal.selectedWorker;
+  const workerId = worker?.userId || worker?.id;
+  if (!workerId) return;
+
+  deletingWorker.value = true;
+  try {
+    await apiClient.delete(`/users/${workerId}/permanent-manager`);
+    deleteWorkerDialog.value = false;
+    closeWorkerModal();
+    await loadWorkers();
+  } catch (err) {
+    error.value = err?.response?.data?.message || 'Failed to delete worker permanently.';
+    console.error('Error deleting worker:', err);
+  } finally {
+    deletingWorker.value = false;
+  }
 };
 
 // Enhanced worker management methods

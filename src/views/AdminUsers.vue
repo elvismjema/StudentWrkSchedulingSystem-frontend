@@ -141,6 +141,20 @@
               </td>
               <td>
                 <div class="d-flex align-center justify-center gap-1">
+                  <!-- Promote to Admin: only shown for non-admin users -->
+                  <v-tooltip
+                    v-if="getHighestRole(item) !== 'Admin'"
+                    text="Promote to Admin"
+                    location="top"
+                  >
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="deep-purple" variant="text"
+                        @click="openPromoteToAdminDialog(item)">
+                        <v-icon>mdi-shield-crown</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+
                   <!-- Assign / Manage Department: visible for all users (admins can manage anyone) -->
                   <v-tooltip
                     text="Manage Department Assignment"
@@ -337,6 +351,34 @@
             @click="submitInvite"
           >
             Send Invitation
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- ═══ PROMOTE TO ADMIN DIALOG ════════════════════════════════════════ -->
+    <v-dialog v-model="promoteToAdminDialog" max-width="500px">
+      <v-card>
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-2">
+          <v-icon color="deep-purple" start>mdi-shield-crown</v-icon>
+          Promote to Admin
+        </v-card-title>
+        <v-card-text class="px-5">
+          <p>
+            You are about to grant <strong>site-wide admin access</strong> to
+            <strong>{{ promoteToAdminUser?.fName }} {{ promoteToAdminUser?.lName }}</strong>
+            ({{ promoteToAdminUser?.email }}).
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mt-3">
+            This will remove all their current department assignments and future shifts.
+            Admins manage the entire site, not a specific department.
+          </v-alert>
+        </v-card-text>
+        <v-card-actions class="px-5 pb-5">
+          <v-spacer />
+          <v-btn variant="text" @click="promoteToAdminDialog = false">Cancel</v-btn>
+          <v-btn color="deep-purple" :loading="promotingToAdmin" @click="confirmPromoteToAdmin">
+            Make Admin
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -610,6 +652,11 @@ const futureShiftData = ref(null);
 const deleteDialog = ref(false);
 const selectedDeleteUser = ref(null);
 
+// ─── Promote to Admin dialog ──────────────────────────────────────────────────
+const promoteToAdminDialog = ref(false);
+const promoteToAdminUser = ref(null);
+const promotingToAdmin = ref(false);
+
 // ─── Assign to Department dialog ─────────────────────────────────────────────
 const assignDeptDialog = ref(false);
 const assignDeptFormValid = ref(false);
@@ -698,6 +745,8 @@ const applyRoleFilterFromRoute = () => {
 };
 
 const getHighestRole = (user) => {
+  // Check global admin flag first (set by promoteToAdmin)
+  if (user.role === 'admin') return 'Admin';
   const memberships = user.userDepartments || [];
   const levels = memberships.map((ud) => Number(ud.role?.permission_level || 0));
   const max = Math.max(0, ...levels);
@@ -1000,6 +1049,29 @@ const confirmDelete = async () => {
     error.value = 'Failed to remove user: ' + (err.response?.data?.message || err.message);
   } finally {
     deleting.value = false;
+  }
+};
+
+// ─── Promote to Admin ─────────────────────────────────────────────────────────
+const openPromoteToAdminDialog = (user) => {
+  promoteToAdminUser.value = user;
+  promoteToAdminDialog.value = true;
+};
+
+const confirmPromoteToAdmin = async () => {
+  if (!promoteToAdminUser.value) return;
+  try {
+    promotingToAdmin.value = true;
+    error.value = null;
+    const response = await AdminServices.promoteToAdmin(promoteToAdminUser.value.id);
+    successMessage.value = response.data?.message || 'User promoted to admin successfully.';
+    promoteToAdminDialog.value = false;
+    promoteToAdminUser.value = null;
+    await loadUsers();
+  } catch (err) {
+    error.value = 'Failed to promote user: ' + (err.response?.data?.message || err.message);
+  } finally {
+    promotingToAdmin.value = false;
   }
 };
 

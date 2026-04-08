@@ -90,6 +90,10 @@ const AdminServices = {
     // data: { user_id, department_id, role_id, position_id? }
     return apiClient.post("/admin/assign-department", data);
   },
+
+  promoteToAdmin(userId) {
+    return apiClient.post(`/admin/users/${userId}/promote-to-admin`);
+  },
 };
 
 export default AdminServices;

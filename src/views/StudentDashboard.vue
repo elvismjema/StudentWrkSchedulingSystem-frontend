@@ -86,17 +86,6 @@
 
           <div class="d-flex ga-2">
             <v-btn
-              color="primary"
-              variant="flat"
-              :disabled="!canClockIn"
-              @click="handleClockIn"
-              :loading="clockingIn"
-              aria-label="Clock in to shift"
-            >
-              <v-icon start>mdi-login</v-icon>
-              Clock In
-            </v-btn>
-            <v-btn
               variant="outlined"
               color="primary"
               @click="openSwapDialog(nextShift)"
@@ -105,9 +94,6 @@
               <v-icon start>mdi-account-switch</v-icon>
               Find Cover
             </v-btn>
-          </div>
-          <div v-if="!canClockIn && !clockStatus.isClockedIn" class="text-caption text-medium-emphasis mt-2">
-            Clock-in available within 15 minutes of shift start
           </div>
         </div>
       </v-card>
@@ -325,16 +311,6 @@ const nextShiftColor = computed(() => {
     if (name.includes(key)) return color;
   }
   return "#80162B";
-});
-
-const canClockIn = computed(() => {
-  if (clockStatus.isClockedIn) return false;
-  if (!nextShift.value) return false;
-  const start = new Date(shiftStartDT(nextShift.value));
-  if (isNaN(start)) return false;
-  const now = new Date();
-  const diffMin = (start - now) / 60000;
-  return diffMin <= 15 && diffMin >= -60; // within 15 min before to 60 min after
 });
 
 

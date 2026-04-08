@@ -28,27 +28,7 @@
 
     <div class="calendar-scroll-container" v-if="!shiftsLoading">
       <div class="calendar-container fullcalendar-wrap">
-        <FullCalendar
-          ref="fullCalendarRef"
-          :plugins="calendarPlugins"
-          initial-view="timeGridWeek"
-          :initial-date="currentDate"
-          :header-toolbar="false"
-          :all-day-slot="false"
-          :events="calendarEvents"
-          :slot-min-time="'05:00:00'"
-          :slot-max-time="'24:00:00'"
-          :now-indicator="true"
-          :editable="false"
-          :event-overlap="true"
-          :event-click="onCalendarEventClick"
-          :dates-set="onCalendarDatesSet"
-          :event-time-format="{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }"
-          :day-header-format="{ weekday: 'short' }"
-          :height="760"
-          :content-height="700"
-          :expand-rows="true"
-        />
+        <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
       </div>
     </div>
 
@@ -596,8 +576,6 @@ const filteredShifts = computed(() => {
   return shifts.value
 })
 
-const calendarPlugins = [timeGridPlugin, interactionPlugin]
-
 const calendarEvents = computed(() => {
   return shifts.value
     .filter((shift) => !!shift.shift_date)
@@ -621,6 +599,27 @@ const calendarEvents = computed(() => {
       }
     })
 })
+
+const calendarOptions = computed(() => ({
+  plugins: [timeGridPlugin, interactionPlugin],
+  initialView: 'timeGridWeek',
+  initialDate: currentDate.value,
+  headerToolbar: false,
+  allDaySlot: false,
+  events: calendarEvents.value,
+  slotMinTime: '05:00:00',
+  slotMaxTime: '24:00:00',
+  nowIndicator: true,
+  editable: false,
+  eventOverlap: true,
+  eventClick: onCalendarEventClick,
+  datesSet: onCalendarDatesSet,
+  eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
+  dayHeaderFormat: { weekday: 'short' },
+  height: 760,
+  contentHeight: 700,
+  expandRows: true,
+}))
 
 const formatTime = (hour) => {
   const normalizedHour = hour === 24 ? 0 : hour
@@ -825,6 +824,11 @@ const removeEditTask = (index) => {
 }
 
 const getCalendarApi = () => fullCalendarRef.value?.getApi?.()
+
+const updateCalendarSize = async () => {
+  await nextTick()
+  getCalendarApi()?.updateSize()
+}
 
 const onCalendarEventClick = async (clickInfo) => {
   const shift = clickInfo?.event?.extendedProps?.shift
@@ -1050,6 +1054,7 @@ const loadShifts = async () => {
     showError.value = true
   } finally {
     shiftsLoading.value = false
+    await updateCalendarSize()
   }
 }
 
@@ -1266,7 +1271,7 @@ const onShiftAssigned = (assignmentData) => {
   loadShifts()
 }
 
-onMounted(() => {
+onMounted(async () => {
   const scheduleToast = Utils.getStore('managerScheduleToast')
   if (scheduleToast?.message) {
     successMessage.value = scheduleToast.message
@@ -1274,11 +1279,13 @@ onMounted(() => {
     Utils.removeItem('managerScheduleToast')
   }
 
-  Promise.all([
+  await Promise.all([
     loadShifts(),
     loadPositions(),
     loadDepartmentWorkers()
   ])
+
+  await updateCalendarSize()
 
   if (String(route.query?.createShift || '') === '1') {
     openCreateDialog()
@@ -1293,14 +1300,9 @@ onMounted(() => {
 }
 
 .schedule-container {
-  --calendar-time-column-width: 88px;
-  --calendar-header-height: 80px;
-  --calendar-hour-height: 60px;
-  --calendar-row-count: 19;
   padding: 20px;
   background-color: #fafafa;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -1410,22 +1412,19 @@ onMounted(() => {
 
 .calendar-scroll-container {
   flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  height: 100%;
+  min-height: 740px;
 }
 
 .calendar-container {
   background: white;
   border-radius: 12px;
   border: 1px solid #e0e0e0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fullcalendar-wrap {
   padding: 8px 10px 12px;
-  min-height: 680px;
-  height: 100%;
+  min-height: 760px;
 }
 
 .fullcalendar-wrap :deep(.fc) {
@@ -1433,75 +1432,7 @@ onMounted(() => {
   --fc-page-bg-color: #ffffff;
   --fc-neutral-bg-color: #fafafa;
   --fc-today-bg-color: #f8e6ea;
-  min-height: 660px;
-}
-
-/* Fallback structure styles in case injected FullCalendar styles are blocked */
-.fullcalendar-wrap :deep(.fc table) {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-scrollgrid),
-.fullcalendar-wrap :deep(.fc .fc-scrollgrid table) {
-  border: 1px solid #e5e7eb;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-col-header-cell) {
-  background: #fafafa;
-  border: 1px solid #e5e7eb;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
-  display: inline-block;
-  padding: 10px 4px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-axis) {
-  width: 84px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-axis-frame),
-.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label-frame) {
-  padding: 0 8px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-view-harness) {
-  min-height: 620px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-body) {
-  min-height: 560px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-body table),
-.fullcalendar-wrap :deep(.fc .fc-timegrid-slots table) {
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-axis-cushion),
-.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label-cushion) {
-  color: #666;
-  font-size: 12px;
-  padding: 0 6px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
-  color: #666;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-timegrid-slot) {
-  border-top: 1px solid #f0f0f0;
-  height: 46px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-scroller),
-.fullcalendar-wrap :deep(.fc .fc-scroller-liquid-absolute) {
-  min-height: 560px;
+  height: 740px;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event) {
@@ -1519,175 +1450,6 @@ onMounted(() => {
 
 .fullcalendar-wrap :deep(.fc .fc-event-title) {
   font-weight: 600;
-}
-
-.calendar-grid {
-  display: flex;
-  align-items: flex-start;
-  background: white;
-}
-
-.time-column {
-  width: var(--calendar-time-column-width);
-  flex: 0 0 var(--calendar-time-column-width);
-  border-right: 1px solid #e0e0e0;
-  background-color: #fafafa;
-}
-
-.time-column::before {
-  content: '';
-  display: block;
-  height: var(--calendar-header-height);
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.time-slot {
-  height: var(--calendar-hour-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #666;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.days-container {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.day-column {
-  min-width: 0;
-  border-right: 1px solid #e0e0e0;
-  display: flex;
-  flex-direction: column;
-}
-
-.day-column:last-child {
-  border-right: none;
-}
-
-.day-header {
-  height: var(--calendar-header-height);
-  padding: 16px 8px;
-  text-align: center;
-  border-bottom: 1px solid #e0e0e0;
-  background-color: #fafafa;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.day-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.day-date {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-top: 4px;
-}
-
-.day-date.today {
-  color: #8B1538;
-  background-color: #f8e6ea;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-}
-
-.hour-slots {
-  display: grid;
-  grid-template-rows: repeat(var(--calendar-row-count), var(--calendar-hour-height));
-  position: relative;
-}
-
-.drag-preview-block {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  background-color: rgba(139, 21, 56, 0.18);
-  border: 2px solid rgba(139, 21, 56, 0.65);
-  border-radius: 6px;
-  pointer-events: none;
-  z-index: 10;
-  display: flex;
-  align-items: flex-start;
-  padding: 3px 6px;
-  box-sizing: border-box;
-}
-
-.drag-preview-time {
-  font-size: 11px;
-  font-weight: 700;
-  color: #8B1538;
-  white-space: nowrap;
-}
-
-.hour-slot {
-  border-bottom: 1px solid #f0f0f0;
-  position: relative;
-  cursor: crosshair;
-}
-
-.hour-slot.drag-highlight {
-  background-color: rgba(139, 21, 56, 0.10);
-}
-
-.hour-slot.drag-over-cell {
-  background-color: rgba(139, 21, 56, 0.20);
-  outline: 2px dashed rgba(139, 21, 56, 0.50);
-  outline-offset: -2px;
-}
-
-.shift-block {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  background-color: #8B1538;
-  color: white;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 12px;
-  overflow: hidden;
-  cursor: grab;
-  border: 2px solid transparent;
-}
-
-.shift-block.selected {
-  border-color: #00c853;
-  box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
-}
-
-.shift-block.dragging {
-  opacity: 0.35;
-  border: 2px dashed rgba(255, 255, 255, 0.7);
-}
-
-.shift-block-title {
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.shift-block-sub {
-  opacity: 0.95;
-  font-size: 11px;
-}
-
-.shift-block-time {
-  opacity: 0.9;
-  font-size: 11px;
 }
 
 .tasks-section {

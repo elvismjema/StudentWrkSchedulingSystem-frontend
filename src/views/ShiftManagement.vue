@@ -26,69 +26,27 @@
       </div>
     </div>
 
-    <div class="calendar-scroll-container" v-if="!shiftsLoading" @mouseup="endDragCreate">
-      <div class="calendar-container">
-        <div class="calendar-grid">
-          <div class="time-column">
-            <div v-for="hour in timeSlots" :key="hour" class="time-slot">
-              {{ formatTime(hour) }}
-            </div>
-          </div>
-
-          <div class="days-container">
-            <div v-for="day in weekDays" :key="day.isoDate" class="day-column">
-              <div class="day-header">
-                <div class="day-name">{{ day.name }}</div>
-                <div class="day-date" :class="{ today: day.isToday }">{{ day.date }}</div>
-              </div>
-
-              <div class="hour-slots">
-                <!-- Drag-to-create ghost preview -->
-                <div
-                  v-if="isDragCreating && dragCreate?.isoDate === day.isoDate"
-                  class="drag-preview-block"
-                  :style="getDragPreviewStyle()"
-                >
-                  <div class="drag-preview-time">{{ getDragPreviewLabel() }}</div>
-                </div>
-
-                <div
-                  v-for="hour in timeSlots"
-                  :key="`${day.isoDate}-${hour}`"
-                  class="hour-slot"
-                  :class="{
-                    'drag-highlight': isDragHighlight(day.isoDate, hour),
-                    'drag-over-cell': dragOverCell?.isoDate === day.isoDate && dragOverCell?.hour === hour
-                  }"
-                  @mousedown.prevent="startDragCreate(day.isoDate, hour, $event)"
-                  @mouseenter="continueDragCreate(day.isoDate, hour)"
-                  @dragover.prevent="onShiftDragOver(day.isoDate, hour)"
-                  @drop.prevent="onShiftDrop(day.isoDate, hour)"
-                >
-                  <div
-                    v-for="(shift, idx) in getShiftsForCell(day.isoDate, hour)"
-                    :key="shift.shift_id"
-                    class="shift-block"
-                    :class="{
-                      selected: selectedShift?.shift_id === shift.shift_id,
-                      dragging: draggingShift?.shift_id === shift.shift_id
-                    }"
-                    :style="getShiftBlockStyle(shift, idx)"
-                    draggable="true"
-                    @click.stop="selectShift(shift)"
-                    @mousedown.stop
-                    @dragstart="onShiftDragStart(shift, $event)"
-                    @dragend="onShiftDragEnd"
-                  >
-                    <div class="shift-block-title">{{ shift.position?.position_name || 'Shift' }}</div>
-                    <div class="shift-block-sub">{{ shift.department?.department_name || 'Department' }}</div>
-                    <div class="shift-block-time">{{ formatShiftTime(shift.start_time, shift.end_time) }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="calendar-scroll-container" v-if="!shiftsLoading">
+      <div class="calendar-container fullcalendar-wrap">
+        <FullCalendar
+          ref="fullCalendarRef"
+          :plugins="calendarPlugins"
+          initial-view="timeGridWeek"
+          :initial-date="currentDate"
+          :header-toolbar="false"
+          :all-day-slot="false"
+          :events="calendarEvents"
+          :slot-min-time="'05:00:00'"
+          :slot-max-time="'24:00:00'"
+          :now-indicator="true"
+          :editable="false"
+          :event-overlap="true"
+          :event-click="onCalendarEventClick"
+          :dates-set="onCalendarDatesSet"
+          :event-time-format="{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }"
+          :day-header-format="{ weekday: 'short' }"
+          :height="'auto'"
+        />
       </div>
     </div>
 
@@ -495,6 +453,9 @@
 <script setup>
 import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FullCalendar from '@fullcalendar/vue3'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
@@ -510,6 +471,7 @@ const currentDeptId = deptContext.department_id || null
 const currentDeptName = deptContext.department_name || ''
 
 const currentDate = ref(new Date())
+const fullCalendarRef = ref(null)
 const shifts = ref([])
 const departments = ref([])
 const positions = ref([])
@@ -630,6 +592,32 @@ const currentGreetingDate = computed(() => {
 
 const filteredShifts = computed(() => {
   return shifts.value
+})
+
+const calendarPlugins = [timeGridPlugin, interactionPlugin]
+
+const calendarEvents = computed(() => {
+  return shifts.value
+    .filter((shift) => !!shift.shift_date)
+    .map((shift) => {
+      const start = `${shift.shift_date}T${normalizeTimeInput(shift.start_time) || '00:00'}:00`
+      const end = `${shift.shift_date}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
+      const title = shift.position?.position_name || 'Shift'
+      const department = shift.department?.department_name || 'Department'
+      return {
+        id: String(shift.shift_id),
+        title,
+        start,
+        end,
+        backgroundColor: '#8B1538',
+        borderColor: selectedShift.value?.shift_id === shift.shift_id ? '#00c853' : '#8B1538',
+        classNames: selectedShift.value?.shift_id === shift.shift_id ? ['fc-shift-selected'] : [],
+        extendedProps: {
+          shift,
+          department,
+        },
+      }
+    })
 })
 
 const formatTime = (hour) => {
@@ -834,6 +822,21 @@ const removeEditTask = (index) => {
   editShift.value.tasks.splice(index, 1)
 }
 
+const getCalendarApi = () => fullCalendarRef.value?.getApi?.()
+
+const onCalendarEventClick = async (clickInfo) => {
+  const shift = clickInfo?.event?.extendedProps?.shift
+  if (shift) {
+    await selectShift(shift)
+  }
+}
+
+const onCalendarDatesSet = (arg) => {
+  if (arg?.view?.currentStart) {
+    currentDate.value = new Date(arg.view.currentStart)
+  }
+}
+
 // --- Create dialog helpers ---
 const openCreateDialog = (isoDate = '', startTime = '', endTime = '') => {
   newShift.value = {
@@ -993,18 +996,33 @@ const onShiftDrop = async (isoDate, hour) => {
 }
 
 const previousWeek = () => {
+  const api = getCalendarApi()
+  if (api) {
+    api.prev()
+    return
+  }
   const nextDate = new Date(currentDate.value)
   nextDate.setDate(nextDate.getDate() - 7)
   currentDate.value = nextDate
 }
 
 const nextWeek = () => {
+  const api = getCalendarApi()
+  if (api) {
+    api.next()
+    return
+  }
   const nextDate = new Date(currentDate.value)
   nextDate.setDate(nextDate.getDate() + 7)
   currentDate.value = nextDate
 }
 
 const goToToday = () => {
+  const api = getCalendarApi()
+  if (api) {
+    api.today()
+    return
+  }
   currentDate.value = new Date()
 }
 
@@ -1399,6 +1417,51 @@ onMounted(() => {
   border-radius: 12px;
   border: 1px solid #e0e0e0;
   overflow: hidden;
+}
+
+.fullcalendar-wrap {
+  padding: 8px 10px 12px;
+}
+
+.fullcalendar-wrap :deep(.fc) {
+  --fc-border-color: #e5e7eb;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #fafafa;
+  --fc-today-bg-color: #f8e6ea;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-axis-cushion),
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label-cushion) {
+  color: #666;
+  font-size: 12px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot) {
+  height: 46px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-event) {
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 12px;
+  border: 2px solid #8B1538;
+  background-color: #8B1538;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-event.fc-shift-selected) {
+  border-color: #00c853;
+  box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
+}
+
+.fullcalendar-wrap :deep(.fc .fc-event-title) {
+  font-weight: 600;
 }
 
 .calendar-grid {

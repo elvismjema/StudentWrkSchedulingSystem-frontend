@@ -43,6 +43,15 @@
               </div>
 
               <div class="hour-slots">
+                <!-- Drag-to-create ghost preview -->
+                <div
+                  v-if="isDragCreating && dragCreate?.isoDate === day.isoDate"
+                  class="drag-preview-block"
+                  :style="getDragPreviewStyle()"
+                >
+                  <div class="drag-preview-time">{{ getDragPreviewLabel() }}</div>
+                </div>
+
                 <div
                   v-for="hour in timeSlots"
                   :key="`${day.isoDate}-${hour}`"
@@ -904,6 +913,36 @@ const isDragHighlight = (isoDate, hour) => {
   return hour >= minH && hour <= maxH
 }
 
+const _fmtMins = (totalMins) => {
+  const clamped = Math.min(Math.max(totalMins, 0), 23 * 60)
+  const h = Math.floor(clamped / 60)
+  const m = clamped % 60
+  const period = h < 12 ? 'AM' : 'PM'
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`
+}
+
+const getDragPreviewStyle = () => {
+  if (!dragCreate.value) return {}
+  const { startHour, startMinute, currentHour } = dragCreate.value
+  const fromHour = Math.min(startHour, currentHour)
+  const toHour = Math.max(startHour, currentHour) + 1
+  const FIRST_HOUR = 5 // timeSlots starts at hour 5
+  const top = (fromHour - FIRST_HOUR) * 60 + (fromHour === startHour ? startMinute : 0)
+  const height = Math.max(15, (toHour - FIRST_HOUR) * 60 - top)
+  return { top: `${top}px`, height: `${height}px` }
+}
+
+const getDragPreviewLabel = () => {
+  if (!dragCreate.value) return ''
+  const { startHour, startMinute, currentHour } = dragCreate.value
+  const fromHour = Math.min(startHour, currentHour)
+  const toHour = Math.max(startHour, currentHour) + 1
+  const startMins = fromHour * 60 + (fromHour === startHour ? startMinute : 0)
+  const endMins = Math.min(toHour, 23) * 60
+  return `${_fmtMins(startMins)} – ${_fmtMins(endMins)}`
+}
+
 // --- Drag-to-reschedule ---
 const onShiftDragStart = (shift, event) => {
   draggingShift.value = shift
@@ -1449,6 +1488,29 @@ onMounted(() => {
 .hour-slots {
   display: grid;
   grid-template-rows: repeat(var(--calendar-row-count), var(--calendar-hour-height));
+  position: relative;
+}
+
+.drag-preview-block {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background-color: rgba(139, 21, 56, 0.18);
+  border: 2px solid rgba(139, 21, 56, 0.65);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  padding: 3px 6px;
+  box-sizing: border-box;
+}
+
+.drag-preview-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8B1538;
+  white-space: nowrap;
 }
 
 .hour-slot {

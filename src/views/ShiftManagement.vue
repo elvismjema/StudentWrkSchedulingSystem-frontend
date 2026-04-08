@@ -20,13 +20,13 @@
         <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
-        <v-btn color="primary" variant="elevated" @click="router.push('/manager/create-shift')" prepend-icon="mdi-plus">
+        <v-btn color="primary" variant="elevated" @click="openCreateDialog()" prepend-icon="mdi-plus">
           Create Shift
         </v-btn>
       </div>
     </div>
 
-    <div class="calendar-scroll-container" v-if="!shiftsLoading">
+    <div class="calendar-scroll-container" v-if="!shiftsLoading" @mouseup="endDragCreate">
       <div class="calendar-container">
         <div class="calendar-grid">
           <div class="time-column">
@@ -43,14 +43,33 @@
               </div>
 
               <div class="hour-slots">
-                <div v-for="hour in timeSlots" :key="`${day.isoDate}-${hour}`" class="hour-slot">
+                <div
+                  v-for="hour in timeSlots"
+                  :key="`${day.isoDate}-${hour}`"
+                  class="hour-slot"
+                  :class="{
+                    'drag-highlight': isDragHighlight(day.isoDate, hour),
+                    'drag-over-cell': dragOverCell?.isoDate === day.isoDate && dragOverCell?.hour === hour
+                  }"
+                  @mousedown.prevent="startDragCreate(day.isoDate, hour, $event)"
+                  @mouseenter="continueDragCreate(day.isoDate, hour)"
+                  @dragover.prevent="onShiftDragOver(day.isoDate, hour)"
+                  @drop.prevent="onShiftDrop(day.isoDate, hour)"
+                >
                   <div
                     v-for="(shift, idx) in getShiftsForCell(day.isoDate, hour)"
                     :key="shift.shift_id"
                     class="shift-block"
-                    :class="{ selected: selectedShift?.shift_id === shift.shift_id }"
+                    :class="{
+                      selected: selectedShift?.shift_id === shift.shift_id,
+                      dragging: draggingShift?.shift_id === shift.shift_id
+                    }"
                     :style="getShiftBlockStyle(shift, idx)"
-                    @click="selectShift(shift)"
+                    draggable="true"
+                    @click.stop="selectShift(shift)"
+                    @mousedown.stop
+                    @dragstart="onShiftDragStart(shift, $event)"
+                    @dragend="onShiftDragEnd"
                   >
                     <div class="shift-block-title">{{ shift.position?.position_name || 'Shift' }}</div>
                     <div class="shift-block-sub">{{ shift.department?.department_name || 'Department' }}</div>
@@ -68,64 +87,67 @@
       <v-progress-circular indeterminate color="primary" />
     </div>
 
-    <!-- Create/Edit Shift Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="640px">
+    <!-- Create Shift Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="680px">
       <v-card>
-        <v-card-title>
-          <v-icon class="mr-2">mdi-plus</v-icon>
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-3">
+          <v-icon color="primary" start>mdi-calendar-plus</v-icon>
           Create New Shift
         </v-card-title>
 
-        <!-- Department context banner -->
         <v-alert
           v-if="currentDeptName"
           type="info"
           variant="tonal"
           density="compact"
-          class="mx-4 mt-2"
+          class="mx-4 mb-0"
           icon="mdi-office-building"
         >
           Creating shift for: <span class="font-weight-bold">{{ currentDeptName }}</span>
         </v-alert>
-        
-        <v-divider></v-divider>
 
-        <v-card-text>
+        <v-divider class="mt-3" />
+
+        <v-card-text class="pa-5">
           <v-form ref="createFormRef" v-model="createFormValid">
-            <v-row>
-              <v-col cols="12" md="6">
+            <v-row dense>
+              <!-- Position -->
+              <v-col cols="12">
                 <v-select
                   v-model="newShift.position_id"
                   :items="positions"
                   item-title="position_name"
                   item-value="position_id"
-                  label="Position"
+                  label="Position *"
                   variant="outlined"
+                  density="comfortable"
+                  prepend-inner-icon="mdi-briefcase-outline"
                   :rules="[v => !!v || 'Position is required']"
-                ></v-select>
+                />
               </v-col>
-              <v-col cols="12" md="6">
+
+              <!-- Date -->
+              <v-col cols="12" md="4">
                 <v-text-field
                   v-model="newShift.shift_date"
                   type="date"
-                  label="Date"
+                  label="Date *"
                   variant="outlined"
+                  density="comfortable"
                   :rules="[v => !!v || 'Date is required']"
-                ></v-text-field>
+                />
               </v-col>
-              <v-col cols="12" md="6">
-                <v-menu
-                  v-model="startTimeMenu"
-                  :close-on-content-click="false"
-                  location="bottom"
-                  offset="8"
-                >
+
+              <!-- Start Time -->
+              <v-col cols="12" md="4">
+                <v-menu v-model="startTimeMenu" :close-on-content-click="false" location="bottom" offset="8">
                   <template #activator="{ props }">
                     <v-text-field
                       v-bind="props"
                       :model-value="formatTimeDisplay(newShift.start_time)"
-                      placeholder="Start Time"
+                      placeholder="Start Time *"
                       variant="outlined"
+                      density="comfortable"
                       readonly
                       prepend-inner-icon="mdi-clock-outline"
                       persistent-placeholder
@@ -137,48 +159,15 @@
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
-                          <v-btn
-                            v-for="hour in hourOptions"
-                            :key="`start-hour-${hour}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="startTimeParts.hour === hour ? '#1976d2' : undefined"
-                            @click="updateTimePart('start', 'hour', hour)"
-                          >
-                            {{ hour }}
-                          </v-btn>
+                          <v-btn v-for="hour in hourOptions" :key="`sh-${hour}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.hour === hour ? '#1976d2' : undefined" @click="updateTimePart('start', 'hour', hour)">{{ hour }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
-                          <v-btn
-                            v-for="minute in minuteOptions"
-                            :key="`start-minute-${minute}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="startTimeParts.minute === minute ? '#1976d2' : undefined"
-                            @click="updateTimePart('start', 'minute', minute)"
-                          >
-                            {{ minute }}
-                          </v-btn>
+                          <v-btn v-for="minute in minuteOptions" :key="`sm-${minute}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('start', 'minute', minute)">{{ minute }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
-                          <v-btn
-                            v-for="period in periodOptions"
-                            :key="`start-period-${period}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="startTimeParts.period === period ? '#1976d2' : undefined"
-                            @click="updateTimePart('start', 'period', period)"
-                          >
-                            {{ period }}
-                          </v-btn>
+                          <v-btn v-for="period in periodOptions" :key="`sp-${period}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.period === period ? '#1976d2' : undefined" @click="updateTimePart('start', 'period', period)">{{ period }}</v-btn>
                         </div>
                       </div>
                       <div class="time-picker-actions">
@@ -189,20 +178,17 @@
                   </v-card>
                 </v-menu>
               </v-col>
-              <v-col cols="12" md="6">
-                <v-menu
-                  v-model="endTimeMenu"
-                  :close-on-content-click="false"
-                  location="bottom"
-                  offset="8"
-                  :disabled="!newShift.start_time"
-                >
+
+              <!-- End Time -->
+              <v-col cols="12" md="4">
+                <v-menu v-model="endTimeMenu" :close-on-content-click="false" location="bottom" offset="8" :disabled="!newShift.start_time">
                   <template #activator="{ props }">
                     <v-text-field
                       v-bind="props"
                       :model-value="formatTimeDisplay(newShift.end_time)"
-                      placeholder="End Time"
+                      placeholder="End Time *"
                       variant="outlined"
+                      density="comfortable"
                       readonly
                       prepend-inner-icon="mdi-clock-outline"
                       :disabled="!newShift.start_time"
@@ -215,48 +201,15 @@
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
-                          <v-btn
-                            v-for="hour in hourOptions"
-                            :key="`end-hour-${hour}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="endTimeParts.hour === hour ? '#1976d2' : undefined"
-                            @click="updateTimePart('end', 'hour', hour)"
-                          >
-                            {{ hour }}
-                          </v-btn>
+                          <v-btn v-for="hour in hourOptions" :key="`eh-${hour}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.hour === hour ? '#1976d2' : undefined" @click="updateTimePart('end', 'hour', hour)">{{ hour }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
-                          <v-btn
-                            v-for="minute in minuteOptions"
-                            :key="`end-minute-${minute}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="endTimeParts.minute === minute ? '#1976d2' : undefined"
-                            @click="updateTimePart('end', 'minute', minute)"
-                          >
-                            {{ minute }}
-                          </v-btn>
+                          <v-btn v-for="minute in minuteOptions" :key="`em-${minute}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('end', 'minute', minute)">{{ minute }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
-                          <v-btn
-                            v-for="period in periodOptions"
-                            :key="`end-period-${period}`"
-                            size="small"
-                            variant="flat"
-                            block
-                            class="mb-1"
-                            :color="endTimeParts.period === period ? '#1976d2' : undefined"
-                            @click="updateTimePart('end', 'period', period)"
-                          >
-                            {{ period }}
-                          </v-btn>
+                          <v-btn v-for="period in periodOptions" :key="`ep-${period}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.period === period ? '#1976d2' : undefined" @click="updateTimePart('end', 'period', period)">{{ period }}</v-btn>
                         </div>
                       </div>
                       <div class="time-picker-actions">
@@ -267,52 +220,111 @@
                   </v-card>
                 </v-menu>
               </v-col>
-              <!-- Optional: Assign Worker -->
+
+              <!-- Recurring Shift toggle -->
+              <v-col cols="12">
+                <v-card variant="outlined" class="pa-3">
+                  <div class="d-flex justify-space-between align-center">
+                    <div>
+                      <div class="font-weight-medium">Recurring Shift</div>
+                      <div class="text-caption text-grey">Repeat this shift on the same day each week</div>
+                    </div>
+                    <v-switch v-model="newShift.recurring" hide-details color="primary" density="compact" />
+                  </div>
+                </v-card>
+              </v-col>
+
+              <!-- Post as Open Shift toggle -->
+              <v-col cols="12">
+                <v-card variant="outlined" class="pa-3">
+                  <div class="d-flex justify-space-between align-center">
+                    <div>
+                      <div class="font-weight-medium">Post as Open Shift</div>
+                      <div class="text-caption text-grey">Allow workers to claim this shift</div>
+                    </div>
+                    <v-switch
+                      v-model="newShift.post_as_open"
+                      hide-details
+                      color="primary"
+                      density="compact"
+                      @update:modelValue="onOpenShiftToggle"
+                    />
+                  </div>
+                  <v-expand-transition>
+                    <v-text-field
+                      v-if="newShift.post_as_open"
+                      v-model.number="newShift.workers_needed"
+                      type="number"
+                      label="Workers Needed"
+                      min="1"
+                      variant="outlined"
+                      density="comfortable"
+                      class="mt-3"
+                      hide-details
+                    />
+                  </v-expand-transition>
+                </v-card>
+              </v-col>
+
+              <!-- Assign To: required unless open shift -->
               <v-col cols="12">
                 <v-select
                   v-model="newShift.assigned_user_id"
                   :items="departmentWorkers"
                   item-title="title"
                   item-value="value"
-                  label="Assign Worker (optional - leave blank for open shift)"
+                  :label="newShift.post_as_open ? 'Assign To (optional — open shift)' : 'Assign To *'"
                   variant="outlined"
+                  density="comfortable"
                   clearable
-                  hide-details
                   prepend-inner-icon="mdi-account-outline"
-                ></v-select>
+                  :disabled="newShift.post_as_open"
+                  :rules="newShift.post_as_open ? [] : [v => !!v || 'Please assign a worker or toggle Post as Open Shift']"
+                />
               </v-col>
-              <!-- Optional: Tasks -->
+
+              <!-- Tasks -->
               <v-col cols="12">
-                <v-combobox
-                  v-model="newShift.tasks"
-                  label="Add Tasks (optional)"
-                  variant="outlined"
-                  multiple
-                  chips
-                  closable-chips
-                  hide-details
-                  prepend-inner-icon="mdi-format-list-checks"
-                  hint="Type a task name and press Enter to add"
-                  persistent-hint
-                ></v-combobox>
-              </v-col>
-              <v-col cols="12">
-                <v-checkbox v-model="newShift.is_published" label="Publish immediately" hide-details></v-checkbox>
+                <div class="tasks-section">
+                  <div class="tasks-header">
+                    <h4 class="tasks-title">Tasks</h4>
+                    <v-btn size="small" variant="outlined" prepend-icon="mdi-plus" @click="addNewTask">
+                      + ADD TASK
+                    </v-btn>
+                  </div>
+                  <div v-if="newShift.tasks.length === 0" class="empty-tasks text-center py-3">
+                    No tasks added yet. Click "+ ADD TASK" to create checkpoint tasks.
+                  </div>
+                  <div v-for="(task, ti) in newShift.tasks" :key="ti" class="task-item-row">
+                    <v-text-field
+                      v-model="task.task_name"
+                      :label="`Task ${ti + 1}`"
+                      variant="outlined"
+                      hide-details
+                      density="compact"
+                      class="flex-grow-1"
+                    />
+                    <v-btn icon variant="text" color="error" @click="removeNewTask(ti)">
+                      <v-icon>mdi-delete</v-icon>
+                    </v-btn>
+                  </div>
+                </div>
               </v-col>
             </v-row>
           </v-form>
         </v-card-text>
 
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn @click="showCreateDialog = false" variant="text">Cancel</v-btn>
+        <v-card-actions class="px-5 pb-5">
+          <v-spacer />
+          <v-btn variant="text" @click="closeCreateDialog">Cancel</v-btn>
           <v-btn
-            @click="createShift"
             color="primary"
             variant="elevated"
             :loading="creating"
             :disabled="!createFormValid"
+            @click="createShift"
           >
+            <v-icon start>mdi-calendar-check</v-icon>
             Create Shift
           </v-btn>
         </v-card-actions>
@@ -522,8 +534,11 @@ const newShift = ref({
   start_time: '',
   end_time: '',
   assigned_user_id: null,
+  post_as_open: false,
+  workers_needed: 1,
+  recurring: false,
   tasks: [],
-  is_published: false
+  is_published: true
 })
 
 const selectedShift = ref(null)
@@ -542,6 +557,14 @@ const shiftsLoading = ref(false)
 const creating = ref(false)
 const editing = ref(false)
 const deleting = ref(false)
+
+// Drag-to-create state
+const dragCreate = ref(null)
+const isDragCreating = ref(false)
+// Drag-to-reschedule state
+const draggingShift = ref(null)
+const dragOverCell = ref(null)
+const rescheduling = ref(false)
 
 const showSuccess = ref(false)
 const showError = ref(false)
@@ -803,6 +826,132 @@ const removeEditTask = (index) => {
   editShift.value.tasks.splice(index, 1)
 }
 
+// --- Create dialog helpers ---
+const openCreateDialog = (isoDate = '', startTime = '', endTime = '') => {
+  newShift.value = {
+    department_id: currentDeptId,
+    position_id: null,
+    shift_date: isoDate,
+    start_time: startTime,
+    end_time: endTime,
+    assigned_user_id: null,
+    post_as_open: false,
+    workers_needed: 1,
+    recurring: false,
+    tasks: [],
+    is_published: true,
+  }
+  if (startTime) syncTimePartsFromForm('start', startTime)
+  if (endTime) syncTimePartsFromForm('end', endTime)
+  showCreateDialog.value = true
+}
+
+const closeCreateDialog = () => {
+  showCreateDialog.value = false
+  isDragCreating.value = false
+  dragCreate.value = null
+}
+
+const onOpenShiftToggle = () => {
+  if (newShift.value.post_as_open) {
+    newShift.value.assigned_user_id = null
+  }
+}
+
+const addNewTask = () => {
+  newShift.value.tasks.push({ task_name: '' })
+}
+
+const removeNewTask = (index) => {
+  newShift.value.tasks.splice(index, 1)
+}
+
+// --- Drag-to-create ---
+const startDragCreate = (isoDate, hour, event) => {
+  if (event.target.closest && event.target.closest('.shift-block')) return
+  isDragCreating.value = true
+  const startMinute = Math.floor((event.offsetY || 0) / 15) * 15
+  dragCreate.value = { isoDate, startHour: hour, startMinute, currentHour: hour }
+}
+
+const continueDragCreate = (isoDate, hour) => {
+  if (!isDragCreating.value || !dragCreate.value) return
+  if (dragCreate.value.isoDate !== isoDate) return
+  dragCreate.value = { ...dragCreate.value, currentHour: hour }
+}
+
+const endDragCreate = () => {
+  if (!isDragCreating.value || !dragCreate.value) {
+    isDragCreating.value = false
+    dragCreate.value = null
+    return
+  }
+  const { isoDate, startHour, startMinute, currentHour } = dragCreate.value
+  const fromHour = Math.min(startHour, currentHour)
+  const toHour = Math.max(startHour, currentHour) + 1
+  isDragCreating.value = false
+  dragCreate.value = null
+  const startTime = `${String(fromHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`
+  const endHour = Math.min(toHour, 23)
+  const endTime = `${String(endHour).padStart(2, '0')}:00`
+  openCreateDialog(isoDate, startTime, endTime)
+}
+
+const isDragHighlight = (isoDate, hour) => {
+  if (!dragCreate.value || dragCreate.value.isoDate !== isoDate) return false
+  const minH = Math.min(dragCreate.value.startHour, dragCreate.value.currentHour)
+  const maxH = Math.max(dragCreate.value.startHour, dragCreate.value.currentHour)
+  return hour >= minH && hour <= maxH
+}
+
+// --- Drag-to-reschedule ---
+const onShiftDragStart = (shift, event) => {
+  draggingShift.value = shift
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', String(shift.shift_id))
+}
+
+const onShiftDragEnd = () => {
+  draggingShift.value = null
+  dragOverCell.value = null
+}
+
+const onShiftDragOver = (isoDate, hour) => {
+  if (!draggingShift.value) return
+  dragOverCell.value = { isoDate, hour }
+}
+
+const onShiftDrop = async (isoDate, hour) => {
+  const shift = draggingShift.value
+  draggingShift.value = null
+  dragOverCell.value = null
+  if (!shift) return
+  const oldStartMin = toMinutes(shift.start_time)
+  const oldEndMin = toMinutes(shift.end_time)
+  const duration = (oldEndMin != null && oldStartMin != null && oldEndMin > oldStartMin) ? (oldEndMin - oldStartMin) : 60
+  const newStartMin = hour * 60
+  const newEndMin = newStartMin + duration
+  const newStartTime = `${String(Math.floor(newStartMin / 60)).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
+  const newEndTime = `${String(Math.min(Math.floor(newEndMin / 60), 23)).padStart(2, '0')}:${String(newEndMin % 60).padStart(2, '0')}`
+  if (shift.shift_date === isoDate && normalizeTimeInput(shift.start_time) === newStartTime) return
+  try {
+    rescheduling.value = true
+    await shiftService.updateShift(shift.shift_id, {
+      shift_date: isoDate,
+      start_time: newStartTime,
+      end_time: newEndTime,
+    })
+    successMessage.value = 'Shift rescheduled. The assigned worker has been notified.'
+    showSuccess.value = true
+    await loadShifts()
+  } catch (err) {
+    errorMessage.value = err?.response?.data?.message || 'Failed to reschedule shift'
+    showError.value = true
+  } finally {
+    rescheduling.value = false
+  }
+}
+
 const previousWeek = () => {
   const nextDate = new Date(currentDate.value)
   nextDate.setDate(nextDate.getDate() - 7)
@@ -905,46 +1054,46 @@ const createShift = async () => {
       shift_date: newShift.value.shift_date,
       start_time: newShift.value.start_time,
       end_time: newShift.value.end_time,
-      assigned_user_id: newShift.value.assigned_user_id || null,
-      is_published: newShift.value.is_published
+      assigned_user_id: newShift.value.post_as_open ? null : (newShift.value.assigned_user_id || null),
+      is_published: true,
+      is_recurring: newShift.value.recurring,
+      recurrence_pattern: newShift.value.recurring ? 'weekly' : null,
+      recurrence_start_date: newShift.value.recurring ? newShift.value.shift_date : null,
+      workers_needed: newShift.value.post_as_open ? Number(newShift.value.workers_needed) : null,
+      trade_status: newShift.value.post_as_open ? 'open' : null,
     }
-    
+
     const response = await shiftService.createShift(shiftPayload)
     const createdShift = response.data
     const warningMessage = createdShift?.warning_message || ''
 
-    // Create tasks if any were specified
-    if (newShift.value.tasks && newShift.value.tasks.length > 0) {
+    // Create tasks if any were added
+    const validTasks = newShift.value.tasks.filter(t => String(t.task_name || '').trim())
+    if (validTasks.length > 0) {
       const shiftId = createdShift?.shift_id || createdShift?.data?.shift_id
       if (shiftId) {
         await Promise.all(
-          newShift.value.tasks.map(taskName =>
-            apiClient.post('/shift-tasks', { shiftId, taskName })
+          validTasks.map((t, i) =>
+            apiClient.post('/shift-tasks', {
+              shiftId,
+              taskName: t.task_name.trim(),
+              sortOrder: i + 1,
+              isRequired: true,
+              status: 'pending',
+            })
           )
         )
       }
     }
-    
+
     successMessage.value = warningMessage
-      ? `Shift created successfully. Warning: ${warningMessage}`
-      : 'Shift created successfully!'
+      ? `Shift created and published. Note: ${warningMessage}`
+      : 'Shift created and published!'
     showSuccess.value = true
 
-    newShift.value = {
-      department_id: currentDeptId,
-      position_id: null,
-      shift_date: '',
-      start_time: '',
-      end_time: '',
-      assigned_user_id: null,
-      tasks: [],
-      is_published: false
-    }
-    showCreateDialog.value = false
-
-    loadShifts()
+    closeCreateDialog()
+    await loadShifts()
   } catch (error) {
-    console.error('Error creating shift:', error)
     errorMessage.value = error?.response?.data?.message || 'Failed to create shift'
     showError.value = true
   } finally {
@@ -1071,7 +1220,7 @@ onMounted(() => {
   ])
 
   if (String(route.query?.createShift || '') === '1') {
-    showCreateDialog.value = true
+    openCreateDialog()
   }
 })
 </script>
@@ -1305,6 +1454,17 @@ onMounted(() => {
 .hour-slot {
   border-bottom: 1px solid #f0f0f0;
   position: relative;
+  cursor: crosshair;
+}
+
+.hour-slot.drag-highlight {
+  background-color: rgba(139, 21, 56, 0.10);
+}
+
+.hour-slot.drag-over-cell {
+  background-color: rgba(139, 21, 56, 0.20);
+  outline: 2px dashed rgba(139, 21, 56, 0.50);
+  outline-offset: -2px;
 }
 
 .shift-block {
@@ -1317,13 +1477,18 @@ onMounted(() => {
   padding: 8px;
   font-size: 12px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
   border: 2px solid transparent;
 }
 
 .shift-block.selected {
   border-color: #00c853;
   box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
+}
+
+.shift-block.dragging {
+  opacity: 0.35;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
 }
 
 .shift-block-title {

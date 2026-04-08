@@ -622,6 +622,7 @@ const submitShift = async () => {
     const response = await shiftService.createShift(payload);
     const createdShift = response?.data || {};
     const shiftId = createdShift?.shift_id || createdShift?.data?.shift_id;
+    const warningMessage = createdShift?.warning_message || "";
     let taskSaveFailed = false;
 
     if (shiftId && taskEntries.length > 0) {
@@ -646,7 +647,11 @@ const submitShift = async () => {
       ? "Shift Created: posted as open."
       : `Shift Created: assigned to ${getAssignedWorkerLabel()}.${taskSaveFailed ? " Some tasks could not be saved." : ""}`;
 
-    Utils.setStore("managerScheduleToast", { message: toastMessage });
+    const message = warningMessage
+      ? `${toastMessage} Warning: ${warningMessage}`
+      : toastMessage;
+
+    Utils.setStore("managerScheduleToast", { message });
     router.push("/manager/schedule");
   } catch (error) {
     errorMessage.value = error?.response?.data?.message || "Failed to create shift.";

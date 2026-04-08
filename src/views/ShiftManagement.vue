@@ -396,6 +396,32 @@
                   hide-details
                 />
               </v-col>
+              <v-col cols="12">
+                <div class="tasks-section">
+                  <div class="tasks-header">
+                    <h4 class="tasks-title">Tasks</h4>
+                    <v-btn size="small" variant="outlined" prepend-icon="mdi-plus" @click="addEditTask">
+                      Add Task
+                    </v-btn>
+                  </div>
+
+                  <div v-if="editShift.tasks.length === 0" class="empty-tasks">
+                    No tasks added.
+                  </div>
+
+                  <div v-for="(task, index) in editShift.tasks" :key="task.id" class="task-item-row">
+                    <v-text-field
+                      v-model="task.text"
+                      :label="`Task ${index + 1}`"
+                      variant="outlined"
+                      hide-details
+                    />
+                    <v-btn icon variant="text" color="error" @click="removeEditTask(index)">
+                      <v-icon>mdi-delete</v-icon>
+                    </v-btn>
+                  </div>
+                </div>
+              </v-col>
             </v-row>
           </v-form>
         </v-card-text>
@@ -409,7 +435,7 @@
             color="primary"
             variant="elevated"
             :loading="editing"
-            :disabled="!editFormValid"
+            :disabled="isEditSaveDisabled"
             @click="saveShiftEdits"
           >
             Save Changes
@@ -509,6 +535,7 @@ const editShift = ref({
   end_time: '',
   assigned_user_id: null,
   is_published: false,
+  tasks: [],
 })
 
 const shiftsLoading = ref(false)
@@ -520,6 +547,17 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+const isEditSaveDisabled = computed(() => {
+  return (
+    editing.value ||
+    !editShift.value.shift_id ||
+    !editShift.value.position_id ||
+    !editShift.value.shift_date ||
+    !editShift.value.start_time ||
+    !editShift.value.end_time
+  )
+})
 
 // Data table
 const headers = [
@@ -722,8 +760,24 @@ const getShiftBlockStyle = (shift, idx) => {
   }
 }
 
-const selectShift = (shift) => {
+const loadShiftTasks = async (shiftId) => {
+  if (!shiftId) return []
+  try {
+    const response = await apiClient.get(`/shift-tasks/shift/${shiftId}`)
+    const rows = response?.data || []
+    return rows.map((task) => ({
+      id: task.id || `${shiftId}-${Math.random().toString(36).slice(2, 9)}`,
+      taskId: task.id || null,
+      text: String(task.taskName || '').trim(),
+    }))
+  } catch (error) {
+    return []
+  }
+}
+
+const selectShift = async (shift) => {
   selectedShift.value = shift
+  const existingTasks = await loadShiftTasks(shift.shift_id)
   editShift.value = {
     shift_id: shift.shift_id,
     position_id: shift.position_id || null,
@@ -732,8 +786,21 @@ const selectShift = (shift) => {
     end_time: normalizeTimeInput(shift.end_time),
     assigned_user_id: normalizeUserId(shift.assigned_user_id),
     is_published: !!shift.is_published,
+    tasks: existingTasks,
   }
   showEditDialog.value = true
+}
+
+const addEditTask = () => {
+  editShift.value.tasks.push({
+    id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    taskId: null,
+    text: '',
+  })
+}
+
+const removeEditTask = (index) => {
+  editShift.value.tasks.splice(index, 1)
 }
 
 const previousWeek = () => {
@@ -844,6 +911,7 @@ const createShift = async () => {
     
     const response = await shiftService.createShift(shiftPayload)
     const createdShift = response.data
+    const warningMessage = createdShift?.warning_message || ''
 
     // Create tasks if any were specified
     if (newShift.value.tasks && newShift.value.tasks.length > 0) {
@@ -857,7 +925,9 @@ const createShift = async () => {
       }
     }
     
-    successMessage.value = 'Shift created successfully!'
+    successMessage.value = warningMessage
+      ? `Shift created successfully. Warning: ${warningMessage}`
+      : 'Shift created successfully!'
     showSuccess.value = true
 
     newShift.value = {
@@ -875,7 +945,7 @@ const createShift = async () => {
     loadShifts()
   } catch (error) {
     console.error('Error creating shift:', error)
-    errorMessage.value = 'Failed to create shift'
+    errorMessage.value = error?.response?.data?.message || 'Failed to create shift'
     showError.value = true
   } finally {
     creating.value = false
@@ -883,11 +953,11 @@ const createShift = async () => {
 }
 
 const saveShiftEdits = async () => {
-  if (!editFormValid.value || !editShift.value.shift_id) return
+  if (isEditSaveDisabled.value) return
 
   try {
     editing.value = true
-    await shiftService.updateShift(editShift.value.shift_id, {
+    const response = await shiftService.updateShift(editShift.value.shift_id, {
       department_id: currentDeptId,
       position_id: editShift.value.position_id,
       shift_date: editShift.value.shift_date,
@@ -896,8 +966,35 @@ const saveShiftEdits = async () => {
       assigned_user_id: editShift.value.assigned_user_id || null,
       is_published: editShift.value.is_published,
     })
+    const warningMessage = response?.data?.warning_message || ''
 
-    successMessage.value = 'Shift updated successfully!'
+    const currentTasksResponse = await apiClient.get(`/shift-tasks/shift/${editShift.value.shift_id}`)
+    const currentTasks = currentTasksResponse?.data || []
+    await Promise.all(
+      currentTasks.map((task) => apiClient.delete(`/shift-tasks/${task.id}`)),
+    )
+
+    const nextTasks = editShift.value.tasks
+      .map((task) => String(task.text || '').trim())
+      .filter(Boolean)
+
+    if (nextTasks.length > 0) {
+      await Promise.all(
+        nextTasks.map((taskName, index) =>
+          apiClient.post('/shift-tasks', {
+            shiftId: editShift.value.shift_id,
+            taskName,
+            sortOrder: index + 1,
+            isRequired: true,
+            status: 'pending',
+          }),
+        ),
+      )
+    }
+
+    successMessage.value = warningMessage
+      ? `Shift updated successfully. Warning: ${warningMessage}`
+      : 'Shift updated successfully!'
     showSuccess.value = true
     showEditDialog.value = false
     await loadShifts()
@@ -1242,6 +1339,39 @@ onMounted(() => {
 .shift-block-time {
   opacity: 0.9;
   font-size: 11px;
+}
+
+.tasks-section {
+  border: 1px solid #e3e5e8;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tasks-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #101828;
+}
+
+.empty-tasks {
+  color: #667085;
+  font-size: 14px;
+}
+
+.task-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .loading-wrap {

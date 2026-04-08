@@ -11,7 +11,12 @@
       :clocked-in="clockStatus.isClockedIn"
       :clock-in-time="clockStatus.clockInTime"
       :on-break="clockStatus.onBreak"
+      :loading="clockingIn"
       class="mb-6"
+      @clock-in="handleClockIn"
+      @clock-out="handleClockOut"
+      @start-break="handleStartBreak"
+      @end-break="handleEndBreak"
     />
 
     <!-- Loading skeleton -->
@@ -504,6 +509,48 @@ async function handleClockIn() {
     showSnack("Clocked in successfully!");
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to clock in", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+async function handleClockOut() {
+  clockingIn.value = true;
+  try {
+    await studentService.clockOut();
+    clockStatus.isClockedIn = false;
+    clockStatus.clockInTime = null;
+    clockStatus.onBreak = false;
+    clockStatus.clockRecordId = null;
+    showSnack("Clocked out successfully!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to clock out", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+async function handleStartBreak() {
+  clockingIn.value = true;
+  try {
+    await studentService.startBreak(clockStatus.clockRecordId);
+    clockStatus.onBreak = true;
+    showSnack("Break started!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to start break", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+async function handleEndBreak() {
+  clockingIn.value = true;
+  try {
+    await studentService.endBreak(clockStatus.clockRecordId);
+    clockStatus.onBreak = false;
+    showSnack("Break ended!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to end break", "error");
   } finally {
     clockingIn.value = false;
   }

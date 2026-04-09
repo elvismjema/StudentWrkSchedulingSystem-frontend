@@ -70,11 +70,7 @@
         {{ departmentName }}
       </v-app-bar-title>
       <v-spacer />
-      <v-btn icon variant="text" @click="$router.push({ name: 'student-notifications' })">
-        <v-badge :content="unreadCount" :model-value="unreadCount > 0" color="error" overlap>
-          <v-icon>mdi-bell-outline</v-icon>
-        </v-badge>
-      </v-btn>
+      <NotificationDropdown />
       <v-menu
         v-model="menuOpen"
         :close-on-content-click="false"
@@ -145,7 +141,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import UserRoleServices from '../services/userRoleServices.js';
-import studentService from '../services/studentService.js';
+import NotificationDropdown from '../components/NotificationDropdown.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -153,7 +149,6 @@ const drawer = ref(true);
 const rail = ref(false);
 const user = ref(Utils.getStore('user') || {});
 const resolvedDepartmentName = ref('');
-const unreadCount = ref(0);
 const menuOpen = ref(false);
 
 const displayName = computed(() => {
@@ -182,7 +177,6 @@ const navItems = [
   { title: 'My Schedule', icon: 'mdi-calendar-clock', route: '/student/schedule', name: 'student-schedule' },
   { title: 'Clock In/Out', icon: 'mdi-clock-check-outline', route: '/student/clock', name: 'student-clock' },
   { title: 'Trade Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board', name: 'student-trade-board' },
-  { title: 'Notifications', icon: 'mdi-bell-outline', route: '/student/notifications', name: 'student-notifications' },
   { title: 'Availability', icon: 'mdi-calendar-edit', route: '/student/availability', name: 'student-availability' },
 ];
 
@@ -217,14 +211,6 @@ onMounted(async () => {
     }
   }
 
-  // Load unread notification count
-  try {
-    const res = await studentService.getUnreadNotificationCount();
-    const notifs = res?.data?.data || res?.data || [];
-    unreadCount.value = Array.isArray(notifs) ? notifs.filter((n) => !n.isRead).length : 0;
-  } catch {
-    // ignore
-  }
 });
 
 const handleSignOut = () => {

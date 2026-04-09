@@ -6,7 +6,7 @@
         <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
         <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
       </div>
-      <NotificationBell :unread-count="unreadCount" @click="goToNotifications" />
+      <NotificationDropdown />
     </div>
 
     <!-- Clock Status Banner -->
@@ -243,16 +243,14 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
-import NotificationBell from "../components/student/NotificationBell.vue";
+import NotificationDropdown from "../components/NotificationDropdown.vue";
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
 
-const router = useRouter();
 const user = ref(Utils.getStore("user") || {});
 
 // State
@@ -268,7 +266,6 @@ const weekShifts = ref([]);
 const openShiftsCount = ref(0);
 const topOpenShifts = ref([]);
 const pendingRequests = ref([]);
-const unreadCount = ref(0);
 const weeklyHours = ref(0);
 const weeklyShifts = ref(0);
 const estimatedEarnings = ref("0.00");
@@ -412,7 +409,6 @@ async function loadDashboard() {
     weekShifts.value = data.weekShifts || [];
     openShiftsCount.value = data.openShiftsCount ?? openShiftData.count;
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
-    unreadCount.value = data.unreadNotifications || 0;
     weeklyHours.value = data.weeklyHours ?? data.estimatedWeeklyHours ?? 0;
     weeklyShifts.value = data.weeklyShifts || weekShifts.value.length;
     estimatedEarnings.value = data.estimatedEarnings || "0.00";
@@ -462,10 +458,9 @@ async function loadDashboard() {
 async function loadFromIndividualEndpoints() {
   const userId = user.value?.userId || user.value?.id;
 
-  const [shiftsRes, clockRes, notifRes, openRes] = await Promise.allSettled([
+  const [shiftsRes, clockRes, openRes] = await Promise.allSettled([
     studentService.getShifts({ assigned_user_id: userId, is_published: true }),
     studentService.getOpenClockRecord(),
-    studentService.getUnreadNotificationCount(),
     studentService.getOpenShifts(),
   ]);
 
@@ -509,12 +504,6 @@ async function loadFromIndividualEndpoints() {
       clockStatus.clockRecordId = record.id;
       clockStatus.onBreak = record.on_break || false;
     }
-  }
-
-  // Notification count
-  if (notifRes.status === "fulfilled") {
-    const notifs = notifRes.value?.data?.data || notifRes.value?.data || [];
-    unreadCount.value = Array.isArray(notifs) ? notifs.filter((n) => !n.isRead).length : 0;
   }
 
   // Open shifts
@@ -572,10 +561,6 @@ async function handleSwapSubmit(data) {
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to submit request", "error");
   }
-}
-
-function goToNotifications() {
-  router.push({ name: "student-notifications" });
 }
 
 onMounted(loadDashboard);

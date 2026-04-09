@@ -96,21 +96,23 @@
               >
                 <div>
                   <div class="text-body-2 font-weight-medium">
-                    {{ ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
+                    {{ ack.shift?.department?.department_name || ack.shift?.department_name || "Shift" }} — {{ formatDate(ack.shift?.shift_date || ack.shift?.date) }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
                     {{ ack.shift ? formatTimeRange(ack.shift) : "" }}
                   </div>
                 </div>
-                <v-btn
-                  size="small"
-                  color="primary"
-                  variant="flat"
-                  :loading="ack._loading"
-                  @click="acknowledgeShift(ack)"
-                >
-                  Acknowledge
-                </v-btn>
+                <div class="d-flex ga-2">
+                  <v-btn
+                    size="small"
+                    color="primary"
+                    variant="flat"
+                    :loading="ack._loading"
+                    @click="acknowledgeShift(ack)"
+                  >
+                    Accept
+                  </v-btn>
+                </div>
               </v-card>
             </v-col>
           </v-row>
@@ -204,6 +206,7 @@ import { ref, computed, watch, reactive, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+import { buildDateTime, shiftStartDT, shiftEndDT, shiftDateStr, formatTimeRange, formatShiftDate as formatDate } from "../utils/shiftDateTime.js";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
@@ -298,8 +301,8 @@ async function loadShifts() {
     }
     if (acksRes.status === "fulfilled") {
       pendingAcks.value = (acksRes.value?.data?.data || acksRes.value?.data || [])
-        .filter((a) => !a.acknowledged_at)
-        .map((a) => ({ ...a, _loading: false }));
+        .filter((a) => !a.acknowledged && !a.acknowledgedAt && !a.acknowledged_at)
+        .map((a) => ({ ...a, _loading: false, _declining: false }));
     }
   } catch (err) {
     error.value = "Failed to load schedule. Please try again.";
@@ -336,8 +339,8 @@ async function loadOpenShifts() {
 async function claimShift(shift) {
   shift._claiming = true;
   try {
-    await studentService.claimOpenShift(shift.id);
-    openShifts.value = openShifts.value.filter((s) => s.id !== shift.id);
+    await studentService.claimOpenShift(shift.shift_id || shift.id);
+    openShifts.value = openShifts.value.filter((s) => (s.shift_id || s.id) !== (shift.shift_id || shift.id));
     showSnack("Shift claimed!");
     // Reload my shifts
     const userId = user.value?.userId || user.value?.id;
@@ -360,9 +363,9 @@ async function acknowledgeShift(ack) {
   try {
     await studentService.acknowledgeShift(ack.id);
     pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
-    showSnack("Shift acknowledged!");
+    showSnack("Shift accepted!");
   } catch (err) {
-    showSnack("Failed to acknowledge shift", "error");
+    showSnack("Failed to accept shift", "error");
   } finally {
     ack._loading = false;
   }
@@ -375,21 +378,10 @@ function openSwap(shift, mode) {
   swapDialogOpen.value = true;
 }
 
-async function handleSwapSubmit(data) {
-  try {
-    if (data.type === "pool") {
-      await studentService.findCover(data.shift.id, { notes: data.notes });
-    } else {
-      await studentService.requestSwap(data.shift.id, {
-        targetUserId: data.coworker?.id,
-        notes: data.notes,
-      });
-    }
-    swapDialogOpen.value = false;
-    showSnack("Request submitted!");
-  } catch (err) {
-    showSnack(err?.response?.data?.message || "Request failed", "error");
-  }
+async function handleSwapSubmit() {
+  swapDialogOpen.value = false;
+  showSnack("Request submitted!");
+  await loadAll();
 }
 
 function addToCalendar(shift) {
@@ -405,47 +397,6 @@ function addToCalendar(shift) {
 
 // Helpers
 
-/** Combine separate shift_date + time fields into a parseable datetime string */
-function buildDateTime(shift, timeField) {
-  const time = shift[timeField];
-  if (!time) return null;
-  // If time is already a full datetime (contains 'T' or '-'), use as-is
-  if (time.includes("T") || time.includes("-")) return time;
-  // Combine with shift_date
-  const date = shift.shift_date || shift.date;
-  if (date) return date + "T" + time;
-  return null;
-}
-
-function shiftStartDT(shift) {
-  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
-}
-
-function shiftEndDT(shift) {
-  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
-}
-
-function shiftDateStr(shift) {
-  return shift.shift_date || shift.date || shift.start_time || shift.shift_start;
-}
-
-function formatTimeRange(shift) {
-  if (!shift) return "";
-  const fmt = (d) => {
-    if (!d) return "";
-    const dt = new Date(d);
-    if (isNaN(dt)) return "";
-    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
-  if (isNaN(d)) return "";
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
 
 function getDeptColor(shift) {
   const name = (shift.department_name || shift.department?.department_name || "").toLowerCase();

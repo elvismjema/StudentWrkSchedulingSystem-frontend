@@ -1,11 +1,10 @@
 <template>
   <div class="student-dashboard pa-6">
     <!-- Header -->
-    <div class="dashboard-header d-flex align-center justify-space-between mb-6">
-      <div>
-        <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
-        <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
-      </div>
+
+    <div class="dashboard-header mb-6">
+      <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
+      <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
     </div>
 
     <!-- Clock Status Banner -->
@@ -13,7 +12,12 @@
       :clocked-in="clockStatus.isClockedIn"
       :clock-in-time="clockStatus.clockInTime"
       :on-break="clockStatus.onBreak"
+      :loading="clockingIn"
       class="mb-6"
+      @clock-in="handleClockIn"
+      @clock-out="handleClockOut"
+      @start-break="handleStartBreak"
+      @end-break="handleEndBreak"
     />
 
     <!-- Loading skeleton -->
@@ -83,17 +87,6 @@
 
           <div class="d-flex ga-2">
             <v-btn
-              color="primary"
-              variant="flat"
-              :disabled="!canClockIn"
-              @click="handleClockIn"
-              :loading="clockingIn"
-              aria-label="Clock in to shift"
-            >
-              <v-icon start>mdi-login</v-icon>
-              Clock In
-            </v-btn>
-            <v-btn
               variant="outlined"
               color="primary"
               @click="openSwapDialog(nextShift)"
@@ -102,9 +95,6 @@
               <v-icon start>mdi-account-switch</v-icon>
               Find Cover
             </v-btn>
-          </div>
-          <div v-if="!canClockIn && !clockStatus.isClockedIn" class="text-caption text-medium-emphasis mt-2">
-            Clock-in available within 15 minutes of shift start
           </div>
         </div>
       </v-card>
@@ -174,14 +164,31 @@
                   v-for="req in pendingRequests"
                   :key="req.id"
                   class="d-flex align-center justify-space-between py-2"
+                  style="gap: 8px"
                 >
-                  <div class="d-flex align-center">
-                    <v-icon size="18" :color="req.iconColor" class="mr-2">{{ req.icon }}</v-icon>
-                    <span class="text-body-2">{{ req.label }}</span>
+                  <!-- Icon + label -->
+                  <div class="d-flex align-center flex-grow-1" style="min-width: 0">
+                    <v-icon size="18" :color="req.iconColor" class="mr-2 flex-shrink-0">{{ req.icon }}</v-icon>
+                    <span class="text-body-2 text-truncate">{{ req.label }}</span>
                   </div>
-                  <v-chip :color="req.statusColor" size="x-small" variant="tonal">
-                    {{ req.status }}
+
+                  <!-- Status chip -->
+                  <v-chip :color="req.statusColor" size="x-small" variant="tonal" class="flex-shrink-0">
+                    {{ req.statusLabel }}
                   </v-chip>
+
+                  <!-- Cancel button — only for pending time-off requests -->
+                  <v-btn
+                    v-if="req.type === 'time_off' && req.status === 'pending'"
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    :loading="req.cancelling"
+                    icon="mdi-close"
+                    aria-label="Cancel request"
+                    class="flex-shrink-0"
+                    @click.stop="cancelRequest(req)"
+                  />
                 </div>
               </template>
               <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
@@ -244,6 +251,9 @@
 import { ref, computed, reactive, onMounted } from "vue";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+
+import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
+
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
@@ -321,48 +331,69 @@ const nextShiftColor = computed(() => {
   return "#80162B";
 });
 
-const canClockIn = computed(() => {
-  if (clockStatus.isClockedIn) return false;
-  if (!nextShift.value) return false;
-  const start = new Date(shiftStartDT(nextShift.value));
-  if (isNaN(start)) return false;
-  const now = new Date();
-  const diffMin = (start - now) / 60000;
-  return diffMin <= 15 && diffMin >= -60; // within 15 min before to 60 min after
-});
-
-/** Combine separate shift_date + time fields into a parseable datetime string */
-function buildDateTime(shift, timeField) {
-  const time = shift[timeField];
-  if (!time) return null;
-  if (time.includes("T") || time.includes("-")) return time;
-  const date = shift.shift_date || shift.date;
-  if (date) return date + "T" + time;
-  return null;
-}
-
-function shiftStartDT(shift) {
-  return buildDateTime(shift, "start_time") || shift.start_time || shift.shift_start;
-}
-
-function shiftEndDT(shift) {
-  return buildDateTime(shift, "end_time") || shift.end_time || shift.shift_end;
-}
-
-function formatTimeRange(shift) {
-  const fmt = (d) => {
-    if (!d) return "";
-    const dt = new Date(d);
-    if (isNaN(dt)) return "";
-    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  };
-  return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
-}
 
 function showSnack(text, color = "success") {
   snackbar.text = text;
   snackbar.color = color;
   snackbar.show = true;
+}
+
+/**
+ * Map a raw request object (time-off or swap) from the API into the
+ * display shape used by the Pending Requests card.
+ */
+function mapRequest(r) {
+  const statusLabelMap = {
+    pending:          "Pending",
+    manager_pending:  "Awaiting Manager",
+    approved:         "Approved",
+    declined:         "Declined",
+    rejected:         "Rejected",
+    cancelled:        "Cancelled",
+    accepted:         "Accepted",
+  };
+  const statusColorMap = {
+    pending:          "warning",
+    manager_pending:  "orange",
+    approved:         "success",
+    declined:         "error",
+    rejected:         "error",
+    cancelled:        "grey",
+    accepted:         "info",
+  };
+  const status = r.status || "pending";
+  return {
+    id:          r.id,
+    type:        r.type || "time_off",
+    label:       r.type === "time_off"
+                   ? `Time off: ${r.startDate ?? r.start_date} – ${r.endDate ?? r.end_date}`
+                   : r.type === "find_cover"
+                     ? `Cover request – ${r.shiftDate ?? r.shift_date ?? ""}`
+                     : r.label || "Swap request",
+    icon:        r.type === "time_off" ? "mdi-calendar-remove" : "mdi-swap-horizontal",
+    iconColor:   r.type === "time_off" ? "orange" : "blue",
+    status,
+    statusLabel: statusLabelMap[status] || status,
+    statusColor: statusColorMap[status] || "warning",
+    cancelling:  false,
+  };
+}
+
+/**
+ * Cancel a pending time-off request from the Pending Requests card.
+ * Uses the DELETE /student/time-off/:id endpoint.
+ */
+async function cancelRequest(req) {
+  req.cancelling = true;
+  try {
+    await studentService.cancelTimeOff(req.id);
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== req.id);
+    showSnack("Time-off request cancelled.");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to cancel request.", "error");
+  } finally {
+    req.cancelling = false;
+  }
 }
 
 function normalizeOpenShiftPayload(payload) {
@@ -424,14 +455,7 @@ async function loadDashboard() {
               status: "Pending",
             }))
         : [];
-    pendingRequests.value = rawRequests.map((r) => ({
-      id: r.id,
-      label: r.type === "time_off" ? `Time off: ${r.startDate} – ${r.endDate}` : r.label || "Request",
-      icon: r.type === "time_off" ? "mdi-calendar-remove" : "mdi-swap-horizontal",
-      iconColor: r.type === "time_off" ? "orange" : "blue",
-      status: r.status || "Pending",
-      statusColor: r.status === "approved" ? "success" : r.status === "denied" ? "error" : "warning",
-    }));
+    pendingRequests.value = rawRequests.map((r) => mapRequest(r));
 
     // Clock status
     if (data.clockStatus) {
@@ -523,7 +547,7 @@ function getWeekStart(date) {
 async function handleClockIn() {
   clockingIn.value = true;
   try {
-    const payload = { shiftId: nextShift.value?.id };
+    const payload = { shiftId: nextShift.value?.shift_id || nextShift.value?.id };
     await studentService.clockIn(payload);
     clockStatus.isClockedIn = true;
     clockStatus.clockInTime = new Date().toISOString();
@@ -535,6 +559,49 @@ async function handleClockIn() {
   }
 }
 
+async function handleClockOut() {
+  clockingIn.value = true;
+  try {
+    await studentService.clockOut();
+    clockStatus.isClockedIn = false;
+    clockStatus.clockInTime = null;
+    clockStatus.onBreak = false;
+    clockStatus.clockRecordId = null;
+    showSnack("Clocked out successfully!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to clock out", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+async function handleStartBreak() {
+  clockingIn.value = true;
+  try {
+    await studentService.startBreak(clockStatus.clockRecordId);
+    clockStatus.onBreak = true;
+    showSnack("Break started!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to start break", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+async function handleEndBreak() {
+  clockingIn.value = true;
+  try {
+    await studentService.endBreak(clockStatus.clockRecordId);
+    clockStatus.onBreak = false;
+    showSnack("Break ended!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to end break", "error");
+  } finally {
+    clockingIn.value = false;
+  }
+}
+
+
 function openSwapDialog(shift) {
   swapShift.value = shift;
   swapDialogOpen.value = true;
@@ -544,22 +611,12 @@ function onWeekChange({ monday }) {
   selectedDate.value = monday;
 }
 
-async function handleSwapSubmit(data) {
-  try {
-    if (data.type === "pool") {
-      await studentService.findCover(data.shift.id, { notes: data.notes });
-    } else {
-      await studentService.requestSwap(data.shift.id, {
-        targetUserId: data.coworker?.id,
-        notes: data.notes,
-      });
-    }
-    swapDialogOpen.value = false;
-    showSnack("Request submitted!");
-  } catch (err) {
-    showSnack(err?.response?.data?.message || "Failed to submit request", "error");
-  }
+function handleSwapSubmit() {
+  swapDialogOpen.value = false;
+  showSnack("Request submitted!");
+  loadDashboard();
 }
+
 
 onMounted(loadDashboard);
 </script>

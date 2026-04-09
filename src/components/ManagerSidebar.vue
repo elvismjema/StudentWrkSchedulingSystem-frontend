@@ -20,18 +20,27 @@
     <v-divider />
 
     <v-list nav class="nav-list">
-      <v-list-item
+      <v-tooltip
         v-for="item in navItems"
         :key="item.title"
-        :to="item.route"
-        class="nav-item"
-        active-class="active-nav-item"
+        :text="item.title"
+        :disabled="!rail"
+        location="end"
       >
-        <template #prepend>
-          <v-icon :icon="item.icon" size="20" />
+        <template #activator="{ props: tooltipProps }">
+          <v-list-item
+            v-bind="tooltipProps"
+            :to="item.route"
+            class="nav-item"
+            active-class="active-nav-item"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="20" />
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
         </template>
-        <v-list-item-title>{{ item.title }}</v-list-item-title>
-      </v-list-item>
+      </v-tooltip>
 
       <!-- Admin-only section -->
       <template v-if="isAdmin">
@@ -39,18 +48,27 @@
         <div v-if="!rail" class="section-label">
           Admin
         </div>
-        <v-list-item
+        <v-tooltip
           v-for="item in adminNavItems"
           :key="item.title"
-          :to="item.route"
-          class="nav-item"
-          active-class="active-nav-item"
+          :text="item.title"
+          :disabled="!rail"
+          location="end"
         >
-          <template #prepend>
-            <v-icon :icon="item.icon" size="20" />
+          <template #activator="{ props: tooltipProps }">
+            <v-list-item
+              v-bind="tooltipProps"
+              :to="item.route"
+              class="nav-item"
+              active-class="active-nav-item"
+            >
+              <template #prepend>
+                <v-icon :icon="item.icon" size="20" />
+              </template>
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+            </v-list-item>
           </template>
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
-        </v-list-item>
+        </v-tooltip>
       </template>
     </v-list>
 
@@ -120,7 +138,7 @@ const navItems = [
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
   { title: "Templates", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
-  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
+  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-pay" },
   { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
 ];
 

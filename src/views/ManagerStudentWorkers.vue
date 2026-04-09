@@ -71,9 +71,6 @@
               <h3 class="worker-name">
                 {{ `${worker.fName || ''} ${worker.lName || ''}`.trim() || 'Unknown Worker' }}
               </h3>
-              <v-chip size="small" color="#8B1538" variant="outlined" class="position-chip">
-                {{ getPositionName(worker) }}
-              </v-chip>
             </div>
           </div>
 
@@ -124,12 +121,6 @@
             <!-- Worker Details Tab -->
             <v-window-item value="details">
               <div class="details-section">
-                <div class="detail-row">
-                  <span class="detail-label">Position:</span>
-                  <v-chip color="#8B1538" variant="outlined">
-                    {{ getPositionName(workerModal.selectedWorker) }}
-                  </v-chip>
-                </div>
                 <div class="detail-row">
                   <span class="detail-label">Email:</span>
                   <span class="detail-value">{{ workerModal.selectedWorker.email || 'No email' }}</span>
@@ -228,14 +219,31 @@
         </v-card-text>
 
         <v-card-actions class="modal-actions">
-          <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
           <v-btn
-            color="#8B1538"
-            :loading="loadingSchedule"
-            @click="loadClassSchedule"
+            color="error"
+            variant="text"
+            :disabled="deletingWorker"
+            @click="openDeleteWorkerDialog"
           >
-            <v-icon start>mdi-calendar-search</v-icon>
-            View Schedule
+            Delete Worker
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteWorkerDialog" max-width="420px">
+      <v-card>
+        <v-card-title class="text-h6">Delete Worker Permanently?</v-card-title>
+        <v-card-text>
+          This permanently deletes the user account and cannot be undone.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="deletingWorker" @click="deleteWorkerDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="elevated" :loading="deletingWorker" @click="confirmDeleteWorker">
+            Delete
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -272,6 +280,8 @@ const classSchedule = ref([]);
 const loadingSchedule = ref(false);
 const scheduleError = ref('');
 const activeTab = ref('details');
+const deletingWorker = ref(false);
+const deleteWorkerDialog = ref(false);
 
 // Department context
 const deptContext = Utils.getStore('currentDepartmentContext') || {};
@@ -317,22 +327,24 @@ const getWorkerInitials = (worker) => {
   return first && last ? `${first}${last}` : first || 'U';
 };
 
-const getPositionName = (worker) => {
-  return worker.position?.position_name || worker.positionName || 'Not assigned';
-};
-
 const getAvailabilityForDay = (worker, dayKey) => {
   const availability = workerAvailability.value[worker.userId || worker.id];
   if (!availability || !availability[dayKey]) {
     return '—';
   }
-  
+
   const dayAvailability = availability[dayKey];
-  if (dayAvailability.available && dayAvailability.startTime && dayAvailability.endTime) {
-    return `${formatTime(dayAvailability.startTime)} – ${formatTime(dayAvailability.endTime)}`;
-  }
-  
-  return 'Not set';
+  const segments = [];
+
+  (dayAvailability.available || []).forEach((range) => {
+    segments.push(`${range} (Available)`);
+  });
+
+  (dayAvailability.unavailable || []).forEach((range) => {
+    segments.push(`${range} (Unavailable)`);
+  });
+
+  return segments.length ? segments.join(', ') : '—';
 };
 
 const formatTime = (timeString) => {
@@ -388,6 +400,31 @@ const closeWorkerModal = () => {
   workerModal.selectedWorker = null;
   classSchedule.value = [];
   scheduleError.value = '';
+  deleteWorkerDialog.value = false;
+};
+
+const openDeleteWorkerDialog = () => {
+  if (!workerModal.selectedWorker) return;
+  deleteWorkerDialog.value = true;
+};
+
+const confirmDeleteWorker = async () => {
+  const worker = workerModal.selectedWorker;
+  const workerId = worker?.userId || worker?.id;
+  if (!workerId) return;
+
+  deletingWorker.value = true;
+  try {
+    await apiClient.delete(`/users/${workerId}/permanent-manager`);
+    deleteWorkerDialog.value = false;
+    closeWorkerModal();
+    await loadWorkers();
+  } catch (err) {
+    error.value = err?.response?.data?.message || 'Failed to delete worker permanently.';
+    console.error('Error deleting worker:', err);
+  } finally {
+    deletingWorker.value = false;
+  }
 };
 
 // Enhanced worker management methods
@@ -487,13 +524,31 @@ const loadWorkersAvailability = async () => {
       
       // Convert availability array to object keyed by day
       const availabilityMap = {};
+      const dayKeyByNumber = {
+        0: 'sunday',
+        1: 'monday',
+        2: 'tuesday',
+        3: 'wednesday',
+        4: 'thursday',
+        5: 'friday',
+        6: 'saturday',
+      };
+
       availabilityData.forEach((availability) => {
-        if (availability.day_of_week) {
-          availabilityMap[availability.day_of_week.toLowerCase()] = {
-            available: availability.is_available,
-            startTime: availability.start_time,
-            endTime: availability.end_time,
-          };
+        const dayNumber = Number(availability.dayOfWeek);
+        const dayKey = dayKeyByNumber[dayNumber];
+        if (!dayKey || !availability.isRecurring) return;
+
+        if (!availabilityMap[dayKey]) {
+          availabilityMap[dayKey] = { available: [], unavailable: [] };
+        }
+
+        const timeRange = `${formatTime(availability.startTime)} – ${formatTime(availability.endTime)}`;
+        const type = String(availability.availabilityType || '').toLowerCase();
+        if (type === 'unavailable' || type === 'time_off') {
+          availabilityMap[dayKey].unavailable.push(timeRange);
+        } else {
+          availabilityMap[dayKey].available.push(timeRange);
         }
       });
       
@@ -690,10 +745,6 @@ watch(activeTab, (nextTab) => {
   line-height: 1.2;
 }
 
-.position-chip {
-  font-size: 12px;
-}
-
 .availability-section {
   margin-top: 16px;
 }
@@ -726,9 +777,10 @@ watch(activeTab, (nextTab) => {
 }
 
 .day-time {
-  font-size: 10px;
+  font-size: 11px;
   color: #1f2937;
-  line-height: 1.1;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 /* Modal Styles */

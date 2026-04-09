@@ -71,6 +71,29 @@ const AdminServices = {
   getDepartmentMembers(departmentId) {
     return apiClient.get(`/admin/departments/${departmentId}/members`);
   },
+
+  /**
+   * Get roles for a specific department, excluding admin-level roles.
+   * Used to populate the role dropdown in the Assign to Department dialog.
+   */
+  getDepartmentRoles(departmentId) {
+    return apiClient.get(`/admin/departments/${departmentId}/roles`);
+  },
+
+  /**
+   * Assign a manager or student worker to a single department.
+   * Enforces the one-department rule: all existing non-admin memberships (and future
+   * shifts in those departments) are removed before the new assignment is created.
+   * Notifications are sent to the assigned user and (for students) to dept managers.
+   */
+  assignDepartment(data) {
+    // data: { user_id, department_id, role_id, position_id? }
+    return apiClient.post("/admin/assign-department", data);
+  },
+
+  promoteToAdmin(userId) {
+    return apiClient.post(`/admin/users/${userId}/promote-to-admin`);
+  },
 };
 
 export default AdminServices;

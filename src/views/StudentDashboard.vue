@@ -20,6 +20,56 @@
       @end-break="handleEndBreak"
     />
 
+    <!-- Shift Acknowledgements Banner -->
+    <template v-if="pendingAcknowledgements.length > 0">
+      <div class="mb-6">
+        <div class="d-flex align-center mb-3">
+          <v-icon size="18" color="warning" class="mr-2">mdi-alert-circle-outline</v-icon>
+          <span class="text-subtitle-2 font-weight-bold">
+            {{ pendingAcknowledgements.length }} shift{{ pendingAcknowledgements.length > 1 ? 's' : '' }} need{{ pendingAcknowledgements.length === 1 ? 's' : '' }} your acknowledgement
+          </span>
+        </div>
+        <v-card
+          v-for="ack in pendingAcknowledgements"
+          :key="ack.id"
+          class="mb-2 ack-card"
+          elevation="0"
+          rounded="lg"
+          border
+        >
+          <div class="ack-card__bar"></div>
+          <div class="pa-4 d-flex align-center justify-space-between flex-wrap" style="gap: 12px; flex: 1">
+            <div>
+              <div class="text-subtitle-2 font-weight-bold mb-1">
+                {{ ack.shift?.department?.department_name || 'New Shift Assigned' }}
+              </div>
+              <div class="d-flex align-center flex-wrap text-body-2 text-medium-emphasis" style="gap: 12px">
+                <span v-if="ack.shift?.shift_date">
+                  <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
+                  {{ new Date(ack.shift.shift_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}
+                </span>
+                <span v-if="ack.shift?.start_time && ack.shift?.end_time">
+                  <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ ack.shift.start_time.slice(0, 5) }} – {{ ack.shift.end_time.slice(0, 5) }}
+                </span>
+              </div>
+            </div>
+            <v-btn
+              color="primary"
+              variant="tonal"
+              size="small"
+              :loading="acknowledgingId === ack.id"
+              :disabled="acknowledgingId !== null"
+              prepend-icon="mdi-check"
+              @click="acknowledgeShift(ack)"
+            >
+              Acknowledge
+            </v-btn>
+          </div>
+        </v-card>
+      </div>
+    </template>
+
     <!-- Loading skeleton -->
     <template v-if="loading">
       <v-row>
@@ -274,6 +324,8 @@ const weekShifts = ref([]);
 const openShiftsCount = ref(0);
 const topOpenShifts = ref([]);
 const pendingRequests = ref([]);
+const pendingAcknowledgements = ref([]);
+const acknowledgingId = ref(null);
 const weeklyHours = ref(0);
 const weeklyShifts = ref(0);
 const estimatedEarnings = ref("0.00");
@@ -464,6 +516,14 @@ async function loadDashboard() {
       clockStatus.onBreak = data.clockStatus.onBreak || false;
       clockStatus.clockRecordId = data.clockStatus.clockRecordId || null;
     }
+
+    // Pending shift acknowledgements (fetched separately — dashboard only returns count)
+    try {
+      const ackRes = await studentService.getPendingAcknowledgements();
+      pendingAcknowledgements.value = ackRes?.data || [];
+    } catch {
+      pendingAcknowledgements.value = [];
+    }
   } catch (dashErr) {
     // Fallback: load data from individual endpoints
     try {
@@ -517,14 +577,16 @@ async function loadFromIndividualEndpoints() {
     estimatedEarnings.value = (parseFloat(weeklyHours.value) * (user.value?.hourlyRate || 10)).toFixed(2);
   }
 
-  // Clock status
+  // Clock status — field names match ClockRecord model: clock_in, clock_out, clock_id
   if (clockRes.status === "fulfilled") {
     const record = clockRes.value?.data?.data || clockRes.value?.data;
-    if (record && !record.clock_out_time) {
+    if (record && !record.clock_out) {
       clockStatus.isClockedIn = true;
-      clockStatus.clockInTime = record.clock_in_time;
-      clockStatus.clockRecordId = record.id;
-      clockStatus.onBreak = record.on_break || false;
+      clockStatus.clockInTime = record.clock_in;
+      clockStatus.clockRecordId = record.clock_id;
+      // onBreak: check if breaks array has an open entry (break_end is null)
+      const breaks = record.breaks || record.breakRecords || [];
+      clockStatus.onBreak = Array.isArray(breaks) && breaks.some((b) => !b.break_end);
     }
   }
 
@@ -533,6 +595,14 @@ async function loadFromIndividualEndpoints() {
     const openShiftData = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data);
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
     openShiftsCount.value = openShiftData.count;
+  }
+
+  // Pending acknowledgements (always fetch separately)
+  try {
+    const ackRes = await studentService.getPendingAcknowledgements();
+    pendingAcknowledgements.value = ackRes?.data || [];
+  } catch {
+    pendingAcknowledgements.value = [];
   }
 }
 
@@ -602,6 +672,19 @@ async function handleEndBreak() {
 }
 
 
+async function acknowledgeShift(ack) {
+  acknowledgingId.value = ack.id;
+  try {
+    await studentService.acknowledgeShift(ack.id);
+    pendingAcknowledgements.value = pendingAcknowledgements.value.filter((a) => a.id !== ack.id);
+    showSnack("Shift acknowledged!");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to acknowledge shift.", "error");
+  } finally {
+    acknowledgingId.value = null;
+  }
+}
+
 function openSwapDialog(shift) {
   swapShift.value = shift;
   swapDialogOpen.value = true;
@@ -634,5 +717,16 @@ onMounted(loadDashboard);
 .next-shift-card__bar {
   width: 5px;
   flex-shrink: 0;
+}
+
+.ack-card {
+  overflow: hidden;
+  display: flex;
+}
+
+.ack-card__bar {
+  width: 5px;
+  flex-shrink: 0;
+  background: #F57C00;
 }
 </style>

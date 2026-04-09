@@ -268,11 +268,25 @@ const loadDashboardData = async () => {
   try {
     const [shiftsRes, swapsRes] = await Promise.all([
       shiftService.listShifts({ department_id: currentDeptId, is_published: true }),
-      apiClient.get(`/shift-acknowledgements?type=swap&departmentId=${currentDeptId || ""}`),
+      // Fetch manager_pending swap/cover requests from the correct manager endpoint
+      apiClient.get("/manager/swap-requests"),
     ]);
 
     allShifts.value = shiftsRes?.data || [];
-    swapRequests.value = swapsRes?.data?.data || swapsRes?.data || [];
+    // Normalize to the shape pendingApprovals computed expects
+    const raw = swapsRes?.data?.data || swapsRes?.data || [];
+    swapRequests.value = raw.map((item) => ({
+      id: item.id,
+      status: item.status === 'manager_pending' ? 'pending' : item.status,
+      requestType: item.type === 'find_cover' ? 'Find Cover' : 'Swap',
+      requestedBy: item.requester
+        ? `${item.requester.fName} ${item.requester.lName}`
+        : 'Unknown Worker',
+      shift: item.requesterShift || null,
+      shift_date: item.requesterShift?.shift_date || null,
+      start_time: item.requesterShift?.start_time || null,
+      end_time: item.requesterShift?.end_time || null,
+    }));
   } catch (err) {
     error.value = err?.response?.data?.message || "Failed to load dashboard data.";
   }

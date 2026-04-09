@@ -59,6 +59,19 @@ class NotificationService {
     return true;
   }
 
+  static async deleteNotification(notificationId) {
+    await apiClient.delete(`/notifications/${notificationId}`);
+    return true;
+  }
+
+  static async clearAllNotifications() {
+    const userId = getCurrentUserId();
+    await apiClient.delete(`/notifications`, {
+      params: userId ? { userId } : {},
+    });
+    return true;
+  }
+
   static async markAsRead(notificationId) {
     await apiClient.patch(`/notifications/${notificationId}/read`, {});
     return true;

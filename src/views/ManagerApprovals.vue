@@ -189,8 +189,12 @@
                 </div>
               </div>
 
-              <div v-if="swap.status === 'pending'" class="d-flex gap-2">
+              <div v-if="swap.status === 'pending' || swap.status === 'manager_pending'" class="d-flex gap-2 align-center">
+                <v-chip v-if="swap.status === 'pending'" size="x-small" color="orange" variant="tonal" class="mr-1">
+                  Waiting for volunteer
+                </v-chip>
                 <v-btn
+                  v-if="swap.status === 'manager_pending'"
                   color="success"
                   variant="tonal"
                   size="small"
@@ -405,8 +409,8 @@ const pendingTimeOffCount = computed(() =>
 
 const pendingSwapCount = computed(() =>
   [
-    ...swapRequests.value.filter(s => String(s.status || '').toLowerCase() === 'manager_pending'),
-    ...openShiftClaims.value.filter(c => String(c.status || '').toLowerCase() === 'manager_pending')
+    ...swapRequests.value.filter(s => ['pending', 'manager_pending'].includes(String(s.status || '').toLowerCase())),
+    ...openShiftClaims.value.filter(c => ['pending', 'manager_pending'].includes(String(c.status || '').toLowerCase()))
   ].length
 )
 

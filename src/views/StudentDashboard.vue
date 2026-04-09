@@ -8,11 +8,6 @@
         <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
       </div>
       <NotificationDropdown />
-
-    <div class="dashboard-header mb-6">
-      <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
-      <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
-
     </div>
 
     <!-- Clock Status Banner -->

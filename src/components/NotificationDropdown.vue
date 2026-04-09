@@ -36,7 +36,6 @@
           </span>
         </div>
         <v-btn
-          v-if="unreadCount > 0"
           variant="text"
           size="small"
           color="primary"
@@ -44,7 +43,7 @@
           @click="handleMarkAllAsRead"
           :loading="markingAllAsRead"
         >
-          Mark all as read
+          Mark all as read ({{ unreadCount }})
         </v-btn>
       </div>
 

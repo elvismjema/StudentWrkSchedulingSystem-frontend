@@ -48,17 +48,30 @@
                   </span>
                 </div>
               </div>
-              <v-btn
-                color="success"
-                variant="flat"
-                size="small"
-                :loading="acknowledgingId === ack.id"
-                :disabled="acknowledgingId !== null"
-                prepend-icon="mdi-check-circle"
-                @click="acknowledgeShift(ack)"
-              >
-                Acknowledge
-              </v-btn>
+              <div class="d-flex ga-2">
+                <v-btn
+                  color="success"
+                  variant="flat"
+                  size="small"
+                  :loading="acknowledgingId === ack.id"
+                  :disabled="acknowledgingId !== null"
+                  prepend-icon="mdi-check-circle"
+                  @click="acknowledgeShift(ack)"
+                >
+                  Acknowledge
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  :loading="acknowledgingId === ack.id + '-cover'"
+                  :disabled="acknowledgingId !== null"
+                  prepend-icon="mdi-account-switch"
+                  @click="acknowledgeAndFindCover(ack)"
+                >
+                  Find Cover
+                </v-btn>
+              </div>
             </div>
           </v-card>
         </div>
@@ -742,6 +755,29 @@ async function acknowledgeShift(ack) {
     showSnack("Shift acknowledged! You can now clock in when your shift starts.");
     // Reload the full dashboard so next shift / clock status reflect the newly acknowledged shift
     await loadDashboard();
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to acknowledge shift.", "error");
+  } finally {
+    acknowledgingId.value = null;
+  }
+}
+
+async function acknowledgeAndFindCover(ack) {
+  acknowledgingId.value = ack.id + '-cover';
+  try {
+    // Step 1: Acknowledge the shift (accept it into the schedule)
+    await studentService.acknowledgeShift(ack.id);
+    pendingAcknowledgements.value = pendingAcknowledgements.value.filter((a) => a.id !== ack.id);
+
+    // Step 2: Open the Find Cover dialog for this shift
+    const shift = ack.shift || {};
+    swapShift.value = {
+      ...shift,
+      shift_id: shift.shift_id || shift.id,
+      department_name: shift.department?.department_name || shift.department_name,
+    };
+    swapDialogOpen.value = true;
+    showSnack("Shift acknowledged. Now post for cover.");
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to acknowledge shift.", "error");
   } finally {

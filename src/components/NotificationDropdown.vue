@@ -35,6 +35,17 @@
             {{ unreadCount }} unread
           </span>
         </div>
+        <v-btn
+          v-if="unreadCount > 0"
+          variant="text"
+          size="small"
+          color="primary"
+          class="mark-all-read-btn"
+          @click="handleMarkAllAsRead"
+          :loading="markingAllAsRead"
+        >
+          Mark all as read
+        </v-btn>
       </div>
 
       <v-divider></v-divider>
@@ -95,6 +106,7 @@ const currentUser = Utils.getStore("user") || {}
 
 const isOpen = ref(false)
 const notifications = ref([])
+const markingAllAsRead = ref(false)
 
 const unreadCount = computed(() => {
   return notifications.value.filter(n => n.unread).length
@@ -119,6 +131,21 @@ const handleNotificationClick = async (notification) => {
   }
   emit('notification-click', notification)
   isOpen.value = false
+}
+
+const handleMarkAllAsRead = async () => {
+  markingAllAsRead.value = true
+  try {
+    await NotificationService.markAllAsRead()
+    // Update all notifications to marked as read
+    notifications.value.forEach(notification => {
+      notification.unread = false
+    })
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error)
+  } finally {
+    markingAllAsRead.value = false
+  }
 }
 
 const handleViewAll = () => {
@@ -148,12 +175,21 @@ onMounted(() => {
 
 .dropdown-header {
   padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .header-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+}
+
+.mark-all-read-btn {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: auto;
 }
 
 .header-title h3 {

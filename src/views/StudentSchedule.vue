@@ -393,7 +393,7 @@ async function claimShift(shift) {
   try {
     await studentService.claimOpenShift(shift.shift_id || shift.id);
     openShifts.value = openShifts.value.filter((s) => (s.shift_id || s.id) !== (shift.shift_id || shift.id));
-    showSnack("Shift picked up! Waiting for manager approval.");
+    showSnack("Claim submitted. Waiting for manager approval.");
     // Reload my shifts so it shows in My Schedule
     const userId = user.value?.userId || user.value?.id;
     const res = await studentService.getShifts({ assigned_user_id: userId, is_published: true });

@@ -206,7 +206,7 @@
         <v-card-text class="pa-4 pt-0">
           <p>Are you sure you want to clock out?</p>
           <p v-if="clockInTime" class="text-body-2 text-medium-emphasis">
-            Clocked in since {{ new Date(clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) }}
+            Clocked in since {{ new Date(clockInTime).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true }) }}
             &nbsp;·&nbsp; {{ elapsed }} elapsed
           </p>
         </v-card-text>
@@ -258,6 +258,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Utils from '../config/utils.js';
+import { TZ } from '../utils/tz.js';
 import studentService from '../services/studentService.js';
 
 const user = Utils.getStore('user');
@@ -361,7 +362,7 @@ const formatShiftTime = (s) => {
     if (!d) return '';
     const dt = new Date(d);
     if (isNaN(dt)) return '';
-    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return dt.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
   };
   const startDT = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
   const endDT   = buildDT(s, 'end_time')   || s.end_time   || s.endTime   || s.shift_end;
@@ -407,7 +408,7 @@ const timesheetRows = computed(() => {
     const fmtTime = (v) => {
       if (!v) return null;
       const dt = new Date(v);
-      return isNaN(dt) ? null : dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return isNaN(dt) ? null : dt.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
     };
 
     // Scheduled: prefer clock record fields, fall back to shift data

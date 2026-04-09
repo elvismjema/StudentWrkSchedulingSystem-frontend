@@ -207,6 +207,7 @@ import { useRoute } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
 import { buildDateTime, shiftStartDT, shiftEndDT, shiftDateStr, formatTimeRange, formatShiftDate as formatDate } from "../utils/shiftDateTime.js";
+import { TZ, localDateStr } from "../utils/tz.js";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
@@ -217,7 +218,7 @@ const user = ref(Utils.getStore("user") || {});
 // State
 const loading = ref(true);
 const error = ref(null);
-const selectedDate = ref(new Date().toISOString().slice(0, 10));
+const selectedDate = ref(localDateStr());
 const activeTab = ref(route.query.tab === "open" ? "open" : "mine");
 const allShifts = ref([]);
 const openShifts = ref([]);
@@ -255,7 +256,7 @@ const shiftDates = computed(() =>
     const d = shiftStartDT(s);
     if (!d) return null;
     const dt = new Date(d);
-    return isNaN(dt) ? null : dt.toISOString().slice(0, 10);
+    return isNaN(dt) ? null : localDateStr(dt);
   }).filter(Boolean))]
 );
 
@@ -266,14 +267,14 @@ const selectedDayShifts = computed(() => {
       const d = shiftStartDT(s);
       if (!d) return false;
       const dt = new Date(d);
-      return !isNaN(dt) && dt.toISOString().slice(0, 10) === selectedDate.value;
+      return !isNaN(dt) && localDateStr(dt) === selectedDate.value;
     })
     .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
 });
 
 const selectedDayLabel = computed(() => {
   const d = new Date(selectedDate.value + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  return d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric" });
 });
 
 // Data loading

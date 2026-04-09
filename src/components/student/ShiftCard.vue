@@ -120,6 +120,7 @@
 <script setup>
 import { computed } from 'vue';
 import { buildDateTime } from '../../utils/shiftDateTime.js';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   shift: { type: Object, required: true },
@@ -153,7 +154,7 @@ const formatTime = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d)) return '';
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const formattedTime = computed(() => {

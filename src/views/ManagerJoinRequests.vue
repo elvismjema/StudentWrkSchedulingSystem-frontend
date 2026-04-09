@@ -81,6 +81,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import apiClient from "../services/services.js";
+import { TZ } from "../utils/tz.js";
 
 const loading = ref(false);
 const requests = ref([]);
@@ -100,7 +101,7 @@ const getInitials = (user) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { timeZone: TZ, month: "short", day: "numeric", year: "numeric" });
 };
 
 const fetchPending = async () => {

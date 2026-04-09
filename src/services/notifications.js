@@ -1,5 +1,6 @@
 import apiClient from "./services.js";
 import Utils from "../config/utils.js";
+import { formatDateTime } from "../utils/tz.js";
 
 const iconForType = (type = "", title = "") => {
   switch (type) {
@@ -25,7 +26,7 @@ const toUiNotification = (item) => ({
   id: item.id,
   title: item.title,
   description: item.message,
-  timestamp: new Date(item.createdAt || item.updatedAt || Date.now()).toLocaleString(),
+  timestamp: formatDateTime(new Date(item.createdAt || item.updatedAt || Date.now())),
   unread: !item.isRead,
   icon: iconForType(item.type, item.title),
   // US1 AC3, US3 AC3 – deep-link path stored on the notification record

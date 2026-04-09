@@ -484,6 +484,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import templateService from '../services/templateService.js'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+import { TZ } from '../utils/tz.js'
 import UserRoleServices from '../services/userRoleServices.js'
 import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 
@@ -548,7 +549,7 @@ const recurrenceLabel = (type) =>
 const dayLabel = (dow) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dow] ?? ''
 
 const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+  d ? new Date(d).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' }) : ''
 
 const formatTime12 = (t) => {
   if (!t) return ''
@@ -597,7 +598,7 @@ const publishDateRangeHint = computed(() => {
   const start  = new Date(publishForm.value.start_date + 'T00:00:00')
   const end    = new Date(start)
   end.setDate(end.getDate() + 6)
-  const fmt    = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const fmt    = (d) => d.toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' })
   return `Shifts will be created: ${fmt(start)} – ${fmt(end)}`
 })
 

@@ -324,6 +324,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import timePayService from "../services/timePayService.js";
+import { TZ, localDateStr } from "../utils/tz.js";
 
 const HOURLY_RATE = 10;
 const ANCHOR_DATE = new Date("2026-03-30T00:00:00");
@@ -415,16 +416,14 @@ const endOfDay = (date) => {
   return clone;
 };
 
-const toDateOnlyString = (date) => {
-  const d = new Date(date);
-  return d.toISOString().split("T")[0];
-};
+const toDateOnlyString = (date) => localDateStr(new Date(date));
 
 const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-US", {
+    timeZone: TZ,
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -435,7 +434,7 @@ const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 };
 
 const formatHours = (value) => `${Number(value || 0).toFixed(1)}h`;

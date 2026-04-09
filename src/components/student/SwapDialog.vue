@@ -104,6 +104,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import studentService from '../../services/studentService.js';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -166,7 +167,7 @@ const formatShiftTime = (s) => {
     if (!d) return '';
     const dt = new Date(d);
     if (isNaN(dt)) return '';
-    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return dt.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
   };
   const start = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
   const end = buildDT(s, 'end_time') || s.end_time || s.endTime || s.shift_end;

@@ -106,6 +106,7 @@
 import { ref, computed, onMounted } from 'vue'
 import shiftService from '../services/shiftService.js'
 import UserRoleServices from '../services/userRoleServices.js'
+import { TZ } from '../utils/tz.js'
 
 const props = defineProps({
   shiftInfo: {
@@ -146,6 +147,7 @@ const getInitials = (firstName, lastName) => {
 const formatDate = (dateString) => {
   if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('en-US', { 
+    timeZone: TZ,
     weekday: 'short', 
     month: 'short', 
     day: 'numeric' 

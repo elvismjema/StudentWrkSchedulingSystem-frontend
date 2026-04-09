@@ -152,6 +152,7 @@ import { computed, reactive, ref, watch } from "vue";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
+import { localDateStr } from "../utils/tz.js";
 
 const props = defineProps({
   modelValue: {
@@ -197,11 +198,7 @@ const form = reactive({
   notes: "",
 });
 
-const todayIso = computed(() => {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-});
+const todayIso = computed(() => localDateStr());
 
 const toItems = (response) => response?.data?.data || response?.data || [];
 

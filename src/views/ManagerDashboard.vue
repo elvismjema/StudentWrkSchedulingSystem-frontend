@@ -137,6 +137,7 @@ import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
+import { TZ } from "../utils/tz.js";
 
 const router = useRouter();
 const currentUser = Utils.getStore("user") || {};
@@ -154,6 +155,7 @@ const managerHeading = computed(() => {
 
 const todayLabel = computed(() =>
   new Date().toLocaleDateString("en-US", {
+    timeZone: TZ,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -171,7 +173,7 @@ const toDateTime = (dateValue, timeValue) => {
 const formatDateShort = (dateValue) => {
   if (!dateValue) return "—";
   const date = new Date(`${dateValue}T00:00:00`);
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { timeZone: TZ, month: "short", day: "numeric" });
 };
 
 const formatTime = (timeValue) => {
@@ -179,7 +181,7 @@ const formatTime = (timeValue) => {
   const [hour, minute] = String(timeValue).split(":");
   const date = new Date();
   date.setHours(Number(hour || 0), Number(minute || 0), 0, 0);
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 };
 
 const formatRange = (startTime, endTime) => `${formatTime(startTime)} – ${formatTime(endTime)}`;

@@ -35,13 +35,15 @@ export function shiftDateStr(shift) {
   return shift.shift_date || shift.date || shift.start_time || shift.shift_start;
 }
 
+import { TZ } from './tz.js';
+
 export function formatTimeRange(shift) {
   if (!shift) return "";
   const fmt = (d) => {
     if (!d) return "";
     const dt = new Date(d);
     if (isNaN(dt)) return "";
-    return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return dt.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
   };
   return `${fmt(shiftStartDT(shift))} – ${fmt(shiftEndDT(shift))}`;
 }
@@ -50,5 +52,5 @@ export function formatShiftDate(dateStr) {
   if (!dateStr) return "";
   const d = dateStr instanceof Date ? dateStr : new Date(typeof dateStr === "string" && dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
   if (isNaN(d)) return "";
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
 }

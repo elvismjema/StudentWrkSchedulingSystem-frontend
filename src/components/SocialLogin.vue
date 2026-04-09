@@ -55,7 +55,7 @@ const handleCredentialResponse = async (response) => {
       } else if (role === "manager") {
         router.push({ name: "manager-dashboard" });
       } else if (role === "student") {
-        router.push({ name: "student-schedule" });
+        router.push({ name: "student-dashboard" });
       }
     })
     .catch((error) => {

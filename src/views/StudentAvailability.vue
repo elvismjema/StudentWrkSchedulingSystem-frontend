@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <div class="availability-container">
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">My Availability</h1>
       <p class="page-subtitle">
-        Click on time slots to mark when you're available or unavailable to work.
+        Drag on the calendar to mark when you're available or unavailable each week. Click a block to edit or delete it.
       </p>
     </div>
 
@@ -31,54 +31,55 @@
       <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
     </div>
 
+    <!-- Legend -->
+    <div class="legend-row">
+      <span class="legend-item">
+        <span class="legend-dot available-dot" />
+        Available
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot unavailable-dot" />
+        Unavailable
+      </span>
+    </div>
+
     <!-- Loading Indicator -->
     <v-progress-linear v-if="loading" indeterminate color="#8B1538" class="mb-4" />
 
-    <!-- Weekly Grid -->
-    <div class="grid-card">
-      <table class="availability-grid">
-        <thead>
-          <tr>
-            <th class="time-header">Time</th>
-            <th v-for="day in days" :key="day.value" class="day-header">{{ day.label }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="hour in timeSlots" :key="hour.value">
-            <td class="time-cell">{{ hour.label }}</td>
-            <td
-              v-for="day in days"
-              :key="`${day.value}-${hour.value}`"
-              class="slot-cell"
-              :class="{
-                'available': isAvailable(day.value, hour.value),
-                'unavailable-slot': isUnavailable(day.value, hour.value),
-                disabled: hour.disabled
-              }"
-              @click="hour.disabled ? null : openTimeRangeDialog(day, hour.value)"
-            />
-          </tr>
-        </tbody>
-      </table>
+    <!-- FullCalendar weekly availability grid -->
+    <div :class="['calendar-card', gridMode === 'unavailable' ? 'mode-unavailable' : 'mode-available']">
+      <FullCalendar ref="calendarRef" :options="calendarOptions" />
     </div>
 
-    <!-- Time Range Dialog -->
-    <v-dialog v-model="showTimeRangeDialog" max-width="420">
+    <!-- Create Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="420">
       <v-card>
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-clock-outline" class="mr-2" />
-          {{ gridMode === 'available' ? 'Set Availability' : 'Set Unavailability' }} — {{ timeRangeForm.dayLabel }}
+          Add Block â€” {{ dowLabel(createForm.dayOfWeek) }}
         </v-card-title>
         <v-card-text>
-          <p class="text-body-2 text-grey mb-4">
-            Choose the time range you are
-            <strong>{{ gridMode === 'available' ? 'available' : 'unavailable' }}</strong>
-            on <strong>{{ timeRangeForm.dayLabel }}</strong>.
-          </p>
+          <p class="text-body-2 text-grey mb-3">Choose the type and time range for this block.</p>
+          <v-btn-toggle
+            v-model="createForm.availabilityType"
+            mandatory
+            density="comfortable"
+            rounded="lg"
+            class="mb-4"
+          >
+            <v-btn value="available" :color="createForm.availabilityType === 'available' ? '#0D9488' : undefined">
+              <v-icon start>mdi-calendar-check</v-icon>
+              Available
+            </v-btn>
+            <v-btn value="unavailable" :color="createForm.availabilityType === 'unavailable' ? 'error' : undefined">
+              <v-icon start>mdi-calendar-remove</v-icon>
+              Unavailable
+            </v-btn>
+          </v-btn-toggle>
           <v-row>
             <v-col cols="6">
               <v-text-field
-                v-model="timeRangeForm.startTime"
+                v-model="createForm.startTime"
                 type="time"
                 label="Start Time"
                 variant="outlined"
@@ -87,7 +88,7 @@
             </v-col>
             <v-col cols="6">
               <v-text-field
-                v-model="timeRangeForm.endTime"
+                v-model="createForm.endTime"
                 type="time"
                 label="End Time"
                 variant="outlined"
@@ -95,16 +96,68 @@
               />
             </v-col>
           </v-row>
-          <p v-if="timeRangeForm.startTime && timeRangeForm.endTime" class="text-body-2 mt-1">
-            <v-icon icon="mdi-check-circle" color="#0D9488" size="16" class="mr-1" />
-            {{ formatTimeLabel(timeRangeForm.startTime) }} – {{ formatTimeLabel(timeRangeForm.endTime) }}
-          </p>
         </v-card-text>
         <v-card-actions>
-          <v-btn variant="text" color="error" @click="clearDaySlots">Clear Day</v-btn>
           <v-spacer />
-          <v-btn variant="text" @click="showTimeRangeDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" @click="applyTimeRange">Apply</v-btn>
+          <v-btn variant="text" @click="showCreateDialog = false">Cancel</v-btn>
+          <v-btn color="#0D9488" variant="flat" @click="confirmCreate">Add</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Edit Dialog -->
+    <v-dialog v-model="showEditDialog" max-width="420">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-pencil-outline" class="mr-2" />
+          Edit Block â€” {{ dowLabel(editForm.dayOfWeek) }}
+        </v-card-title>
+        <v-card-text>
+          <v-btn-toggle
+            v-model="editForm.availabilityType"
+            mandatory
+            density="comfortable"
+            rounded="lg"
+            class="mb-4"
+          >
+            <v-btn value="available" :color="editForm.availabilityType === 'available' ? '#0D9488' : undefined">
+              <v-icon start>mdi-calendar-check</v-icon>
+              Available
+            </v-btn>
+            <v-btn value="unavailable" :color="editForm.availabilityType === 'unavailable' ? 'error' : undefined">
+              <v-icon start>mdi-calendar-remove</v-icon>
+              Unavailable
+            </v-btn>
+          </v-btn-toggle>
+          <v-row>
+            <v-col cols="6">
+              <v-text-field
+                v-model="editForm.startTime"
+                type="time"
+                label="Start Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field
+                v-model="editForm.endTime"
+                type="time"
+                label="End Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteBlock">
+            <v-icon start>mdi-delete</v-icon>
+            Delete
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn color="#0D9488" variant="flat" @click="confirmEdit">Save</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -113,7 +166,7 @@
     <div class="exceptions-section">
       <h2 class="exceptions-title">Time Off Requests</h2>
       <p class="exceptions-subtitle">
-        Request specific dates when you are unavailable — your manager will review and approve.
+        Request specific dates when you are unavailable â€” your manager will review and approve.
       </p>
 
       <!-- Existing exceptions list -->
@@ -128,7 +181,7 @@
             <div>
               <strong>{{ formatDate(exc.specificDate) }}</strong>
               <span class="ml-2 text-grey">
-                {{ formatTimeLabel(exc.startTime) }} – {{ formatTimeLabel(exc.endTime) }}
+                {{ formatTimeLabel(exc.startTime) }} â€“ {{ formatTimeLabel(exc.endTime) }}
               </span>
               <v-chip size="x-small" class="ml-2" :color="exc.availabilityType === 'unavailable' ? 'error' : 'success'" variant="tonal">
                 {{ exc.availabilityType }}
@@ -207,49 +260,40 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import FullCalendar from "@fullcalendar/vue3";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
 
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
 
+// --- FullCalendar ref ---
+const calendarRef = ref(null);
+
 // --- State ---
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
-const gridMode = ref('available');
-const selectedSlots = ref(new Set());
-const unavailableSlots = ref(new Set());
-const initialSlots = ref(new Set());
-const initialUnavailableSlots = ref(new Set());
+const gridMode = ref("available");
+
+// blocks: array of { tempId, dayOfWeek, startTime (HH:mm), endTime (HH:mm), availabilityType }
+const blocks = ref([]);
+const initialFingerprint = ref("");
 const existingRecords = ref([]);
+let tempIdCounter = 0;
+
+// Dialog state
+const showCreateDialog = ref(false);
+const createForm = ref({ dayOfWeek: 1, startTime: "", endTime: "", availabilityType: "available" });
+const showEditDialog = ref(false);
+const editForm = ref({ tempId: "", dayOfWeek: 1, startTime: "", endTime: "", availabilityType: "available" });
+
+// Exception form state
 const showExceptionDialog = ref(false);
 const exceptionFormRef = ref(null);
 const exceptionFormValid = ref(false);
-const snackbar = ref({ show: false, text: "", color: "success" });
-const showTimeRangeDialog = ref(false);
-const timeRangeForm = ref({ dayValue: null, dayLabel: "", startTime: "", endTime: "" });
-
-// --- Days and Time Slots ---
-const days = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 2 },
-  { label: "Wed", value: 3 },
-  { label: "Thu", value: 4 },
-  { label: "Fri", value: 5 },
-  { label: "Sat", value: 6 },
-  { label: "Sun", value: 0 },
-];
-
-const timeSlots = [];
-for (let h = 6; h <= 24; h++) {
-  const normalizedHour = h === 24 ? 0 : h;
-  const period = normalizedHour >= 12 ? "PM" : "AM";
-  const display = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour;
-  timeSlots.push({ label: `${display}:00 ${period}`, value: h, disabled: h === 24 });
-}
-
-// --- Exception Form ---
 const exceptionForm = ref({
   specificDate: "",
   startTime: "",
@@ -257,34 +301,43 @@ const exceptionForm = ref({
   availabilityType: "unavailable",
 });
 
-const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
+const snackbar = ref({ show: false, text: "", color: "success" });
 
-// --- Computed ---
-const hasChanges = computed(() => {
-  if (selectedSlots.value.size !== initialSlots.value.size) return true;
-  for (const key of selectedSlots.value) {
-    if (!initialSlots.value.has(key)) return true;
-  }
-  if (unavailableSlots.value.size !== initialUnavailableSlots.value.size) return true;
-  for (const key of unavailableSlots.value) {
-    if (!initialUnavailableSlots.value.has(key)) return true;
-  }
-  return false;
-});
+// --- Day-of-week mappings ---
+// Reference week: 2024-01-01 (Mon) â€¦ 2024-01-07 (Sun)
+const DOW_TO_DATE = {
+  1: "2024-01-01",
+  2: "2024-01-02",
+  3: "2024-01-03",
+  4: "2024-01-04",
+  5: "2024-01-05",
+  6: "2024-01-06",
+  0: "2024-01-07",
+};
 
-const exceptions = computed(() =>
-  existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
-);
+const DOW_LABELS = {
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+  0: "Sunday",
+};
+
+const dowLabel = (dow) => DOW_LABELS[dow] ?? "";
 
 // --- Helpers ---
-const slotKey = (day, hour) => `${day}-${hour}`;
+const normalizeToHHMM = (t) => (t ? String(t).slice(0, 5) : "");
+const notify = (text, color = "success") => { snackbar.value = { show: true, text, color }; };
+const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
 
-const isAvailable = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
-const isUnavailable = (day, hour) => unavailableSlots.value.has(slotKey(day, hour));
-
-const notify = (text, color = "success") => {
-  snackbar.value = { show: true, text, color };
-};
+const blocksFingerprint = (bs) =>
+  JSON.stringify(
+    [...bs]
+      .map((b) => `${b.dayOfWeek}|${b.startTime}|${b.endTime}|${b.availabilityType}`)
+      .sort()
+  );
 
 const formatTimeLabel = (value) => {
   if (!value) return "";
@@ -305,91 +358,140 @@ const formatDate = (value) => {
   });
 };
 
-const pad = (n) => String(n).padStart(2, "0");
+// --- Computed ---
+const hasChanges = computed(() => blocksFingerprint(blocks.value) !== initialFingerprint.value);
 
-// --- Grid Interactions ---
-const openTimeRangeDialog = (day, hour) => {
-  const existingHours = [];
-  for (const key of selectedSlots.value) {
-    const [d, h] = key.split("-").map(Number);
-    if (d === day.value) existingHours.push(h);
-  }
-  existingHours.sort((a, b) => a - b);
+const exceptions = computed(() =>
+  existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
+);
 
-  let startH = hour;
-  let endH = hour + 1;
-  if (existingHours.length > 0) {
-    startH = existingHours[0];
-    endH = existingHours[existingHours.length - 1] + 1;
-  }
+const calendarEvents = computed(() =>
+  blocks.value.map((b) => ({
+    id: b.tempId,
+    title: b.availabilityType === "available" ? "Available" : "Unavailable",
+    start: `${DOW_TO_DATE[b.dayOfWeek]}T${b.startTime}`,
+    end: `${DOW_TO_DATE[b.dayOfWeek]}T${b.endTime}`,
+    backgroundColor: b.availabilityType === "available" ? "#0D9488" : "#DC2626",
+    borderColor: b.availabilityType === "available" ? "#0D9488" : "#DC2626",
+    extendedProps: { block: b },
+  }))
+);
 
-  timeRangeForm.value = {
-    dayValue: day.value,
-    dayLabel: days.find((d) => d.value === day.value)?.label || "",
-    startTime: `${pad(startH)}:00`,
-    endTime: `${pad(endH)}:00`,
+// --- FullCalendar callbacks ---
+const onCalendarSelect = (selectInfo) => {
+  const dateStr = selectInfo.startStr.split("T")[0];
+  const dow = new Date(`${dateStr}T12:00:00`).getDay();
+  const startTime = selectInfo.startStr.split("T")[1].slice(0, 5);
+  const endTime = selectInfo.endStr.split("T")[1].slice(0, 5);
+  createForm.value = {
+    dayOfWeek: dow,
+    startTime,
+    endTime,
+    availabilityType: gridMode.value,
   };
-  showTimeRangeDialog.value = true;
+  showCreateDialog.value = true;
+  calendarRef.value?.getApi()?.unselect();
 };
 
-const applyTimeRange = () => {
-  const { dayValue, startTime, endTime } = timeRangeForm.value;
+const confirmCreate = () => {
+  const { dayOfWeek, startTime, endTime, availabilityType } = createForm.value;
   if (!startTime || !endTime) return;
-
-  const startH = parseInt(startTime.split(":")[0], 10);
-  const startM = parseInt(startTime.split(":")[1], 10);
-  const endH = parseInt(endTime.split(":")[0], 10);
-  const endM = parseInt(endTime.split(":")[1], 10);
-
-  if (startH > endH || (startH === endH && startM >= endM)) {
+  if (startTime >= endTime) {
     notify("End time must be after start time.", "error");
     return;
   }
-
-  const targetSet = gridMode.value === 'available' ? selectedSlots : unavailableSlots;
-  const otherSet = gridMode.value === 'available' ? unavailableSlots : selectedSlots;
-
-  const updated = new Set(targetSet.value);
-  const updatedOther = new Set(otherSet.value);
-
-  // Clear existing slots for this day in both sets
-  for (const key of [...updated]) {
-    if (key.startsWith(`${dayValue}-`)) updated.delete(key);
-  }
-  for (const key of [...updatedOther]) {
-    if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
-  }
-
-  // Fill slots for the range (round to full hours)
-  const effectiveStart = startH;
-  const effectiveEnd = endM > 0 ? endH + 1 : endH;
-  for (let h = effectiveStart; h < effectiveEnd && h <= 24; h++) {
-    if (h >= 6) updated.add(slotKey(dayValue, h));
-  }
-
-  targetSet.value = updated;
-  otherSet.value = updatedOther;
-  showTimeRangeDialog.value = false;
+  blocks.value = [
+    ...blocks.value,
+    { tempId: `blk-${++tempIdCounter}`, dayOfWeek, startTime, endTime, availabilityType },
+  ];
+  showCreateDialog.value = false;
 };
 
-const clearDaySlots = () => {
-  const { dayValue } = timeRangeForm.value;
-  const updatedAvail = new Set(selectedSlots.value);
-  const updatedUnavail = new Set(unavailableSlots.value);
-  for (const key of [...updatedAvail]) {
-    if (key.startsWith(`${dayValue}-`)) updatedAvail.delete(key);
-  }
-  for (const key of [...updatedUnavail]) {
-    if (key.startsWith(`${dayValue}-`)) updatedUnavail.delete(key);
-  }
-  selectedSlots.value = updatedAvail;
-  unavailableSlots.value = updatedUnavail;
-  showTimeRangeDialog.value = false;
+const onEventClick = (clickInfo) => {
+  const block = clickInfo.event.extendedProps.block;
+  editForm.value = { ...block };
+  showEditDialog.value = true;
 };
+
+const confirmEdit = () => {
+  const { tempId, dayOfWeek, startTime, endTime, availabilityType } = editForm.value;
+  if (!startTime || !endTime) return;
+  if (startTime >= endTime) {
+    notify("End time must be after start time.", "error");
+    return;
+  }
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx !== -1) {
+    const updated = [...blocks.value];
+    updated[idx] = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    blocks.value = updated;
+  }
+  showEditDialog.value = false;
+};
+
+const deleteBlock = () => {
+  blocks.value = blocks.value.filter((b) => b.tempId !== editForm.value.tempId);
+  showEditDialog.value = false;
+};
+
+const onEventDrop = (dropInfo) => {
+  const tempId = dropInfo.event.id;
+  const newDateStr = dropInfo.event.startStr.split("T")[0];
+  const newDow = new Date(`${newDateStr}T12:00:00`).getDay();
+  const newStart = dropInfo.event.startStr.split("T")[1].slice(0, 5);
+  const newEnd = dropInfo.event.endStr.split("T")[1].slice(0, 5);
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx !== -1) {
+    const updated = [...blocks.value];
+    updated[idx] = { ...updated[idx], dayOfWeek: newDow, startTime: newStart, endTime: newEnd };
+    blocks.value = updated;
+  }
+};
+
+const onEventResize = (resizeInfo) => {
+  const tempId = resizeInfo.event.id;
+  const newEnd = resizeInfo.event.endStr.split("T")[1].slice(0, 5);
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx !== -1) {
+    const updated = [...blocks.value];
+    updated[idx] = { ...updated[idx], endTime: newEnd };
+    blocks.value = updated;
+  }
+};
+
+// --- Calendar options ---
+const calendarOptions = computed(() => ({
+  plugins: [timeGridPlugin, interactionPlugin],
+  initialView: "timeGridWeek",
+  initialDate: "2024-01-01",
+  headerToolbar: false,
+  allDaySlot: false,
+  firstDay: 1,
+  dayHeaderFormat: { weekday: "short" },
+  validRange: { start: "2024-01-01", end: "2024-01-08" },
+  slotMinTime: "05:00:00",
+  slotMaxTime: "24:00:00",
+  slotDuration: "00:15:00",
+  slotLabelInterval: "01:00:00",
+  snapDuration: "00:15:00",
+  nowIndicator: false,
+  selectable: true,
+  selectMirror: true,
+  editable: true,
+  eventOverlap: false,
+  selectOverlap: false,
+  events: calendarEvents.value,
+  select: onCalendarSelect,
+  eventClick: onEventClick,
+  eventDrop: onEventDrop,
+  eventResize: onEventResize,
+  height: 700,
+  expandRows: true,
+  eventTimeFormat: { hour: "numeric", minute: "2-digit", meridiem: "short" },
+}));
 
 const clearAll = () => {
-  selectedSlots.value = new Set();
-  unavailableSlots.value = new Set();
+  blocks.value = [];
 };
 
 // --- API ---
@@ -400,23 +502,18 @@ const loadAvailabilities = async () => {
     const response = await availabilityService.listForUser(userId);
     const records = response.data || [];
     existingRecords.value = records;
-
-    const availSlots = new Set();
-    const unavailSlots = new Set();
-    for (const rec of records) {
-      if (rec.specificDate && !rec.isRecurring) continue;
-      if (rec.dayOfWeek == null) continue;
-      const startHour = parseInt(String(rec.startTime).split(":")[0], 10);
-      const endHour = parseInt(String(rec.endTime).split(":")[0], 10);
-      const targetSet = rec.availabilityType === 'unavailable' ? unavailSlots : availSlots;
-      for (let h = startHour; h < endHour; h++) {
-        targetSet.add(slotKey(rec.dayOfWeek, h));
-      }
-    }
-    selectedSlots.value = new Set(availSlots);
-    unavailableSlots.value = new Set(unavailSlots);
-    initialSlots.value = new Set(availSlots);
-    initialUnavailableSlots.value = new Set(unavailSlots);
+    tempIdCounter = 0;
+    const loadedBlocks = records
+      .filter((r) => r.dayOfWeek != null && !r.specificDate)
+      .map((r) => ({
+        tempId: `loaded-${++tempIdCounter}`,
+        dayOfWeek: r.dayOfWeek,
+        startTime: normalizeToHHMM(r.startTime),
+        endTime: normalizeToHHMM(r.endTime),
+        availabilityType: r.availabilityType || "available",
+      }));
+    blocks.value = loadedBlocks;
+    initialFingerprint.value = blocksFingerprint(loadedBlocks);
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
@@ -428,53 +525,22 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
-    const recurringRecords = existingRecords.value.filter(
-      (r) => !r.specificDate || r.isRecurring
-    );
+    // Delete all existing recurring records first
+    const recurringRecords = existingRecords.value.filter((r) => !r.specificDate || r.isRecurring);
     for (const rec of recurringRecords) {
       await availabilityService.remove(rec.id);
     }
-
-    const buildRanges = (slotsSet, type) => {
-      const slotsByDay = {};
-      for (const key of slotsSet) {
-        const [day, hour] = key.split("-").map(Number);
-        if (!slotsByDay[day]) slotsByDay[day] = [];
-        slotsByDay[day].push(hour);
-      }
-      const payloads = [];
-      for (const [day, hours] of Object.entries(slotsByDay)) {
-        hours.sort((a, b) => a - b);
-        let start = hours[0];
-        let end = hours[0];
-        for (let i = 1; i < hours.length; i++) {
-          if (hours[i] === end + 1) {
-            end = hours[i];
-          } else {
-            payloads.push({ day, start, end: end + 1 });
-            start = hours[i];
-            end = hours[i];
-          }
-        }
-        payloads.push({ day, start, end: end + 1 });
-      }
-      return payloads.map(({ day, start, end }) =>
-        availabilityService.create({
-          userId,
-          dayOfWeek: parseInt(day, 10),
-          startTime: `${pad(start)}:00`,
-          endTime: `${pad(end)}:00`,
-          availabilityType: type,
-          isRecurring: true,
-        })
-      );
-    };
-
-    await Promise.all([
-      ...buildRanges(selectedSlots.value, 'available'),
-      ...buildRanges(unavailableSlots.value, 'unavailable'),
-    ]);
-
+    // Re-create all current blocks sequentially to avoid race conditions
+    for (const block of blocks.value) {
+      await availabilityService.create({
+        userId,
+        dayOfWeek: block.dayOfWeek,
+        startTime: block.startTime,
+        endTime: block.endTime,
+        availabilityType: block.availabilityType,
+        isRecurring: true,
+      });
+    }
     notify("Availability saved successfully.");
     await loadAvailabilities();
   } catch (error) {
@@ -487,7 +553,6 @@ const saveChanges = async () => {
 const saveException = async () => {
   const valid = await exceptionFormRef.value?.validate();
   if (!valid?.valid) return;
-
   savingException.value = true;
   try {
     await availabilityService.create({
@@ -559,93 +624,86 @@ onMounted(loadAvailabilities);
 .action-buttons {
   display: flex;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.grid-card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-  margin-bottom: 32px;
+.legend-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
 }
 
-.availability-grid {
-  width: 100%;
-  border-collapse: collapse;
-  user-select: none;
-}
-
-.availability-grid th,
-.availability-grid td {
-  border: 1px solid #e8e8e8;
-  text-align: center;
-}
-
-.time-header {
-  width: 100px;
-  padding: 14px 8px;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  background: #fafafa;
+  color: #555;
 }
 
-.day-header {
-  padding: 14px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #fafafa;
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
 }
 
-.time-cell {
-  padding: 10px 8px;
-  font-size: 12px;
-  color: #666;
-  background: #fafafa;
-  white-space: nowrap;
-  width: 100px;
-}
-
-.slot-cell {
-  height: 44px;
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-  background-color: white;
-}
-
-.slot-cell.disabled {
-  cursor: default;
-  background-color: #fafafa;
-}
-
-.slot-cell:hover {
-  background-color: #e0f2f1;
-}
-
-.slot-cell.disabled:hover {
-  background-color: #fafafa;
-}
-
-.slot-cell.available {
+.available-dot {
   background-color: #0D9488;
 }
 
-.slot-cell.available:hover {
-  background-color: #0f766e;
+.unavailable-dot {
+  background-color: #DC2626;
 }
 
-.slot-cell.unavailable-slot {
-  background-color: #ef5350;
+/* Calendar card */
+.calendar-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 8px 10px 12px;
+  margin-bottom: 32px;
+  overflow: visible;
 }
 
-.slot-cell.unavailable-slot:hover {
-  background-color: #c62828;
+/* FullCalendar theme overrides */
+.calendar-card :deep(.fc) {
+  --fc-border-color: #e5e7eb;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #fafafa;
+}
+
+.calendar-card :deep(.fc .fc-event) {
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calendar-card :deep(.fc .fc-event-title) {
+  font-weight: 600;
+}
+
+/* Selection highlight and mirror â€” teal for available mode, red for unavailable mode */
+.mode-available :deep(.fc .fc-highlight) {
+  background-color: rgba(13, 148, 136, 0.15);
+}
+
+.mode-available :deep(.fc .fc-event.fc-mirror) {
+  background-color: rgba(13, 148, 136, 0.75);
+  border-color: #0D9488;
+}
+
+.mode-unavailable :deep(.fc .fc-highlight) {
+  background-color: rgba(220, 38, 38, 0.12);
+}
+
+.mode-unavailable :deep(.fc .fc-event.fc-mirror) {
+  background-color: rgba(220, 38, 38, 0.7);
+  border-color: #DC2626;
 }
 
 /* Exceptions Section */

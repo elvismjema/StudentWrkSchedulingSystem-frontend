@@ -505,26 +505,43 @@ async function loadDashboard() {
     nextShift.value = data.nextShift || null;
     todayShifts.value = data.todayShifts || [];
     weekShifts.value = data.weekShifts || [];
-    openShiftsCount.value = data.openShiftsCount ?? openShiftData.count;
+    openShiftsCount.value = openShiftData.count;
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
-    weeklyHours.value = data.weeklyHours ?? data.estimatedWeeklyHours ?? 0;
-    weeklyShifts.value = data.weeklyShifts || weekShifts.value.length;
+    weeklyHours.value = data.estimatedWeeklyHours ?? 0;
+    weeklyShifts.value = weekShifts.value.length;
     estimatedEarnings.value = data.estimatedEarnings || "0.00";
 
-    // Map pending requests — exclude acknowledgements (shown in dedicated alert above)
-    const rawRequests = Array.isArray(data.pendingRequests)
-      ? data.pendingRequests.filter((r) => r.type !== 'acknowledgement' && r.type !== 'acknowledgements')
-      : data.pendingCounts && typeof data.pendingCounts === "object"
-        ? Object.entries(data.pendingCounts)
-            .filter(([type, count]) => Number(count) > 0 && type !== 'acknowledgements')
-            .map(([type, count]) => ({
-              id: type,
-              type,
-              label: `${count} pending ${type.replace(/([A-Z])/g, " $1").toLowerCase()}`,
-              status: "Pending",
-            }))
-        : [];
-    pendingRequests.value = rawRequests.map((r) => mapRequest(r));
+    // Map pending requests — build display rows directly from counts
+    // (acknowledgements are shown in the dedicated alert above, not here)
+    const rawRequests = [];
+    if (Array.isArray(data.pendingRequests)) {
+      rawRequests.push(
+        ...data.pendingRequests
+          .filter((r) => r.type !== 'acknowledgement' && r.type !== 'acknowledgements')
+          .map((r) => mapRequest(r))
+      );
+    } else if (data.pendingCounts && typeof data.pendingCounts === "object") {
+      const { timeOff, swapRequests } = data.pendingCounts;
+      if (Number(timeOff) > 0) {
+        rawRequests.push({
+          id: 'pending_time_off', type: 'time_off',
+          label: `${timeOff} pending time-off request${timeOff > 1 ? 's' : ''}`,
+          icon: 'mdi-calendar-remove', iconColor: 'orange',
+          status: 'pending', statusLabel: 'Pending', statusColor: 'warning',
+          cancelling: false,
+        });
+      }
+      if (Number(swapRequests) > 0) {
+        rawRequests.push({
+          id: 'pending_swaps', type: 'swap',
+          label: `${swapRequests} pending swap request${swapRequests > 1 ? 's' : ''}`,
+          icon: 'mdi-swap-horizontal', iconColor: 'blue',
+          status: 'pending', statusLabel: 'Pending', statusColor: 'warning',
+          cancelling: false,
+        });
+      }
+    }
+    pendingRequests.value = rawRequests;
 
     // Clock status
     if (data.clockStatus) {
@@ -643,10 +660,14 @@ function getWeekStart(date) {
 }
 
 async function handleClockIn() {
+  const shiftId = nextShift.value?.shift_id;
+  if (!shiftId) {
+    showSnack("No upcoming shift to clock into. Please acknowledge your shift first.", "warning");
+    return;
+  }
   clockingIn.value = true;
   try {
-    const payload = { shiftId: nextShift.value?.shift_id || nextShift.value?.id };
-    await studentService.clockIn(payload);
+    await studentService.clockIn({ shiftId });
     clockStatus.isClockedIn = true;
     clockStatus.clockInTime = new Date().toISOString();
     showSnack("Clocked in successfully!");

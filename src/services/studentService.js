@@ -170,12 +170,11 @@ export default {
 
   // ─── Shift Acknowledgements ──────────────────────────────────────
   getPendingAcknowledgements() {
-    const userId = getUserId();
-    return apiClient.get(`/shift-acknowledgements/user/${userId}`);
+    return apiClient.get('/student/acknowledgements');
   },
 
   acknowledgeShift(acknowledgementId) {
-    return apiClient.patch(`/shift-acknowledgements/${acknowledgementId}/acknowledge`, {});
+    return apiClient.put(`/student/acknowledgements/${acknowledgementId}`, {});
   },
 
   // ─── Departments ─────────────────────────────────────────────────

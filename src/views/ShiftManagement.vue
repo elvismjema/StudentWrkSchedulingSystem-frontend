@@ -103,7 +103,7 @@
                       :rules="[v => !!v || 'Start time is required']"
                     />
                   </template>
-                  <v-card class="time-picker-card" min-width="320">
+                  <v-card class="time-picker-card start-time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
@@ -112,7 +112,9 @@
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
-                          <v-btn v-for="minute in minuteOptions" :key="`sm-${minute}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('start', 'minute', minute)">{{ minute }}</v-btn>
+                          <div class="minute-scroll-list" ref="startMinuteListRef">
+                            <v-btn v-for="minute in minuteOptions" :key="`sm-${minute}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('start', 'minute', minute)">{{ minute }}</v-btn>
+                          </div>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
@@ -145,7 +147,7 @@
                       :rules="[v => !!v || 'End time is required']"
                     />
                   </template>
-                  <v-card class="time-picker-card" min-width="320">
+                  <v-card class="time-picker-card end-time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
@@ -154,7 +156,9 @@
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
-                          <v-btn v-for="minute in minuteOptions" :key="`em-${minute}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('end', 'minute', minute)">{{ minute }}</v-btn>
+                          <div class="minute-scroll-list" ref="endMinuteListRef">
+                            <v-btn v-for="minute in minuteOptions" :key="`em-${minute}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('end', 'minute', minute)">{{ minute }}</v-btn>
+                          </div>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
@@ -454,6 +458,8 @@ const currentDeptName = deptContext.department_name || ''
 
 const currentDate = ref(new Date())
 const fullCalendarRef = ref(null)
+const startMinuteListRef = ref(null)
+const endMinuteListRef = ref(null)
 const shifts = ref([])
 const departments = ref([])
 const positions = ref([])
@@ -472,7 +478,7 @@ const endTimeMenu = ref(false)
 const startTimeParts = reactive({ hour: '09', minute: '00', period: 'AM' })
 const endTimeParts = reactive({ hour: '10', minute: '00', period: 'AM' })
 const hourOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
-const minuteOptions = ['00', '30']
+const minuteOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 const periodOptions = ['AM', 'PM']
 
 const createFormRef = ref(null)
@@ -600,6 +606,16 @@ const calendarEvents = computed(() => {
     })
 })
 
+const onCalendarSelect = (selectInfo) => {
+  const start = selectInfo.start
+  const end = selectInfo.end
+  const isoDate = start.toISOString().split('T')[0]
+  const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+  const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+  openCreateDialog(isoDate, startTime, endTime)
+  getCalendarApi()?.unselect()
+}
+
 const calendarOptions = computed(() => ({
   plugins: [timeGridPlugin, interactionPlugin],
   initialView: 'timeGridWeek',
@@ -609,10 +625,16 @@ const calendarOptions = computed(() => ({
   events: calendarEvents.value,
   slotMinTime: '05:00:00',
   slotMaxTime: '24:00:00',
+  slotDuration: '00:15:00',
+  slotLabelInterval: '01:00:00',
+  snapDuration: '00:15:00',
   nowIndicator: true,
   editable: false,
+  selectable: true,
+  selectMirror: true,
   eventOverlap: true,
   eventClick: onCalendarEventClick,
+  select: onCalendarSelect,
   datesSet: onCalendarDatesSet,
   eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
   dayHeaderFormat: { weekday: 'short' },
@@ -740,6 +762,26 @@ const clearTime = (target) => {
   newShift.value.end_time = ''
   endTimeMenu.value = false
 }
+
+const scrollMinuteListToSelected = (listRef, selectedMinute) => {
+  nextTick(() => {
+    const container = listRef?.value
+    if (!container) return
+    const index = parseInt(selectedMinute, 10) || 0
+    // Each button is approximately 28px tall (small + mb-1)
+    const itemHeight = 28
+    const scrollTop = Math.max(0, index * itemHeight - container.clientHeight / 2 + itemHeight / 2)
+    container.scrollTop = scrollTop
+  })
+}
+
+watch(startTimeMenu, (val) => {
+  if (val) scrollMinuteListToSelected(startMinuteListRef, startTimeParts.minute)
+})
+
+watch(endTimeMenu, (val) => {
+  if (val) scrollMinuteListToSelected(endMinuteListRef, endTimeParts.minute)
+})
 
 const getShiftDurationHours = (shift) => {
   const start = parseHour(shift.start_time)
@@ -1370,6 +1412,11 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+.minute-scroll-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .time-picker-actions {
   display: flex;
   justify-content: flex-end;
@@ -1446,6 +1493,16 @@ onMounted(async () => {
 .fullcalendar-wrap :deep(.fc .fc-event.fc-shift-selected) {
   border-color: #00c853;
   box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
+}
+
+.fullcalendar-wrap :deep(.fc .fc-highlight) {
+  background-color: rgba(139, 21, 56, 0.15);
+}
+
+.fullcalendar-wrap :deep(.fc .fc-event.fc-mirror) {
+  background-color: rgba(139, 21, 56, 0.7);
+  border-color: #8B1538;
+  opacity: 0.85;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event-title) {

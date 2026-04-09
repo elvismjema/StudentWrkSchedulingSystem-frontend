@@ -6,7 +6,7 @@
         <p class="page-subtitle">{{ todayLabel }}</p>
       </div>
       <div class="header-actions">
-        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="openCreateShiftDialog">
+        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="openCreateShiftPopup">
           Create Shift
         </v-btn>
         <v-btn variant="outlined" prepend-icon="mdi-calendar-month-outline" @click="router.push('/manager/schedule')">
@@ -111,7 +111,7 @@
 
     <v-row>
       <v-col cols="12" sm="6">
-        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-attendance')">
+        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-pay')">
           <div class="quick-content">
             <v-icon size="24">mdi-clock-outline</v-icon>
             <span>Time &amp; Pay</span>
@@ -128,27 +128,21 @@
       </v-col>
     </v-row>
 
-    <CreateShiftModal
-      v-model="createShiftModal.open"
-      @shift-created="onShiftCreated"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
-import CreateShiftModal from "../components/CreateShiftModal.vue";
 
 const router = useRouter();
 const currentUser = Utils.getStore("user") || {};
 const error = ref("");
 const allShifts = ref([]);
 const swapRequests = ref([]);
-const createShiftModal = reactive({ open: false });
 
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 const currentDeptId = deptContext.department_id || null;
@@ -266,11 +260,7 @@ const unfilledShifts = computed(() => {
 const unfilledPreview = computed(() => unfilledShifts.value.slice(0, 3));
 
 const openCreateShiftDialog = () => {
-  createShiftModal.open = true;
-};
-
-const onShiftCreated = async () => {
-  await loadDashboardData();
+  router.push('/manager/create-shift');
 };
 
 const loadDashboardData = async () => {
@@ -286,6 +276,10 @@ const loadDashboardData = async () => {
   } catch (err) {
     error.value = err?.response?.data?.message || "Failed to load dashboard data.";
   }
+};
+
+const openCreateShiftPopup = () => {
+  router.push({ name: "manager-schedule", query: { createShift: "1" } });
 };
 
 onMounted(loadDashboardData);

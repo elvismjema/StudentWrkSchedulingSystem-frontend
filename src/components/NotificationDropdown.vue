@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
 import Utils from '../config/utils'
@@ -209,8 +209,17 @@ const handleViewAll = () => {
   isOpen.value = false
 }
 
+// Poll for new notifications every 30 seconds so students get
+// near-real-time updates when a manager approves/declines requests
+let pollTimer = null
+
 onMounted(() => {
   loadNotifications()
+  pollTimer = setInterval(loadNotifications, 30_000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 

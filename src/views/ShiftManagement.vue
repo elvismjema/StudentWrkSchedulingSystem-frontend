@@ -346,12 +346,54 @@
                   :items="departmentWorkers"
                   item-title="title"
                   item-value="value"
-                  label="Assign Worker (optional - leave blank for open shift)"
+                  :label="editShift.post_as_open ? 'Assign Worker (optional — open shift)' : 'Assign Worker (optional - leave blank for open shift)'"
                   variant="outlined"
                   clearable
                   hide-details
                   prepend-inner-icon="mdi-account-outline"
+                  :disabled="editShift.post_as_open"
                 />
+              </v-col>
+              <v-col cols="12">
+                <v-card variant="outlined" class="pa-3">
+                  <div class="d-flex justify-space-between align-center">
+                    <div>
+                      <div class="font-weight-medium">Recurring Shift</div>
+                      <div class="text-caption text-grey">Repeat this shift on the same day each week</div>
+                    </div>
+                    <v-switch v-model="editShift.recurring" hide-details color="primary" density="compact" />
+                  </div>
+                  <v-expand-transition>
+                    <v-text-field
+                      v-if="editShift.recurring"
+                      v-model="editShift.repeat_until"
+                      type="date"
+                      label="Repeat Until"
+                      variant="outlined"
+                      density="comfortable"
+                      class="mt-3"
+                      :min="editShift.shift_date || undefined"
+                      :rules="[v => !!v || 'Repeat until is required for recurring shifts']"
+                    />
+                  </v-expand-transition>
+                </v-card>
+              </v-col>
+              <v-col cols="12">
+                <v-card variant="outlined" class="pa-3">
+                  <div class="d-flex justify-space-between align-center">
+                    <div>
+                      <div class="font-weight-medium">Post as Open Shift</div>
+                      <div class="text-caption text-grey">Allow workers to claim this shift</div>
+                    </div>
+                    <v-switch
+                      v-model="editShift.post_as_open"
+                      hide-details
+                      color="primary"
+                      density="compact"
+                      @update:modelValue="onEditOpenShiftToggle"
+                    />
+                  </div>
+                </v-card>
               </v-col>
               <v-col cols="12">
                 <v-checkbox
@@ -507,6 +549,9 @@ const editShift = ref({
   start_time: '',
   end_time: '',
   assigned_user_id: null,
+  post_as_open: false,
+  recurring: false,
+  repeat_until: '',
   is_published: false,
   tasks: [],
 })
@@ -536,7 +581,8 @@ const isEditSaveDisabled = computed(() => {
     !editShift.value.position_id ||
     !editShift.value.shift_date ||
     !editShift.value.start_time ||
-    !editShift.value.end_time
+    !editShift.value.end_time ||
+    (editShift.value.recurring && !editShift.value.repeat_until)
   )
 })
 
@@ -847,6 +893,9 @@ const selectShift = async (shift) => {
     start_time: normalizeTimeInput(shift.start_time),
     end_time: normalizeTimeInput(shift.end_time),
     assigned_user_id: normalizeUserId(shift.assigned_user_id),
+    post_as_open: String(shift.trade_status || '').toLowerCase() === 'open',
+    recurring: !!shift.is_recurring,
+    repeat_until: normalizeDateInput(shift.recurrence_end_date),
     is_published: !!shift.is_published,
     tasks: existingTasks,
   }
@@ -863,6 +912,12 @@ const addEditTask = () => {
 
 const removeEditTask = (index) => {
   editShift.value.tasks.splice(index, 1)
+}
+
+const onEditOpenShiftToggle = () => {
+  if (editShift.value.post_as_open) {
+    editShift.value.assigned_user_id = null
+  }
 }
 
 const getCalendarApi = () => fullCalendarRef.value?.getApi?.()
@@ -1224,7 +1279,12 @@ const saveShiftEdits = async () => {
       shift_date: editShift.value.shift_date,
       start_time: editShift.value.start_time,
       end_time: editShift.value.end_time,
-      assigned_user_id: editShift.value.assigned_user_id || null,
+      assigned_user_id: editShift.value.post_as_open ? null : (editShift.value.assigned_user_id || null),
+      trade_status: editShift.value.post_as_open ? 'open' : null,
+      is_recurring: editShift.value.recurring,
+      recurrence_pattern: editShift.value.recurring ? 'weekly' : null,
+      recurrence_start_date: editShift.value.recurring ? editShift.value.shift_date : null,
+      recurrence_end_date: editShift.value.recurring ? editShift.value.repeat_until : null,
       is_published: editShift.value.is_published,
     })
     const warningMessage = response?.data?.warning_message || ''

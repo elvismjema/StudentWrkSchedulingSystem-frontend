@@ -35,16 +35,30 @@
             {{ unreadCount }} unread
           </span>
         </div>
-        <v-btn
-          variant="text"
-          size="small"
-          color="primary"
-          class="mark-all-read-btn"
-          @click="handleMarkAllAsRead"
-          :loading="markingAllAsRead"
-        >
-          Mark all as read ({{ unreadCount }})
-        </v-btn>
+        <div class="header-actions">
+          <v-btn
+            variant="text"
+            size="small"
+            color="primary"
+            class="mark-all-read-btn"
+            @click="handleMarkAllAsRead"
+            :loading="markingAllAsRead"
+            v-if="unreadCount > 0"
+          >
+            Mark all as read
+          </v-btn>
+          <v-btn
+            variant="text"
+            size="small"
+            color="error"
+            class="clear-all-btn"
+            @click="handleClearAllNotifications"
+            :loading="clearingAll"
+            v-if="notifications.length > 0"
+          >
+            Clear all
+          </v-btn>
+        </div>
       </div>
 
       <v-divider></v-divider>
@@ -65,8 +79,20 @@
             <div class="notification-title">{{ notification.title }}</div>
             <div class="notification-time">{{ notification.timestamp }}</div>
           </div>
-          <div class="notification-indicator" v-if="notification.unread">
-            <div class="unread-dot"></div>
+          <div class="notification-actions">
+            <div class="notification-indicator" v-if="notification.unread">
+              <div class="unread-dot"></div>
+            </div>
+            <v-btn
+              icon
+              size="x-small"
+              variant="text"
+              color="grey-lighten-1"
+              class="delete-btn"
+              @click.stop="handleDeleteNotification(notification)"
+            >
+              <v-icon size="16">mdi-close</v-icon>
+            </v-btn>
           </div>
         </div>
       </div>
@@ -106,6 +132,7 @@ const currentUser = Utils.getStore("user") || {}
 const isOpen = ref(false)
 const notifications = ref([])
 const markingAllAsRead = ref(false)
+const clearingAll = ref(false)
 
 const unreadCount = computed(() => {
   return notifications.value.filter(n => n.unread).length
@@ -130,6 +157,32 @@ const handleNotificationClick = async (notification) => {
   }
   emit('notification-click', notification)
   isOpen.value = false
+}
+
+const handleDeleteNotification = async (notification) => {
+  try {
+    await NotificationService.deleteNotification(notification.id)
+    // Remove notification from list
+    const index = notifications.value.findIndex(n => n.id === notification.id)
+    if (index > -1) {
+      notifications.value.splice(index, 1)
+    }
+  } catch (error) {
+    console.error('Error deleting notification:', error)
+  }
+}
+
+const handleClearAllNotifications = async () => {
+  clearingAll.value = true
+  try {
+    await NotificationService.clearAllNotifications()
+    // Clear all notifications from list
+    notifications.value = []
+  } catch (error) {
+    console.error('Error clearing all notifications:', error)
+  } finally {
+    clearingAll.value = false
+  }
 }
 
 const handleMarkAllAsRead = async () => {
@@ -185,7 +238,19 @@ onMounted(() => {
   gap: 12px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .mark-all-read-btn {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: auto;
+}
+
+.clear-all-btn {
   font-size: 12px;
   font-weight: 500;
   min-width: auto;
@@ -238,6 +303,12 @@ onMounted(() => {
   min-width: 0;
 }
 
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .notification-title {
   font-size: 14px;
   font-weight: 500;
@@ -263,15 +334,13 @@ onMounted(() => {
   border-radius: 50%;
 }
 
-.no-notifications {
-  padding: 32px 16px;
-  text-align: center;
-  color: #666;
+.delete-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.no-notifications p {
-  margin: 12px 0 0 0;
-  font-size: 14px;
+.notification-item:hover .delete-btn {
+  opacity: 1;
 }
 
 .dropdown-footer {

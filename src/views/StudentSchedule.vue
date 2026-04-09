@@ -354,7 +354,21 @@ async function onAcknowledge() {
   eventDialog.loading = true;
   try {
     await studentService.acknowledgeShift(ack.id);
+
+    // Remove the pending-ack entry so the orange event disappears
     pendingAcks.value = pendingAcks.value.filter((a) => a.id !== ack.id);
+
+    // Ensure the shift now appears as a normal (maroon) shift.
+    // allShifts is loaded separately from the acks; if it doesn't already
+    // contain this shift, add it from the ack payload so the calendar stays correct.
+    const ackedShift = ack.shift;
+    if (ackedShift) {
+      const shiftId = String(ackedShift.shift_id || ackedShift.id);
+      if (!allShifts.value.some((s) => String(s.shift_id || s.id) === shiftId)) {
+        allShifts.value = [...allShifts.value, ackedShift];
+      }
+    }
+
     eventDialog.show = false;
     showSnack("Shift accepted!");
   } catch {

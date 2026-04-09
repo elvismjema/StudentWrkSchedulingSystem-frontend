@@ -703,11 +703,11 @@ async function acknowledgeShift(ack) {
 }
 
 function goToOpenShiftsForDept(shift) {
-  const deptId = shift.department_id || shift.department?.id || '';
-  const deptName = shift.department_name || shift.department?.department_name || '';
+  // Use the department_id that the backend understands for server-side filtering
+  const deptId = shift.department_id || shift.department?.department_id || shift.department?.id || '';
   router.push({
     name: 'student-schedule',
-    query: { tab: 'open', department: deptId || deptName },
+    query: { tab: 'open', departmentId: deptId },
   });
 }
 

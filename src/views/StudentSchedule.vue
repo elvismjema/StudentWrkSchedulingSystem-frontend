@@ -122,7 +122,7 @@
       <!-- Open Shifts Tab -->
       <div v-else>
         <!-- Department filter -->
-        <div v-if="openShifts.length > 0" class="d-flex align-center mb-4 flex-wrap" style="gap: 12px">
+        <div v-if="allOpenShifts.length > 0 || departmentFilter" class="d-flex align-center mb-4 flex-wrap" style="gap: 12px">
           <v-select
             v-model="departmentFilter"
             :items="openShiftDepartments"
@@ -135,14 +135,14 @@
             style="max-width: 280px"
           />
           <span class="text-body-2 text-medium-emphasis">
-            {{ filteredOpenShifts.length }} shift{{ filteredOpenShifts.length !== 1 ? 's' : '' }} available
+            {{ openShifts.length }} shift{{ openShifts.length !== 1 ? 's' : '' }} available
           </span>
         </div>
 
-        <template v-if="filteredOpenShifts.length">
+        <template v-if="openShifts.length">
           <v-row>
             <v-col
-              v-for="shift in filteredOpenShifts"
+              v-for="shift in openShifts"
               :key="shift.id"
               cols="12"
               sm="6"
@@ -251,9 +251,10 @@ const selectedDate = ref(new Date().toISOString().slice(0, 10));
 const activeTab = ref(route.query.tab === "open" ? "open" : "mine");
 const allShifts = ref([]);
 const openShifts = ref([]);
+const allOpenShifts = ref([]); // unfiltered copy for building dept dropdown
 const pendingAcks = ref([]);
 const coworkers = ref([]);
-const departmentFilter = ref(route.query.department || '');
+const departmentFilter = ref(route.query.departmentId || '');
 
 // Swap dialog
 const swapDialogOpen = ref(false);
@@ -307,25 +308,15 @@ const selectedDayLabel = computed(() => {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 });
 
-// Unique departments from open shifts for the filter dropdown
+// Unique departments from ALL open shifts (unfiltered) for the dropdown
 const openShiftDepartments = computed(() => {
   const depts = new Map();
-  openShifts.value.forEach((s) => {
-    const id = String(s.department_id || s.department?.id || '');
+  allOpenShifts.value.forEach((s) => {
+    const id = String(s.department_id || s.department?.department_id || '');
     const name = s.department_name || s.department?.department_name || 'Unknown';
-    if (id || name) depts.set(id || name, name);
+    if (id) depts.set(id, name);
   });
   return [{ value: '', title: 'All Departments' }, ...Array.from(depts, ([value, title]) => ({ value, title }))];
-});
-
-// Filtered open shifts by selected department
-const filteredOpenShifts = computed(() => {
-  if (!departmentFilter.value) return openShifts.value;
-  return openShifts.value.filter((s) => {
-    const id = String(s.department_id || s.department?.id || '');
-    const name = s.department_name || s.department?.department_name || '';
-    return id === departmentFilter.value || name === departmentFilter.value;
-  });
 });
 
 // Data loading
@@ -334,18 +325,28 @@ async function loadShifts() {
   error.value = null;
   const userId = user.value?.userId || user.value?.id;
 
+  // Build open-shift params — pass departmentId for server-side filter
+  const openParams = {};
+  if (departmentFilter.value) openParams.departmentId = departmentFilter.value;
+
   try {
-    const [shiftsRes, openRes, acksRes] = await Promise.allSettled([
+    const [shiftsRes, allOpenRes, filteredOpenRes, acksRes] = await Promise.allSettled([
       studentService.getShifts({ assigned_user_id: userId, is_published: true }),
-      studentService.getOpenShifts(),
+      studentService.getOpenShifts(),                   // unfiltered — for dropdown
+      studentService.getOpenShifts(openParams),          // filtered — for display
       studentService.getPendingAcknowledgements(),
     ]);
 
     if (shiftsRes.status === "fulfilled") {
       allShifts.value = shiftsRes.value?.data?.data || shiftsRes.value?.data || [];
     }
-    if (openRes.status === "fulfilled") {
-      openShifts.value = normalizeOpenShiftPayload(openRes.value?.data?.data || openRes.value?.data).map((s) => ({
+    // All open shifts (unfiltered) — used to build the department dropdown
+    if (allOpenRes.status === "fulfilled") {
+      allOpenShifts.value = normalizeOpenShiftPayload(allOpenRes.value?.data?.data || allOpenRes.value?.data);
+    }
+    // Filtered open shifts — what we actually display
+    if (filteredOpenRes.status === "fulfilled") {
+      openShifts.value = normalizeOpenShiftPayload(filteredOpenRes.value?.data?.data || filteredOpenRes.value?.data).map((s) => ({
         ...s,
         _claiming: false,
         _conflict: null,
@@ -368,16 +369,23 @@ function handleWeekChange({ monday }) {
   selectedDate.value = monday;
 }
 
+// When department filter changes, re-fetch open shifts from API (server-side filter)
+watch(departmentFilter, async () => {
+  await loadOpenShifts();
+});
+
 // Watch for tab changes to reload open shifts if needed
 watch(activeTab, (tab) => {
-  if (tab === "open" && !openShifts.value.length) {
+  if (tab === "open") {
     loadOpenShifts();
   }
 });
 
 async function loadOpenShifts() {
   try {
-    const res = await studentService.getOpenShifts();
+    const params = {};
+    if (departmentFilter.value) params.departmentId = departmentFilter.value;
+    const res = await studentService.getOpenShifts(params);
     openShifts.value = normalizeOpenShiftPayload(res?.data?.data || res?.data).map((s) => ({
       ...s,
       _claiming: false,

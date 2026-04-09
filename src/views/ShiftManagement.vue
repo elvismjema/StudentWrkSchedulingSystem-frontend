@@ -1141,8 +1141,12 @@ const loadDepartments = async () => {
 }
 
 const loadPositions = async () => {
+  if (!currentDeptId) {
+    positions.value = []
+    return
+  }
   try {
-    const response = await apiClient.get('/positions')
+    const response = await apiClient.get(`/positions?department_id=${currentDeptId}`)
     positions.value = response?.data?.data || []
   } catch (error) {
     console.error('Error loading positions:', error)

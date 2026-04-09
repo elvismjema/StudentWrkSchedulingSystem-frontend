@@ -33,7 +33,7 @@
           </div>
 
           <!-- Worker Form -->
-          <v-form v-else ref="form" v-model="valid" @submit.prevent="submitForm">
+          <v-form v-else ref="formRef" v-model="valid" @submit.prevent="submitForm">
             <v-row>
               <!-- Name Fields -->
               <v-col cols="12" md="6">
@@ -41,7 +41,7 @@
                   v-model="form.fName"
                   label="First Name *"
                   variant="outlined"
-                  :rules="[rules.required]"
+                  :rules="nameRules"
                   hide-details="auto"
                 />
               </v-col>
@@ -50,7 +50,7 @@
                   v-model="form.lName"
                   label="Last Name *"
                   variant="outlined"
-                  :rules="[rules.required]"
+                  :rules="nameRules"
                   hide-details="auto"
                 />
               </v-col>
@@ -116,7 +116,6 @@
                   item-title="position_name"
                   item-value="position_id"
                   variant="outlined"
-                  :rules="[rules.required]"
                   :loading="loadingPositions"
                   hide-details="auto"
                 >
@@ -144,7 +143,7 @@
           <v-btn
             color="#8B1538"
             :loading="submitting"
-            :disabled="!valid || submitting"
+            :disabled="!canSubmit"
             @click="submitForm"
           >
             {{ isEditMode ? 'Update Worker' : 'Add Worker' }}
@@ -163,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import apiClient from '../services/services.js';
 import Utils from '../config/utils.js';
 import CreatePositionModal from './CreatePositionModal.vue';
@@ -205,6 +204,7 @@ const form = reactive({
 
 // UI state
 const valid = ref(false);
+const formRef = ref(null);
 const submitting = ref(false);
 const checkingEmail = ref(false);
 const loadingPositions = ref(false);
@@ -223,6 +223,24 @@ const deptContext = Utils.getStore('currentDepartmentContext') || {};
 
 // Computed properties
 const isEditMode = computed(() => !!props.worker);
+const requiresNameFields = computed(() => isEditMode.value || !existingUser.value);
+const nameRules = computed(() => (requiresNameFields.value ? [rules.required] : []));
+const emailValue = computed(() => String(form.email || '').trim().toLowerCase());
+const hasValidEmail = computed(() => rules.email(emailValue.value) === true);
+const hasDepartmentContext = computed(() => !!form.departmentId);
+const hasRequiredNames = computed(
+  () => !!String(form.fName || '').trim() && !!String(form.lName || '').trim(),
+);
+const canSubmit = computed(() => {
+  if (submitting.value || checkingEmail.value) return false;
+  if (!hasValidEmail.value || !hasDepartmentContext.value) return false;
+
+  // Existing-user assignment path: email + department are enough.
+  if (!isEditMode.value && existingUser.value) return true;
+
+  // New-user creation and edit path: keep name requirements.
+  return hasRequiredNames.value;
+});
 
 // Form validation rules
 const rules = {
@@ -276,7 +294,7 @@ const checkEmailExists = async () => {
     existingUser.value = null;
     emailStatus.type = '';
     emailStatus.message = '';
-    return;
+    return null;
   }
 
   checkingEmail.value = true;
@@ -292,7 +310,7 @@ const checkEmailExists = async () => {
       const foundUserId = existingUser.value.userId || existingUser.value.id;
       if (foundUserId !== props.worker?.userId) {
         emailStatus.type = 'info';
-        emailStatus.message = `User exists: ${existingUser.value.fName || ''} ${existingUser.value.lName || ''}`.trim() + '. Will be added to your department.';
+        emailStatus.message = 'Email already exists. This user will be added to your department.';
       } else {
         emailStatus.type = 'success';
         emailStatus.message = 'This is the current user\'s email.';
@@ -301,20 +319,27 @@ const checkEmailExists = async () => {
       emailStatus.type = 'success';
       emailStatus.message = 'Email available for new user creation.';
     }
+    return true;
   } catch (error) {
     emailStatus.type = 'error';
-    emailStatus.message = 'Failed to check email availability.';
+    emailStatus.message = error?.response?.data?.message || 'Failed to check email availability.';
+    return false;
   } finally {
     checkingEmail.value = false;
   }
 };
 
 const submitForm = async () => {
-  if (!valid.value || submitting.value) return;
+  if (!canSubmit.value) return;
 
   submitting.value = true;
   try {
-    await checkEmailExists();
+    const emailCheckResult = await checkEmailExists();
+    if (emailCheckResult === false) return;
+
+    await nextTick();
+    const validation = await formRef.value?.validate();
+    if (validation && !validation.valid) return;
 
     const payload = {
       fName: form.fName.trim(),
@@ -323,7 +348,7 @@ const submitForm = async () => {
       phone: form.phone?.trim() || null,
       studentId: form.studentId?.trim() || null,
       departmentId: form.departmentId,
-      positionId: form.positionId,
+      positionId: form.positionId || null,
     };
 
     if (isEditMode.value) {
@@ -382,6 +407,20 @@ watch(dialogOpen, (isOpen) => {
     resetForm();
     loadPositions();
   }
+});
+
+watch(
+  () => form.email,
+  () => {
+    existingUser.value = null;
+    emailStatus.type = '';
+    emailStatus.message = '';
+  },
+);
+
+watch(requiresNameFields, async () => {
+  await nextTick();
+  formRef.value?.resetValidation();
 });
 
 // Initialize department context

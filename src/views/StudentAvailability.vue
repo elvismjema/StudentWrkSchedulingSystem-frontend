@@ -29,7 +29,6 @@
         Save Changes
       </v-btn>
       <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
-
     </div>
 
     <!-- Loading Indicator -->
@@ -203,12 +202,10 @@
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
       {{ snackbar.text }}
     </v-snackbar>
-
   </div>
 </template>
 
 <script setup>
-
 import { computed, onMounted, ref } from "vue";
 import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
@@ -220,9 +217,9 @@ const userId = currentUser.userId || currentUser.id;
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
-const gridMode = ref('available'); // 'available' | 'unavailable'
-const selectedSlots = ref(new Set()); // available (green)
-const unavailableSlots = ref(new Set()); // unavailable (red)
+const gridMode = ref('available');
+const selectedSlots = ref(new Set());
+const unavailableSlots = ref(new Set());
 const initialSlots = ref(new Set());
 const initialUnavailableSlots = ref(new Set());
 const existingRecords = ref([]);
@@ -354,6 +351,7 @@ const applyTimeRange = () => {
 
   const updated = new Set(targetSet.value);
   const updatedOther = new Set(otherSet.value);
+
   // Clear existing slots for this day in both sets
   for (const key of [...updated]) {
     if (key.startsWith(`${dayValue}-`)) updated.delete(key);
@@ -361,6 +359,7 @@ const applyTimeRange = () => {
   for (const key of [...updatedOther]) {
     if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
   }
+
   // Fill slots for the range (round to full hours)
   const effectiveStart = startH;
   const effectiveEnd = endM > 0 ? endH + 1 : endH;
@@ -422,7 +421,6 @@ const loadAvailabilities = async () => {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
     loading.value = false;
-
   }
 };
 
@@ -430,74 +428,6 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
-
-    successMessage.value = ''
-    errorMessage.value = ''
-    
-    // Save available slots
-    const availableByDay = {}
-    availableSlots.value.forEach(slot => {
-      const [day, time] = slot.split('-')
-      if (!availableByDay[day]) {
-        availableByDay[day] = { startHour: 24, endHour: 0 }
-      }
-      
-      const hour = parseInt(time.split(':')[0])
-      availableByDay[day].startHour = Math.min(availableByDay[day].startHour, hour)
-      availableByDay[day].endHour = Math.max(availableByDay[day].endHour, hour + 1)
-    })
-    
-    // Save unavailable slots
-    const unavailableByDay = {}
-    unavailableSlots.value.forEach(slot => {
-      const [day, time] = slot.split('-')
-      if (!unavailableByDay[day]) {
-        unavailableByDay[day] = { startHour: 24, endHour: 0 }
-      }
-      
-      const hour = parseInt(time.split(':')[0])
-      unavailableByDay[day].startHour = Math.min(unavailableByDay[day].startHour, hour)
-      unavailableByDay[day].endHour = Math.max(unavailableByDay[day].endHour, hour + 1)
-    })
-    
-    const userId = getCurrentUserId()
-    
-    // Save available time blocks
-    for (const [day, timeRange] of Object.entries(availableByDay)) {
-      const availability = {
-        userId: userId,
-        dayOfWeek: parseInt(day),
-        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
-        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
-        availabilityType: 'available',
-        isRecurring: true
-      }
-      
-      await axios.post('/api/availability', availability)
-    }
-    
-    // Save unavailable time blocks
-    for (const [day, timeRange] of Object.entries(unavailableByDay)) {
-      const availability = {
-        userId: userId,
-        dayOfWeek: parseInt(day),
-        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
-        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
-        availabilityType: 'unavailable',
-        isRecurring: true
-      }
-      
-      await axios.post('/api/availability', availability)
-    }
-    
-    await loadExistingAvailability()
-    successMessage.value = 'Availability saved successfully!'
-    
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
-
     const recurringRecords = existingRecords.value.filter(
       (r) => !r.specificDate || r.isRecurring
     );
@@ -547,7 +477,6 @@ const saveChanges = async () => {
 
     notify("Availability saved successfully.");
     await loadAvailabilities();
-
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to save availability.", "error");
   } finally {
@@ -561,29 +490,6 @@ const saveException = async () => {
 
   savingException.value = true;
   try {
-
-    const userId = getCurrentUserId()
-    const response = await axios.get(`/api/availability/user/${userId}`)
-    existingAvailability.value = response.data
-    
-    availableSlots.value.clear()
-    unavailableSlots.value.clear()
-    
-    existingAvailability.value.forEach(avail => {
-      const startHour = parseInt(avail.startTime.split(':')[0])
-      const endHour = parseInt(avail.endTime.split(':')[0])
-      
-      for (let h = startHour; h < endHour; h++) {
-        const timeStr = h.toString().padStart(2, '0') + ':00'
-        if (avail.availabilityType === 'available') {
-          availableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
-        } else {
-          unavailableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
-        }
-      }
-    })
-    
-
     await availabilityService.create({
       userId,
       startTime: exceptionForm.value.startTime,
@@ -596,7 +502,6 @@ const saveException = async () => {
     showExceptionDialog.value = false;
     exceptionForm.value = { specificDate: "", startTime: "", endTime: "", availabilityType: "unavailable" };
     await loadAvailabilities();
-
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to add exception.", "error");
   } finally {
@@ -615,7 +520,6 @@ const removeException = async (exc) => {
 };
 
 onMounted(loadAvailabilities);
-
 </script>
 
 <style scoped>
@@ -708,75 +612,6 @@ onMounted(loadAvailabilities);
   width: 100px;
 }
 
-
-.time-slot.available {
-  background: #4caf50;
-}
-
-.time-slot.available:hover {
-  background: #45a049;
-}
-
-.time-slot.unavailable {
-  background: #f44336;
-}
-
-.time-slot.unavailable:hover {
-  background: #d32f2f;
-}
-
-.slot-content {
-  width: 100%;
-  height: 100%;
-  min-height: 40px;
-}
-
-.availability-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.save-btn, .clear-btn, .mark-available-btn, .mark-unavailable-btn {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mark-available-btn {
-  background: #00897b;
-  color: white;
-}
-
-.mark-available-btn:hover:not(:disabled) {
-  background: #00796b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 137, 123, 0.3);
-}
-
-.mark-unavailable-btn {
-  background: white;
-  color: #333;
-  border: 2px solid #ddd;
-}
-
-.mark-unavailable-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #bbb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 .slot-cell {
   height: 44px;
   cursor: pointer;
@@ -791,7 +626,6 @@ onMounted(loadAvailabilities);
 
 .slot-cell:hover {
   background-color: #e0f2f1;
-
 }
 
 .slot-cell.disabled:hover {
@@ -802,26 +636,6 @@ onMounted(loadAvailabilities);
   background-color: #0D9488;
 }
 
-.save-btn:disabled, .mark-available-btn:disabled, .mark-unavailable-btn:disabled {
-  background: #e0e0e0;
-  color: #9e9e9e;
-  cursor: not-allowed;
-  opacity: 0.6;
-  border-color: #e0e0e0;
-}
-
-.clear-btn {
-  background: white;
-  color: #333;
-  border: 2px solid #ddd;
-}
-
-.clear-btn:hover {
-  background: #f5f5f5;
-  border-color: #bbb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  
 .slot-cell.available:hover {
   background-color: #0f766e;
 }

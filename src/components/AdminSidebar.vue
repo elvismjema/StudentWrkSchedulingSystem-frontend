@@ -19,18 +19,27 @@
 
     <v-divider />
     <v-list nav class="nav-list">
-      <v-list-item
+      <v-tooltip
         v-for="item in navItems"
         :key="item.title"
-        :to="item.route"
-        class="nav-item"
-        active-class="active-nav-item"
+        :text="item.title"
+        :disabled="!rail"
+        location="end"
       >
-        <template #prepend>
-          <v-icon :icon="item.icon" size="20" />
+        <template #activator="{ props: tooltipProps }">
+          <v-list-item
+            v-bind="tooltipProps"
+            :to="item.route"
+            class="nav-item"
+            active-class="active-nav-item"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="20" />
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
         </template>
-        <v-list-item-title>{{ item.title }}</v-list-item-title>
-      </v-list-item>
+      </v-tooltip>
     </v-list>
 
     <template #append>

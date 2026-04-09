@@ -1,6 +1,6 @@
 <template>
   <div class="student-clock pa-6" role="main" aria-label="Time and Attendance">
-    <h1 class="text-h5 font-weight-bold mb-4">Time & Attendance</h1>
+    <h1 class="text-h5 font-weight-bold mb-4">Time &amp; Attendance</h1>
 
     <!-- Loading -->
     <template v-if="loading">
@@ -10,14 +10,33 @@
     </template>
 
     <template v-else>
-      <!-- Clock Status Banner -->
-      <ClockStatusBanner
-        :clocked-in="clockedIn"
-        :clock-in-time="clockInTime"
-        :on-break="onBreak"
-        :shift-name="currentShiftName"
-        class="mb-4"
-      />
+      <!-- ── #1: Inline Clock Status (replaces ClockStatusBanner) ────────── -->
+      <v-card
+        class="mb-4 pa-4 d-flex align-center"
+        :style="{ backgroundColor: statusBg, color: statusFg }"
+        elevation="0"
+        rounded="lg"
+      >
+        <v-icon :color="statusFg" size="22" class="mr-3">{{ statusIcon }}</v-icon>
+        <div class="flex-grow-1">
+          <div class="text-body-1 font-weight-semibold">{{ statusLabel }}</div>
+          <!-- #2: Live elapsed timer when clocked in -->
+          <div v-if="clockedIn" class="text-h5 font-weight-bold" style="font-variant-numeric: tabular-nums; letter-spacing: 1px;">
+            {{ elapsed }}
+          </div>
+          <!-- #2: Countdown to clock-in window when not clocked in -->
+          <div v-else-if="activeShift && !canClockIn" class="text-body-2" :style="{ color: statusFg, opacity: 0.85 }">
+            Available in {{ clockInCountdown }}
+          </div>
+          <div v-else-if="activeShift && canClockIn" class="text-body-2 font-weight-medium" :style="{ color: statusFg }">
+            Clock-in window is open
+          </div>
+        </div>
+        <!-- On Break chip -->
+        <v-chip v-if="onBreak" color="white" text-color="warning" variant="outlined" size="small" class="ml-2">
+          On Break
+        </v-chip>
+      </v-card>
 
       <!-- Current/Next Shift Info -->
       <v-card
@@ -45,8 +64,9 @@
         </v-card-text>
       </v-card>
 
-      <!-- Clock In/Out Button -->
+      <!-- Clock In/Out Actions -->
       <div class="text-center mb-6">
+        <!-- Not clocked in -->
         <v-btn
           v-if="!clockedIn"
           size="x-large"
@@ -63,16 +83,17 @@
           Clock In
         </v-btn>
 
+        <!-- Clocked in -->
         <div v-else class="d-flex flex-column align-center gap-3">
-          <!-- Break controls -->
           <div v-if="!onBreak" class="d-flex gap-2">
+            <!-- #5: Start Break with confirmation -->
             <v-btn
               color="warning"
               variant="flat"
               rounded="pill"
               :loading="breakLoading"
               aria-label="Start break"
-              @click="startBreak"
+              @click="startBreakDialog = true"
             >
               <v-icon start>mdi-coffee-outline</v-icon>
               Start Break
@@ -90,6 +111,7 @@
             </v-btn>
           </div>
 
+          <!-- #5: End Break with confirmation -->
           <v-btn
             v-else
             color="success"
@@ -97,15 +119,16 @@
             rounded="pill"
             :loading="breakLoading"
             aria-label="End break"
-            @click="endBreakAction"
+            @click="endBreakDialog = true"
           >
             <v-icon start>mdi-coffee-off-outline</v-icon>
             End Break
           </v-btn>
         </div>
 
-        <p v-if="!canClockIn && !clockedIn" class="text-caption text-medium-emphasis mt-2">
-          Clock in is available within 15 minutes of your shift start.
+        <!-- #2: Hint only when no shift at all -->
+        <p v-if="!activeShift" class="text-caption text-medium-emphasis mt-2">
+          No upcoming shift found for today.
         </p>
       </div>
 
@@ -132,6 +155,7 @@
                 <td>
                   <span :class="{ 'font-weight-bold': day.isToday }">{{ day.label }}</span>
                 </td>
+                <!-- #3: Scheduled from shifts data -->
                 <td class="text-body-2">{{ day.scheduled || '—' }}</td>
                 <td class="text-body-2">
                   <span :class="day.actualClass">{{ day.actual || '—' }}</span>
@@ -147,6 +171,7 @@
               </tr>
               <tr>
                 <td colspan="4" class="text-body-2 text-medium-emphasis">Est. Earnings</td>
+                <!-- #4: Real hourly rate -->
                 <td class="text-right text-body-2 font-weight-bold" style="color: #2E7D32">${{ weeklyEarnings }}</td>
               </tr>
             </tfoot>
@@ -164,16 +189,12 @@
             Clocking in for <strong>{{ activeShift.department_name || activeShift.departmentName }}</strong>
             at {{ formatShiftTime(activeShift) }}.
           </p>
-          <p v-if="activeShift && activeShift.location">
-            Location: {{ activeShift.location }}
-          </p>
+          <p v-if="activeShift && activeShift.location">Location: {{ activeShift.location }}</p>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockInDialog = false">Cancel</v-btn>
-          <v-btn color="success" variant="flat" :loading="clockingIn" @click="doClockIn">
-            Clock In
-          </v-btn>
+          <v-btn color="success" variant="flat" :loading="clockingIn" @click="doClockIn">Clock In</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -186,14 +207,43 @@
           <p>Are you sure you want to clock out?</p>
           <p v-if="clockInTime" class="text-body-2 text-medium-emphasis">
             Clocked in since {{ new Date(clockInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) }}
+            &nbsp;·&nbsp; {{ elapsed }} elapsed
           </p>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockOutDialog = false">Cancel</v-btn>
-          <v-btn color="error" variant="flat" :loading="clockingOut" @click="doClockOut">
-            Clock Out
-          </v-btn>
+          <v-btn color="error" variant="flat" :loading="clockingOut" @click="doClockOut">Clock Out</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- #5: Start Break Confirmation Dialog -->
+    <v-dialog v-model="startBreakDialog" max-width="360">
+      <v-card rounded="lg">
+        <v-card-title class="pa-4">Start Break?</v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          <p>This will pause your clock. You can end your break at any time.</p>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="startBreakDialog = false">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" :loading="breakLoading" @click="doStartBreak">Start Break</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- #5: End Break Confirmation Dialog -->
+    <v-dialog v-model="endBreakDialog" max-width="360">
+      <v-card rounded="lg">
+        <v-card-title class="pa-4">End Break?</v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          <p>Your clock will resume from now.</p>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="endBreakDialog = false">Cancel</v-btn>
+          <v-btn color="success" variant="flat" :loading="breakLoading" @click="doEndBreak">End Break</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -206,42 +256,116 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Utils from '../config/utils.js';
 import studentService from '../services/studentService.js';
-import ClockStatusBanner from '../components/student/ClockStatusBanner.vue';
 
 const user = Utils.getStore('user');
 
-const loading = ref(true);
-const clockedIn = ref(false);
-const clockInTime = ref(null);
-const onBreak = ref(false);
+// ── State ─────────────────────────────────────────────────────────────────────
+const loading      = ref(true);
+const clockedIn    = ref(false);
+const clockInTime  = ref(null);
+const onBreak      = ref(false);
 const currentRecordId = ref(null);
-const activeShift = ref(null);
-const currentShiftName = ref('');
+const activeShift  = ref(null);
+const hourlyRate   = ref(0);       // #4 — real rate from profile
 
-const clockingIn = ref(false);
-const clockingOut = ref(false);
+const clockingIn   = ref(false);
+const clockingOut  = ref(false);
 const breakLoading = ref(false);
-const clockInDialog = ref(false);
-const clockOutDialog = ref(false);
 
-const timesheetData = ref([]);
+const clockInDialog    = ref(false);
+const clockOutDialog   = ref(false);
+const startBreakDialog = ref(false);  // #5
+const endBreakDialog   = ref(false);  // #5
+
+const timesheetData  = ref([]);
+const weekShifts     = ref([]);       // #3 — published shifts for the week
 const snackbar = ref({ show: false, text: '', color: 'success' });
+
+// ── Live tick (used for elapsed + countdown) ──────────────────────────────────
+const now = ref(Date.now());
+let ticker = null;
+onMounted(()    => { ticker = setInterval(() => { now.value = Date.now(); }, 1000); });
+onUnmounted(()  => { clearInterval(ticker); });
+
+// ── #1: Inline status display helpers ────────────────────────────────────────
+const statusBg = computed(() => {
+  if (onBreak.value)   return '#E65100';
+  if (clockedIn.value) return '#2E7D32';
+  return '#f5f5f5';
+});
+const statusFg = computed(() => (clockedIn.value || onBreak.value) ? 'white' : '#616161');
+const statusIcon = computed(() => {
+  if (onBreak.value)   return 'mdi-coffee-outline';
+  if (clockedIn.value) return 'mdi-clock-check-outline';
+  return 'mdi-clock-outline';
+});
+const statusLabel = computed(() => {
+  if (onBreak.value)   return 'On break';
+  if (clockedIn.value) return 'Clocked in' + (activeShift.value ? ' — ' + (activeShift.value.department_name || activeShift.value.departmentName || '') : '');
+  return 'Not clocked in';
+});
+
+// ── #2: Live elapsed timer ────────────────────────────────────────────────────
+const elapsed = computed(() => {
+  if (!clockedIn.value || !clockInTime.value) return '00:00:00';
+  const diff = now.value - new Date(clockInTime.value).getTime();
+  if (diff < 0) return '00:00:00';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+});
+
+// ── #2: Clock-in countdown ────────────────────────────────────────────────────
+const clockInCountdown = computed(() => {
+  if (!activeShift.value) return '';
+  const raw = buildDT(activeShift.value, 'start_time') || activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start;
+  const start = new Date(raw).getTime();
+  if (isNaN(start)) return '';
+  // Open window starts 15 min before shift
+  const windowOpen = start - 15 * 60 * 1000;
+  const diff = windowOpen - now.value;
+  if (diff <= 0) return 'now';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+});
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+const buildDT = (shift, field) => {
+  const time = shift[field];
+  if (!time) return null;
+  if (typeof time === 'string' && (time.includes('T') || (time.includes('-') && time.length > 10))) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return String(date).slice(0, 10) + 'T' + time;
+  return null;
+};
 
 const canClockIn = computed(() => {
   if (clockedIn.value) return false;
   if (!activeShift.value) return false;
-  const start = new Date(activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start).getTime();
-  const diff = start - Date.now();
+  const raw = buildDT(activeShift.value, 'start_time') || activeShift.value.start_time || activeShift.value.startTime || activeShift.value.shift_start;
+  const start = new Date(raw).getTime();
+  if (isNaN(start)) return false;
+  const diff = start - now.value;
   return diff <= 15 * 60 * 1000 && diff >= -60 * 60 * 1000;
 });
 
 const formatShiftTime = (s) => {
   if (!s) return '';
-  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return fmt(s.start_time || s.startTime || s.shift_start) + ' – ' + fmt(s.end_time || s.endTime || s.shift_end);
+  const fmt = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const startDT = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
+  const endDT   = buildDT(s, 'end_time')   || s.end_time   || s.endTime   || s.shift_end;
+  return fmt(startDT) + ' – ' + fmt(endDT);
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -255,90 +379,93 @@ const getMonday = (date) => {
   return d;
 };
 
-const toDateStr = (d) => {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-};
+const toDateStr = (d) =>
+  d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
 const todayStr = toDateStr(new Date());
 
+// ── #3: Timesheet rows merge clock records AND week shifts ────────────────────
 const timesheetRows = computed(() => {
   const monday = getMonday(new Date());
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
     const dateStr = toDateStr(d);
+
+    // Clock record for this day
     const entry = timesheetData.value.find(t => {
       const td = new Date(t.date || t.shift_date);
       return toDateStr(td) === dateStr;
     });
 
+    // #3: Scheduled shift for this day (from weekShifts)
+    const shift = weekShifts.value.find(s => {
+      const sd = new Date(s.shift_date || s.date);
+      return toDateStr(sd) === dateStr;
+    });
+
     const fmtTime = (v) => {
       if (!v) return null;
-      return new Date(v).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const dt = new Date(v);
+      return isNaN(dt) ? null : dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     };
 
+    // Scheduled: prefer clock record fields, fall back to shift data
     let scheduled = null;
-    let actual = null;
-    let hours = null;
-    let breakDuration = null;
-    let actualClass = '';
-
-    if (entry) {
-      scheduled = (fmtTime(entry.scheduled_start) || '') + (entry.scheduled_start && entry.scheduled_end ? ' – ' : '') + (fmtTime(entry.scheduled_end) || '');
-      if (!scheduled.trim() || scheduled === ' – ') scheduled = null;
-
-      actual = (fmtTime(entry.actual_start || entry.clock_in_time) || '') +
-        ((entry.actual_start || entry.clock_in_time) && (entry.actual_end || entry.clock_out_time) ? ' – ' : '') +
-        (fmtTime(entry.actual_end || entry.clock_out_time) || '');
-      if (!actual.trim() || actual === ' – ') actual = null;
-
-      hours = entry.total_hours != null ? Number(entry.total_hours).toFixed(1) : null;
-      breakDuration = entry.break_minutes ? entry.break_minutes + 'm' : null;
-
-      // Highlight late clock-ins
-      if (entry.actual_start && entry.scheduled_start) {
-        const late = new Date(entry.actual_start).getTime() - new Date(entry.scheduled_start).getTime();
-        if (late > 5 * 60 * 1000) actualClass = 'text-error';
-      }
+    if (entry?.scheduled_start || shift) {
+      const sStart = fmtTime(entry?.scheduled_start || buildDT(shift, 'start_time') || shift?.start_time);
+      const sEnd   = fmtTime(entry?.scheduled_end   || buildDT(shift, 'end_time')   || shift?.end_time);
+      if (sStart || sEnd) scheduled = (sStart || '') + (sStart && sEnd ? ' – ' : '') + (sEnd || '');
     }
 
-    return {
-      date: dateStr,
-      label: DAY_LABELS[d.getDay()] + ' ' + d.getDate(),
-      isToday: dateStr === todayStr,
-      scheduled,
-      actual,
-      hours,
-      breakDuration,
-      actualClass,
-    };
+    // Actual: from clock record
+    let actual = null;
+    if (entry) {
+      const aStart = fmtTime(entry.actual_start || entry.clock_in_time);
+      const aEnd   = fmtTime(entry.actual_end   || entry.clock_out_time);
+      if (aStart || aEnd) actual = (aStart || '') + (aStart && aEnd ? ' – ' : '') + (aEnd || '');
+    }
+
+    const hours        = entry?.total_hours != null ? Number(entry.total_hours).toFixed(1) : null;
+    const breakDuration = entry?.break_minutes ? entry.break_minutes + 'm' : null;
+
+    let actualClass = '';
+    if (entry?.actual_start && entry?.scheduled_start) {
+      const late = new Date(entry.actual_start).getTime() - new Date(entry.scheduled_start).getTime();
+      if (late > 5 * 60 * 1000) actualClass = 'text-error';
+    }
+
+    return { date: dateStr, label: DAY_LABELS[d.getDay()] + ' ' + d.getDate(), isToday: dateStr === todayStr, scheduled, actual, hours, breakDuration, actualClass };
   });
 });
 
 const weeklyTotal = computed(() => {
-  let sum = 0;
-  timesheetRows.value.forEach(r => {
-    if (r.hours) sum += parseFloat(r.hours);
-  });
+  const sum = timesheetRows.value.reduce((acc, r) => acc + (r.hours ? parseFloat(r.hours) : 0), 0);
   return sum.toFixed(1);
 });
 
-const weeklyEarnings = computed(() => {
-  return (parseFloat(weeklyTotal.value) * 10).toFixed(2);
-});
+// ── #4: Real hourly rate ──────────────────────────────────────────────────────
+const weeklyEarnings = computed(() =>
+  (parseFloat(weeklyTotal.value) * (hourlyRate.value || 0)).toFixed(2)
+);
 
 const normalizeTimesheetEntries = (payload) => {
   if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === 'object' && Array.isArray(payload.entries)) {
-    return payload.entries;
-  }
+  if (payload && typeof payload === 'object' && Array.isArray(payload.entries)) return payload.entries;
   return [];
 };
 
+// ── Data fetching ─────────────────────────────────────────────────────────────
 const fetchAll = async () => {
   loading.value = true;
   try {
-    await Promise.allSettled([fetchClockStatus(), fetchActiveShift(), fetchTimesheet()]);
+    await Promise.allSettled([
+      fetchClockStatus(),
+      fetchActiveShift(),
+      fetchTimesheet(),
+      fetchWeekShifts(),   // #3
+      fetchProfile(),      // #4
+    ]);
   } finally {
     loading.value = false;
   }
@@ -348,10 +475,11 @@ const fetchClockStatus = async () => {
   try {
     const res = await studentService.getOpenClockRecord();
     const record = res?.data?.data || res?.data;
-    if (record && record.id && !record.clock_out_time && !record.clockOutTime) {
+    const recId = record?.clock_id || record?.id;
+    if (record && recId && !record.clock_out && !record.clock_out_time && !record.clockOutTime) {
       clockedIn.value = true;
-      currentRecordId.value = record.id;
-      clockInTime.value = record.clock_in_time || record.clockInTime || record.createdAt;
+      currentRecordId.value = recId;
+      clockInTime.value = record.clock_in || record.clock_in_time || record.clockInTime || record.createdAt;
       onBreak.value = !!record.on_break || !!record.onBreak;
     } else {
       clockedIn.value = false;
@@ -364,26 +492,49 @@ const fetchClockStatus = async () => {
   }
 };
 
+// ── #6: Look ahead 7 days if no shift today ───────────────────────────────────
 const fetchActiveShift = async () => {
   try {
     const userId = user?.userId || user?.id;
-    const today = toDateStr(new Date());
-    const res = await studentService.getShifts({ assigned_user_id: userId, start_date: today, end_date: today });
-    const shifts = res?.data?.data || res?.data || [];
-    const now = Date.now();
+    const today  = toDateStr(new Date());
+    const res = await studentService.getShifts({ assigned_user_id: userId, start_date: today, end_date: today, is_published: true });
+    let shifts = res?.data?.data || res?.data || [];
 
-    // Find current or next upcoming shift today
-    const sorted = shifts.sort((a, b) =>
-      new Date(a.start_time || a.startTime || a.shift_start) - new Date(b.start_time || b.startTime || b.shift_start)
-    );
+    if (!Array.isArray(shifts)) shifts = [];
 
-    activeShift.value = sorted.find(s => {
-      const end = new Date(s.end_time || s.endTime || s.shift_end).getTime();
-      return end > now;
-    }) || sorted[0] || null;
+    const nowTs = Date.now();
+    const upcoming = shifts
+      .filter(s => {
+        const end = new Date(buildDT(s, 'end_time') || s.end_time || s.endTime || s.shift_end).getTime();
+        return end > nowTs;
+      })
+      .sort((a, b) =>
+        new Date(buildDT(a, 'start_time') || a.start_time).getTime() -
+        new Date(buildDT(b, 'start_time') || b.start_time).getTime()
+      );
 
-    if (activeShift.value) {
-      currentShiftName.value = activeShift.value.department_name || activeShift.value.departmentName || '';
+    if (upcoming.length) {
+      activeShift.value = upcoming[0];
+    } else {
+      // #6: No shift today — look ahead 7 days
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      const futureRes = await studentService.getShifts({
+        assigned_user_id: userId,
+        start_date: toDateStr(tomorrow),
+        end_date: toDateStr(nextWeek),
+        is_published: true,
+      });
+      const futureShifts = (futureRes?.data?.data || futureRes?.data || [])
+        .filter(Array.isArray([]) ? () => true : s => s)
+        .sort((a, b) =>
+          new Date(buildDT(a, 'start_time') || a.start_time).getTime() -
+          new Date(buildDT(b, 'start_time') || b.start_time).getTime()
+        );
+      activeShift.value = futureShifts[0] || null;
     }
   } catch {
     activeShift.value = null;
@@ -395,30 +546,53 @@ const fetchTimesheet = async () => {
     const monday = getMonday(new Date());
     const sunday = new Date(monday);
     sunday.setDate(sunday.getDate() + 6);
-
-    const res = await studentService.getTimesheet({
-      startDate: toDateStr(monday),
-      endDate: toDateStr(sunday),
-    });
+    const res = await studentService.getTimesheet({ startDate: toDateStr(monday), endDate: toDateStr(sunday) });
     timesheetData.value = normalizeTimesheetEntries(res?.data?.data || res?.data);
   } catch {
     timesheetData.value = [];
   }
 };
 
-const confirmClockIn = () => {
-  clockInDialog.value = true;
+// ── #3: Fetch published shifts for the full week ──────────────────────────────
+const fetchWeekShifts = async () => {
+  try {
+    const userId = user?.userId || user?.id;
+    const monday = getMonday(new Date());
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    const res = await studentService.getShifts({
+      assigned_user_id: userId,
+      start_date: toDateStr(monday),
+      end_date: toDateStr(sunday),
+      is_published: true,
+    });
+    weekShifts.value = res?.data?.data || res?.data || [];
+    if (!Array.isArray(weekShifts.value)) weekShifts.value = [];
+  } catch {
+    weekShifts.value = [];
+  }
 };
+
+// ── #4: Fetch real hourly rate from student profile ───────────────────────────
+const fetchProfile = async () => {
+  try {
+    const res = await studentService.getProfile();
+    const profile = res?.data?.data || res?.data;
+    hourlyRate.value = Number(profile?.hourlyRate || profile?.hourly_rate || 0);
+  } catch {
+    hourlyRate.value = 0;
+  }
+};
+
+// ── Clock In/Out ──────────────────────────────────────────────────────────────
+const confirmClockIn = () => { clockInDialog.value = true; };
 
 const doClockIn = async () => {
   clockingIn.value = true;
   try {
-    const payload = {
-      user_id: user?.userId || user?.id,
-    };
-    if (activeShift.value) {
-      payload.shift_id = activeShift.value.id;
-    }
+    const payload = activeShift.value
+      ? { shiftId: activeShift.value.shift_id || activeShift.value.id }
+      : {};
     await studentService.clockIn(payload);
     showSnackbar('Clocked in!', 'success');
     clockInDialog.value = false;
@@ -430,14 +604,12 @@ const doClockIn = async () => {
   }
 };
 
-const confirmClockOut = () => {
-  clockOutDialog.value = true;
-};
+const confirmClockOut = () => { clockOutDialog.value = true; };
 
 const doClockOut = async () => {
   clockingOut.value = true;
   try {
-    await studentService.clockOut(currentRecordId.value);
+    await studentService.clockOut();
     showSnackbar('Clocked out!', 'success');
     clockOutDialog.value = false;
     await fetchAll();
@@ -448,11 +620,13 @@ const doClockOut = async () => {
   }
 };
 
-const startBreak = async () => {
+// ── #5: Break with confirmation ───────────────────────────────────────────────
+const doStartBreak = async () => {
   breakLoading.value = true;
   try {
     await studentService.startBreak(currentRecordId.value);
     onBreak.value = true;
+    startBreakDialog.value = false;
     showSnackbar('Break started.', 'info');
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to start break.', 'error');
@@ -461,11 +635,12 @@ const startBreak = async () => {
   }
 };
 
-const endBreakAction = async () => {
+const doEndBreak = async () => {
   breakLoading.value = true;
   try {
     await studentService.endBreak(currentRecordId.value);
     onBreak.value = false;
+    endBreakDialog.value = false;
     showSnackbar('Break ended.', 'success');
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to end break.', 'error');
@@ -482,9 +657,7 @@ onMounted(fetchAll);
 </script>
 
 <style scoped>
-.student-clock {
-  width: 100%;
-}
+.student-clock { width: 100%; }
 
 .clock-btn {
   min-width: 200px;
@@ -496,9 +669,5 @@ onMounted(fetchAll);
 
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
-
-.text-error {
-  color: #EE5044;
-}
-
+.text-error { color: #EE5044; }
 </style>

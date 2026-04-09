@@ -138,9 +138,9 @@
             <v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>
             {{ formatTimeRange(nextShift) }}
           </div>
-          <div v-if="nextShift.supervisor_name" class="d-flex align-center text-body-2 text-medium-emphasis mb-3">
-            <v-icon size="16" class="mr-1">mdi-account-tie</v-icon>
-            {{ nextShift.supervisor_name }}
+          <div v-if="nextShiftPosition" class="d-flex align-center text-body-2 text-medium-emphasis mb-3">
+            <v-icon size="16" class="mr-1">mdi-badge-account-outline</v-icon>
+            {{ nextShiftPosition }}
           </div>
 
           <div class="d-flex ga-2">
@@ -386,6 +386,13 @@ const nextShiftLabel = computed(() => {
   const now = new Date();
   if (!isNaN(start) && start <= now) return "Current Shift";
   return "Next Shift";
+});
+
+const nextShiftPosition = computed(() => {
+  if (!nextShift.value) return '';
+  return nextShift.value.position_name
+    || nextShift.value.position?.position_name
+    || '';
 });
 
 const nextShiftColor = computed(() => {

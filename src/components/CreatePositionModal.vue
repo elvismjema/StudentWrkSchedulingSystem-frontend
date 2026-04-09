@@ -69,6 +69,26 @@
                 </v-checkbox>
               </v-col>
             </v-row>
+
+            <v-row>
+              <v-col cols="12">
+                <div class="color-picker-section">
+                  <div class="color-picker-label">Schedule Color <span class="optional-label">(optional)</span></div>
+                  <p class="color-picker-hint">Choose a color to represent this position on the Manager Schedule.</p>
+                  <div class="color-picker-row">
+                    <input
+                      type="color"
+                      class="color-input"
+                      :value="form.color || '#8B1538'"
+                      @input="form.color = $event.target.value"
+                    />
+                    <span class="color-preview-swatch" :style="{ backgroundColor: form.color || '#8B1538' }"></span>
+                    <span class="color-hex-label">{{ form.color || '#8B1538' }}</span>
+                    <v-btn size="small" variant="text" @click="form.color = null">Reset</v-btn>
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
           </v-form>
         </v-card-text>
 
@@ -121,6 +141,7 @@ const form = reactive({
   positionName: '',
   description: '',
   isCritical: false,
+  color: null,
 });
 
 // UI state
@@ -142,6 +163,7 @@ const resetForm = () => {
   form.positionName = '';
   form.description = '';
   form.isCritical = false;
+  form.color = null;
   valid.value = false;
   submitting.value = false;
 };
@@ -154,6 +176,7 @@ const submitForm = async () => {
       position_name: form.positionName.trim(),
       description: form.description.trim() || null,
       is_critical: form.isCritical,
+      color: form.color || null,
     };
 
     const response = await apiClient.post('/positions', payload);
@@ -214,6 +237,61 @@ watch(dialogOpen, (isOpen) => {
   padding: 16px 24px;
   display: flex;
   gap: 12px;
+}
+
+.color-picker-section {
+  border: 1px solid #e3e5e8;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.color-picker-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #101828;
+  margin-bottom: 4px;
+}
+
+.optional-label {
+  font-weight: 400;
+  color: #667085;
+  font-size: 12px;
+}
+
+.color-picker-hint {
+  font-size: 12px;
+  color: #667085;
+  margin: 0 0 10px;
+}
+
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-input {
+  width: 44px;
+  height: 36px;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.color-preview-swatch {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+
+.color-hex-label {
+  font-size: 13px;
+  font-family: monospace;
+  color: #374151;
 }
 
 @media (max-width: 600px) {

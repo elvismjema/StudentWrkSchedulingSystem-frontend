@@ -2,12 +2,9 @@
   <div class="student-dashboard pa-6">
     <!-- Header -->
 
-    <div class="dashboard-header d-flex align-center justify-space-between mb-6">
-      <div>
-        <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
-        <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
-      </div>
-      <NotificationDropdown />
+    <div class="dashboard-header mb-6">
+      <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
+      <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
     </div>
 
     <!-- Clock Status Banner -->
@@ -254,8 +251,6 @@
 import { ref, computed, reactive, onMounted } from "vue";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
-
-import NotificationDropdown from "../components/NotificationDropdown.vue";
 
 import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
 

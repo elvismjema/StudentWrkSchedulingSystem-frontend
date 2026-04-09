@@ -73,30 +73,35 @@
                 <div class="d-flex align-center mb-2">
                   <v-avatar size="32" color="#8B1538" class="mr-2">
                     <span class="text-caption text-white">
-                      {{ getInitials(req.requester_name || req.user?.fName) }}
+                      {{ getInitials(req.requester?.fName || req.requester_name) }}
                     </span>
                   </v-avatar>
                   <div>
                     <div class="text-body-1 font-weight-bold">
-                      {{ req.requester_name || formatUserName(req.user) || 'Student' }}
+                      {{ formatUserName(req.requester) || req.requester_name || 'Student' }}
                     </div>
+                    <div class="text-caption text-medium-emphasis">needs coverage</div>
                   </div>
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   <v-icon size="14" class="mr-1">mdi-briefcase-outline</v-icon>
-                  {{ req.department_name || req.shift?.department_name || 'Shift' }}
+                  {{ req.requesterShift?.department?.department_name || req.department_name || 'Department' }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
-                  {{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }}
+                  {{ formatDate(req.requesterShift?.shift_date || req.shift_date) }}
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                  {{ formatTimeRange(req.shift || req) }}
+                  {{ formatTimeRange(req.requesterShift || req) }}
                 </div>
-                <div v-if="req.notes" class="text-caption text-medium-emphasis mb-3">
+                <div v-if="req.requesterShift?.position?.position_name" class="text-body-2 text-medium-emphasis mb-1">
+                  <v-icon size="14" class="mr-1">mdi-badge-account-outline</v-icon>
+                  {{ req.requesterShift.position.position_name }}
+                </div>
+                <div v-if="req.requester_notes" class="text-caption text-medium-emphasis mb-3">
                   <v-icon size="12" class="mr-1">mdi-note-text</v-icon>
-                  {{ req.notes }}
+                  {{ req.requester_notes }}
                 </div>
                 <v-btn
                   color="#8B1538"
@@ -107,7 +112,7 @@
                   @click="pickUpRequest(req)"
                   class="mt-2"
                 >
-                  Pick Up
+                  Pick Up Shift
                 </v-btn>
               </v-card-text>
             </v-card>
@@ -394,20 +399,14 @@ const loadingMyShifts = ref(false);
 
 // Data
 const allSwapRequests = ref([]);
+const poolRequests = ref([]);  // cover requests from department coworkers
 const openShifts = ref([]);
 const myShifts = ref([]);
 
 // Derived lists
 const openRequests = computed(() => {
-  // Open/pool requests from OTHER students (not mine)
-  return allSwapRequests.value
-    .filter((r) => {
-      const isMyRequest = r.requester_id === userId.value || r.user_id === userId.value;
-      const isOpenStatus = (r.status || '').toLowerCase() === 'open' || (r.status || '').toLowerCase() === 'pending';
-      const isPoolType = r.type === 'pool' || r.request_type === 'pool' || r.direction === 'pool' || !r.target_user_id;
-      return !isMyRequest && isOpenStatus && isPoolType;
-    })
-    .map((r) => ({ ...r, _loading: false }));
+  // Pool cover requests from department coworkers (fetched via ?direction=pool)
+  return poolRequests.value.map((r) => ({ ...r, _loading: false }));
 });
 
 const myRequests = computed(() => {
@@ -487,8 +486,17 @@ async function loadAllSwapRequests() {
   loadingMine.value = true;
   loadingIncoming.value = true;
   try {
-    const res = await studentService.getSwapRequests();
-    allSwapRequests.value = res?.data?.data || res?.data || [];
+    // Fetch own requests (incoming + outgoing) and pool requests in parallel
+    const [ownRes, poolRes] = await Promise.allSettled([
+      studentService.getSwapRequests(),
+      studentService.getSwapRequests({ direction: 'pool' }),
+    ]);
+    allSwapRequests.value = ownRes.status === 'fulfilled'
+      ? (ownRes.value?.data?.data || ownRes.value?.data || [])
+      : [];
+    poolRequests.value = poolRes.status === 'fulfilled'
+      ? (poolRes.value?.data?.data || poolRes.value?.data || [])
+      : [];
   } catch {
     showSnack('Failed to load trade requests', 'error');
   } finally {

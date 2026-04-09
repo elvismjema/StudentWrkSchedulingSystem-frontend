@@ -511,12 +511,12 @@ async function loadDashboard() {
     weeklyShifts.value = data.weeklyShifts || weekShifts.value.length;
     estimatedEarnings.value = data.estimatedEarnings || "0.00";
 
-    // Map pending requests
+    // Map pending requests — exclude acknowledgements (shown in dedicated alert above)
     const rawRequests = Array.isArray(data.pendingRequests)
-      ? data.pendingRequests
+      ? data.pendingRequests.filter((r) => r.type !== 'acknowledgement' && r.type !== 'acknowledgements')
       : data.pendingCounts && typeof data.pendingCounts === "object"
         ? Object.entries(data.pendingCounts)
-            .filter(([, count]) => Number(count) > 0)
+            .filter(([type, count]) => Number(count) > 0 && type !== 'acknowledgements')
             .map(([type, count]) => ({
               id: type,
               type,
@@ -537,7 +537,13 @@ async function loadDashboard() {
     // Pending shift acknowledgements (fetched separately — dashboard only returns count)
     try {
       const ackRes = await studentService.getPendingAcknowledgements();
-      pendingAcknowledgements.value = ackRes?.data || [];
+      // Handle both wrapped ({ data: [...] }) and unwrapped ([...]) response shapes
+      const ackPayload = ackRes?.data;
+      pendingAcknowledgements.value = Array.isArray(ackPayload)
+        ? ackPayload
+        : Array.isArray(ackPayload?.data)
+          ? ackPayload.data
+          : [];
     } catch {
       pendingAcknowledgements.value = [];
     }
@@ -617,7 +623,12 @@ async function loadFromIndividualEndpoints() {
   // Pending acknowledgements (always fetch separately)
   try {
     const ackRes = await studentService.getPendingAcknowledgements();
-    pendingAcknowledgements.value = ackRes?.data || [];
+    const ackPayload = ackRes?.data;
+    pendingAcknowledgements.value = Array.isArray(ackPayload)
+      ? ackPayload
+      : Array.isArray(ackPayload?.data)
+        ? ackPayload.data
+        : [];
   } catch {
     pendingAcknowledgements.value = [];
   }

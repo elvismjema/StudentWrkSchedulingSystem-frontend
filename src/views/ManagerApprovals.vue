@@ -95,34 +95,30 @@
                 <div class="d-flex align-center gap-2 mt-1 flex-wrap">
                   <v-chip size="x-small" color="primary" variant="tonal">
                     <v-icon start size="12">mdi-calendar</v-icon>
-                    {{ formatDate(req.specificDate) }}
-                  </v-chip>
-                  <v-chip size="x-small" variant="tonal">
-                    <v-icon start size="12">mdi-clock-outline</v-icon>
-                    {{ formatTime(req.startTime) }} – {{ formatTime(req.endTime) }}
+                    {{ formatDate(req.start_date) }} → {{ formatDate(req.end_date) }}
                   </v-chip>
                   <v-chip
                     size="x-small"
-                    :color="statusColor(req.requestStatus)"
+                    :color="statusColor(req.status)"
                     variant="tonal"
                   >
-                    {{ req.requestStatus }}
+                    {{ req.status }}
                   </v-chip>
                 </div>
-                <div v-if="req.requestNotes" class="text-body-2 text-medium-emphasis mt-2">
+                <div v-if="req.notes" class="text-body-2 text-medium-emphasis mt-2">
                   <v-icon size="14" class="mr-1">mdi-note-text-outline</v-icon>
-                  {{ req.requestNotes }}
+                  {{ req.notes }}
                 </div>
               </div>
 
-              <div v-if="req.requestStatus === 'pending'" class="d-flex gap-2">
+              <div v-if="req.status === 'pending'" class="d-flex gap-2">
                 <v-btn
                   color="success"
                   variant="tonal"
                   size="small"
                   prepend-icon="mdi-check"
                   :loading="actioning === req.id + '-approve'"
-                  @click="actionTimeOff(req, 'approved')"
+                  @click="actionTimeOff(req, 'approve')"
                 >
                   Approve
                 </v-btn>
@@ -132,7 +128,7 @@
                   size="small"
                   prepend-icon="mdi-close"
                   :loading="actioning === req.id + '-reject'"
-                  @click="actionTimeOff(req, 'rejected')"
+                  @click="actionTimeOff(req, 'reject')"
                 >
                   Deny
                 </v-btn>
@@ -141,10 +137,10 @@
               <v-chip
                 v-else
                 size="small"
-                :color="statusColor(req.requestStatus)"
+                :color="statusColor(req.status)"
                 variant="flat"
               >
-                {{ req.requestStatus }}
+                {{ req.status }}
               </v-chip>
             </div>
           </v-card-text>
@@ -199,7 +195,8 @@
                   variant="tonal"
                   size="small"
                   prepend-icon="mdi-check"
-                  @click="approveSwap(swap)"
+                  :loading="actioning === `swap-${swap.id}-approve`"
+                  @click="reviewSwap(swap, 'approve')"
                 >
                   Approve
                 </v-btn>
@@ -208,7 +205,8 @@
                   variant="tonal"
                   size="small"
                   prepend-icon="mdi-close"
-                  @click="denySwap(swap)"
+                  :loading="actioning === `swap-${swap.id}-reject`"
+                  @click="reviewSwap(swap, 'decline')"
                 >
                   Deny
                 </v-btn>
@@ -222,6 +220,65 @@
               >
                 {{ swap.status }}
               </v-chip>
+            </div>
+          </v-card-text>
+        </v-card>
+
+        <v-divider class="my-5" />
+
+        <div class="text-subtitle-1 font-weight-bold mb-2">Open Shift Claims</div>
+        <div v-if="openShiftClaims.length === 0 && !claimsLoading" class="empty-state">
+          <v-icon size="40" color="grey-lighten-1">mdi-account-clock-outline</v-icon>
+          <p class="text-body-2 text-medium-emphasis mt-2">No open shift claims waiting for approval.</p>
+        </div>
+
+        <v-card
+          v-for="claim in openShiftClaims"
+          :key="`claim-${claim.id}`"
+          elevation="2"
+          class="mb-3"
+        >
+          <v-card-text>
+            <div class="d-flex align-start justify-space-between flex-wrap gap-2">
+              <div>
+                <div class="text-subtitle-1 font-weight-bold">
+                  {{ claim.requesterName }}
+                  <span class="text-caption text-medium-emphasis ml-1">{{ claim.requesterEmail }}</span>
+                </div>
+                <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
+                  <v-icon size="14">mdi-briefcase-outline</v-icon>
+                  {{ claim.positionName }}
+                  &nbsp;·&nbsp;
+                  <v-icon size="14">mdi-calendar</v-icon>
+                  {{ claim.dateLabel }}
+                  &nbsp;·&nbsp;
+                  <v-icon size="14">mdi-clock-outline</v-icon>
+                  {{ claim.timeRange }}
+                </div>
+              </div>
+
+              <div v-if="claim.status === 'manager_pending' || claim.status === 'pending'" class="d-flex gap-2">
+                <v-btn
+                  color="success"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-check"
+                  :loading="actioning === `claim-${claim.id}-approve`"
+                  @click="reviewOpenClaim(claim, 'approve')"
+                >
+                  Approve
+                </v-btn>
+                <v-btn
+                  color="error"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-close"
+                  :loading="actioning === `claim-${claim.id}-reject`"
+                  @click="reviewOpenClaim(claim, 'reject')"
+                >
+                  Deny
+                </v-btn>
+              </div>
             </div>
           </v-card-text>
         </v-card>
@@ -298,21 +355,24 @@
       </v-tabs-window-item>
     </v-tabs-window>
   </v-container>
+
+  <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
+    {{ snackbar.text }}
+  </v-snackbar>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../services/services.js'
-import availabilityService from '../services/availabilityService.js'
 import Utils from '../config/utils.js'
 
 const deptContext = Utils.getStore('currentDepartmentContext') || {}
 const currentDeptId = deptContext.department_id || null
-const currentUser = Utils.getStore('user') || {}
 
 const activeTab = ref('time-off')
 const loading = ref(false)
 const swapsLoading = ref(false)
+const claimsLoading = ref(false)
 const ackLoading = ref(false)
 const actioning = ref(null)
 const timeOffError = ref('')
@@ -321,6 +381,7 @@ const timeOffFilter = ref('pending')
 const ackFilter = ref('all')
 const timeOffRequests = ref([])
 const swapRequests = ref([])
+const openShiftClaims = ref([])
 const acknowledgments = ref([])
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
@@ -338,11 +399,14 @@ const ackStatusOptions = [
 ]
 
 const pendingTimeOffCount = computed(() =>
-  timeOffRequests.value.filter(r => r.requestStatus === 'pending').length
+  timeOffRequests.value.filter(r => r.status === 'pending').length
 )
 
 const pendingSwapCount = computed(() =>
-  swapRequests.value.filter(s => s.status === 'pending').length
+  [
+    ...swapRequests.value.filter(s => String(s.status || '').toLowerCase() === 'manager_pending'),
+    ...openShiftClaims.value.filter(c => String(c.status || '').toLowerCase() === 'manager_pending')
+  ].length
 )
 
 const unacknowledgedCount = computed(() =>
@@ -354,11 +418,8 @@ const loadTimeOffRequests = async () => {
   timeOffError.value = ''
   try {
     const params = new URLSearchParams()
-    params.append('availabilityType', 'unavailable')
-    if (currentDeptId) params.append('departmentId', currentDeptId)
-    if (timeOffFilter.value) params.append('requestStatus', timeOffFilter.value)
-
-    const response = await apiClient.get(`/availabilities?${params.toString()}`)
+    if (timeOffFilter.value) params.append('status', timeOffFilter.value)
+    const response = await apiClient.get(`/manager/time-off-requests?${params.toString()}`)
     timeOffRequests.value = response?.data?.data || response?.data || []
   } catch (err) {
     timeOffError.value = 'Failed to load time off requests.'
@@ -371,15 +432,48 @@ const loadTimeOffRequests = async () => {
 const loadSwapRequests = async () => {
   swapsLoading.value = true
   try {
-    // Shift swaps come from the trade board / shift acknowledgements with swap type
-    const response = await apiClient.get(`/shift-acknowledgements?type=swap&departmentId=${currentDeptId || ''}`)
-    swapRequests.value = response?.data?.data || response?.data || []
+    const response = await apiClient.get('/manager/swap-requests')
+    const rows = response?.data?.data || []
+    swapRequests.value = rows
+      .filter((row) => !!row.respondentShift || (row.requesterShift?.assigned_user_id != null))
+      .map((row) => ({
+        id: row.id,
+        requestType: row.type === 'swap' ? 'Swap' : 'Find Cover',
+        requestedBy: `${row.requester?.fName || ''} ${row.requester?.lName || ''}`.trim() || row.requester?.email || 'Unknown',
+        claimedBy: row.respondent ? `${row.respondent?.fName || ''} ${row.respondent?.lName || ''}`.trim() : '',
+        dateLabel: formatDate(row.requesterShift?.shift_date),
+        timeRange: `${formatTime(row.requesterShift?.start_time)} – ${formatTime(row.requesterShift?.end_time)}`,
+        location: row.requesterShift?.department?.department_name || 'Department',
+        reason: row.requester_notes || row.manager_notes || '',
+        status: row.status || 'pending',
+      }))
   } catch (err) {
-    // If the endpoint isn't fully wired yet, fall back to empty
     swapRequests.value = []
-    console.warn('Swap requests endpoint not available:', err.message)
+    showSnackbar('Failed to load shift swaps', 'error')
   } finally {
     swapsLoading.value = false
+  }
+}
+
+const loadOpenShiftClaims = async () => {
+  claimsLoading.value = true
+  try {
+    const response = await apiClient.get('/manager/open-shift-claims')
+    const rows = response?.data?.data || []
+    openShiftClaims.value = rows.map((row) => ({
+      id: row.id,
+      requesterName: `${row.requester?.fName || ''} ${row.requester?.lName || ''}`.trim() || 'Unknown',
+      requesterEmail: row.requester?.email || '',
+      positionName: row.requesterShift?.position?.position_name || 'Shift',
+      dateLabel: formatDate(row.requesterShift?.shift_date),
+      timeRange: `${formatTime(row.requesterShift?.start_time)} – ${formatTime(row.requesterShift?.end_time)}`,
+      status: row.status || 'manager_pending',
+    }))
+  } catch (err) {
+    openShiftClaims.value = []
+    showSnackbar('Failed to load open shift claims', 'error')
+  } finally {
+    claimsLoading.value = false
   }
 }
 
@@ -393,7 +487,7 @@ const loadAcknowledgments = async () => {
       params.append('acknowledged', ackFilter.value === 'acknowledged' ? 'true' : 'false')
     }
 
-    const response = await apiClient.get(`/shift-acknowledgements/unacknowledged?${params.toString()}`)
+    const response = await apiClient.get(`/shift-acknowledgements?${params.toString()}`)
     acknowledgments.value = response?.data?.data || response?.data || []
   } catch (err) {
     ackError.value = 'Failed to load shift acknowledgments.'
@@ -404,16 +498,14 @@ const loadAcknowledgments = async () => {
 }
 
 const actionTimeOff = async (req, status) => {
-  const key = `${req.id}-${status === 'approved' ? 'approve' : 'reject'}`
+  const key = `${req.id}-${status}`
   actioning.value = key
   try {
-    await apiClient.patch(`/availabilities/${req.id}/status`, {
-      requestStatus: status,
-      approvedBy: currentUser.userId || currentUser.id,
-      approvedAt: new Date().toISOString()
+    await apiClient.put(`/manager/time-off-requests/${req.id}`, {
+      action: status,
     })
-    req.requestStatus = status
-    showSnackbar(`Request ${status}`, 'success')
+    showSnackbar(`Request ${status === 'approve' ? 'approved' : 'rejected'}`, 'success')
+    await loadTimeOffRequests()
   } catch (err) {
     showSnackbar('Failed to update request', 'error')
     console.error(err)
@@ -422,14 +514,32 @@ const actionTimeOff = async (req, status) => {
   }
 }
 
-const approveSwap = (swap) => {
-  swap.status = 'approved'
-  showSnackbar('Swap approved', 'success')
+const reviewSwap = async (swap, action) => {
+  actioning.value = `swap-${swap.id}-${action === 'approve' ? 'approve' : 'reject'}`
+  try {
+    await apiClient.put(`/manager/swap-requests/${swap.id}`, { action })
+    showSnackbar(`Swap ${action === 'approve' ? 'approved' : 'rejected'}`, 'success')
+    await loadSwapRequests()
+  } catch (err) {
+    showSnackbar('Failed to review swap', 'error')
+    console.error(err)
+  } finally {
+    actioning.value = null
+  }
 }
 
-const denySwap = (swap) => {
-  swap.status = 'denied'
-  showSnackbar('Swap denied', 'success')
+const reviewOpenClaim = async (claim, action) => {
+  actioning.value = `claim-${claim.id}-${action === 'approve' ? 'approve' : 'reject'}`
+  try {
+    await apiClient.put(`/manager/open-shift-claims/${claim.id}`, { action })
+    showSnackbar(`Open shift claim ${action === 'approve' ? 'approved' : 'rejected'}`, 'success')
+    await loadOpenShiftClaims()
+  } catch (err) {
+    showSnackbar('Failed to review open shift claim', 'error')
+    console.error(err)
+  } finally {
+    actioning.value = null
+  }
 }
 
 const formatDate = (dateStr) => {
@@ -449,8 +559,17 @@ const formatTime = (timeStr) => {
 }
 
 const statusColor = (status) => {
-  const map = { pending: 'warning', approved: 'success', rejected: 'error', denied: 'error', claimed: 'info' }
-  return map[status] || 'grey'
+  const normalized = String(status || '').toLowerCase()
+  const map = {
+    pending: 'warning',
+    manager_pending: 'warning',
+    approved: 'success',
+    rejected: 'error',
+    denied: 'error',
+    declined: 'error',
+    claimed: 'info'
+  }
+  return map[normalized] || 'grey'
 }
 
 const showSnackbar = (text, color = 'success') => {
@@ -468,6 +587,7 @@ const formatDateTime = (dateStr) => {
 const loadAll = () => {
   loadTimeOffRequests()
   loadSwapRequests()
+  loadOpenShiftClaims()
   loadAcknowledgments()
 }
 

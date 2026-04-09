@@ -170,7 +170,7 @@ const calendarRef = ref(null);
 // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const loading = ref(true);
 const error = ref(null);
-const showOpenShifts = ref(false);
+const showOpenShifts = ref(true);
 const allShifts = ref([]);
 const openShifts = ref([]);
 const pendingAcks = ref([]);

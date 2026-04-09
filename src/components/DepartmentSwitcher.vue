@@ -1,5 +1,5 @@
 <template>
-  <v-menu offset-y min-width="300">
+  <v-menu offset-y min-width="300" v-if="canSwitchDepartments">
     <template v-slot:activator="{ props }">
       <v-btn
         v-bind="props"
@@ -75,6 +75,12 @@ const currentDepartmentName = computed(() => {
   return current?.department?.department_name || '';
 });
 
+const canSwitchDepartments = computed(() => {
+  const user = Utils.getStore('user');
+  const userRole = (user?.role || "").toLowerCase();
+  return userRole === "manager" || userRole === "admin";
+});
+
 // Methods
 const getRoleColor = (permissionLevel) => {
   if (!permissionLevel) return 'grey';
@@ -95,13 +101,24 @@ const loadUserDepartments = async () => {
     const response = await UserRoleServices.getUserRoles(user.id);
     userDepartments.value = response.data;
 
-    // Set current department from storage or default to first
+    // Get user's role to determine if they can switch departments
+    const userRole = (user.role || "").toLowerCase();
+    const canSwitchDepartments = userRole === "manager" || userRole === "admin";
+
+    // Set current department from storage or default to first (only for managers/admins)
     const storedContext = Utils.getStore('currentDepartmentContext');
-    if (storedContext) {
+    if (storedContext && canSwitchDepartments) {
       currentDepartmentId.value = storedContext.department_id;
-    } else if (userDepartments.value.length > 0) {
+    } else if (userDepartments.value.length > 0 && canSwitchDepartments) {
       currentDepartmentId.value = userDepartments.value[0].department_id;
       saveDepartmentContext(userDepartments.value[0]);
+    } else if (userDepartments.value.length > 0) {
+      // For students, just set the context without allowing switching
+      const activeDept = userDepartments.value.find(dept => dept.is_active === true);
+      if (activeDept) {
+        currentDepartmentId.value = activeDept.department_id;
+        saveDepartmentContext(activeDept);
+      }
     }
   } catch (err) {
     console.error('Failed to load user departments:', err);

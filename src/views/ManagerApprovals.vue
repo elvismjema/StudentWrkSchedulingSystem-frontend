@@ -365,6 +365,7 @@
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
+import { TZ } from '../utils/tz.js'
 
 const deptContext = Utils.getStore('currentDepartmentContext') || {}
 const currentDeptId = deptContext.department_id || null
@@ -545,6 +546,7 @@ const reviewOpenClaim = async (claim, action) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-US', {
+    timeZone: TZ,
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
   })
 }
@@ -579,6 +581,7 @@ const showSnackbar = (text, color = 'success') => {
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleString('en-US', {
+    timeZone: TZ,
     month: 'short', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit'
   })

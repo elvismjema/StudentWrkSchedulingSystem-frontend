@@ -605,6 +605,7 @@ import AdminServices from '../services/adminServices.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
 import apiClient from '../services/services.js';
+import { TZ } from '../utils/tz.js';
 
 const route = useRoute();
 
@@ -774,7 +775,7 @@ const getHighestRoleIcon = (user) => {
 
 const formatDate = (date) => {
   if (!date) return '—';
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString('en-US', { timeZone: TZ });
 };
 
 const normalizeUsersPayload = (payload) => {

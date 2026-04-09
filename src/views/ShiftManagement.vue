@@ -489,6 +489,7 @@ import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
 import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
+import { TZ, localDateStr } from '../utils/tz.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -599,16 +600,16 @@ const headers = [
 // Computed
 const weekDays = computed(() => {
   const today = new Date()
-  const todayIso = today.toISOString().split('T')[0]
+  const todayIso = localDateStr(today)
   const startOfWeek = new Date(currentDate.value)
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(startOfWeek)
     d.setDate(startOfWeek.getDate() + i)
-    const isoDate = d.toISOString().split('T')[0]
+    const isoDate = localDateStr(d)
     return {
       isoDate,
-      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      name: d.toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' }),
       date: d.getDate(),
       isToday: isoDate === todayIso
     }
@@ -621,7 +622,7 @@ const currentGreetingDate = computed(() => {
   if (!weekDays.value.length) return ''
   const first = new Date(weekDays.value[0].isoDate)
   const last = new Date(weekDays.value[6].isoDate)
-  return `${first.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+  return `${first.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric', year: 'numeric' })}`
 })
 
 const filteredShifts = computed(() => {
@@ -655,7 +656,7 @@ const calendarEvents = computed(() => {
 const onCalendarSelect = (selectInfo) => {
   const start = selectInfo.start
   const end = selectInfo.end
-  const isoDate = start.toISOString().split('T')[0]
+  const isoDate = localDateStr(start)
   const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
   const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
   openCreateDialog(isoDate, startTime, endTime)
@@ -845,7 +846,7 @@ const formatShiftTime = (startTime, endTime) => {
     const [h, m] = timeValue.split(':')
     const date = new Date()
     date.setHours(Number(h || 0), Number(m || 0), 0, 0)
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    return date.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' })
   }
 
   return `${normalize(startTime)} - ${normalize(endTime)}`

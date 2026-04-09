@@ -317,6 +317,7 @@ import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
 
 import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
+import { TZ, localDateStr } from "../utils/tz.js";
 
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
@@ -329,7 +330,7 @@ const user = ref(Utils.getStore("user") || {});
 // State
 const loading = ref(true);
 const error = ref(null);
-const selectedDate = ref(new Date().toISOString().slice(0, 10));
+const selectedDate = ref(localDateStr());
 const clockingIn = ref(false);
 
 // Dashboard data
@@ -362,6 +363,7 @@ const firstName = computed(() => user.value?.fName || "Student");
 
 const todayLabel = computed(() => {
   return new Date().toLocaleDateString("en-US", {
+    timeZone: TZ,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -374,7 +376,7 @@ const shiftDates = computed(() => {
     const d = shiftStartDT(s);
     if (!d) return null;
     const dt = new Date(d);
-    return isNaN(dt) ? null : dt.toISOString().slice(0, 10);
+    return isNaN(dt) ? null : localDateStr(dt);
   }).filter(Boolean))];
 });
 

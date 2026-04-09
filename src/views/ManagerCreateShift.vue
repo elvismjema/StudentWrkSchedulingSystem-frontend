@@ -319,6 +319,7 @@ import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import UserRoleServices from "../services/userRoleServices.js";
 import Utils from "../config/utils.js";
+import { localDateStr } from "../utils/tz.js";
 
 const router = useRouter();
 const currentUser = Utils.getStore("user") || {};
@@ -354,11 +355,7 @@ const hourOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).p
 const minuteOptions = ["00", "30"];
 const periodOptions = ["AM", "PM"];
 
-const todayIso = computed(() => {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-});
+const todayIso = computed(() => localDateStr());
 
 const toItems = (response) => response?.data?.data || response?.data || [];
 

@@ -6,7 +6,6 @@
         <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
         <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
       </div>
-      <NotificationDropdown />
     </div>
 
     <!-- Clock Status Banner -->
@@ -245,7 +244,6 @@
 import { ref, computed, reactive, onMounted } from "vue";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
-import NotificationDropdown from "../components/NotificationDropdown.vue";
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";

@@ -1,59 +1,5 @@
 <template>
   <div class="availability-container">
-    <h1>My Availability</h1>
-    
-    <div class="availability-grid">
-      <div class="time-slots-header">
-        <div class="day-label">Time</div>
-        <div class="day-label" v-for="day in days" :key="day.value">{{ day.label }}</div>
-      </div>
-      
-      <div class="time-slots-grid">
-        <div 
-          v-for="slot in timeSlots" 
-          :key="slot.time"
-          class="time-row"
-        >
-          <div class="time-label">{{ slot.label }}</div>
-          <div 
-            v-for="day in days" 
-            :key="`${day.value}-${slot.time}`"
-            class="time-slot"
-            :class="{
-              'selected': isSlotSelected(day.value, slot.time),
-              'selecting': isSlotSelecting(day.value, slot.time),
-              'available': isSlotAvailable(day.value, slot.time),
-              'unavailable': isSlotUnavailable(day.value, slot.time)
-            }"
-            @mousedown="startSelection(day.value, slot.time)"
-            @mouseenter="continueSelection(day.value, slot.time)"
-            @mouseup="endSelection"
-            @dragstart.prevent
-            @dragover.prevent
-            @drop.prevent
-          >
-            <div class="slot-content"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="availability-actions">
-      <button @click="markAsAvailable" class="mark-available-btn" :disabled="currentSelection.size === 0">
-        <v-icon left>mdi-check</v-icon>
-        MARK AVAILABLE
-      </button>
-      <button @click="markAsUnavailable" class="mark-unavailable-btn" :disabled="currentSelection.size === 0">
-        <v-icon left>mdi-close</v-icon>
-        MARK UNAVAILABLE
-      </button>
-      <button @click="saveAvailability" class="save-btn" :disabled="!hasChanges">
-        SAVE CHANGES
-      </button>
-      <button @click="clearAll" class="clear-all-btn">
-        CLEAR ALL
-      </button>
-
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">My Availability</h1>
@@ -373,36 +319,12 @@ const openTimeRangeDialog = (day, hour) => {
   }
   existingHours.sort((a, b) => a - b);
 
-const timeSlots = ref(generateTimeSlots())
-const selectedSlots = ref(new Set())
-const availableSlots = ref(new Set())
-const unavailableSlots = ref(new Set())
-const currentSelection = ref(new Set())
-const isSelecting = ref(false)
-const selectionStart = ref(null)
-const existingAvailability = ref([])
-const successMessage = ref('')
-const errorMessage = ref('')
-
-const isSlotSelected = (day, time) => {
-  return currentSelection.value.has(`${day}-${time}`)
-}
-
-const isSlotAvailable = (day, time) => {
-  return availableSlots.value.has(`${day}-${time}`)
-}
-
-const isSlotUnavailable = (day, time) => {
-  return unavailableSlots.value.has(`${day}-${time}`)
-}
-
   let startH = hour;
   let endH = hour + 1;
   if (existingHours.length > 0) {
     startH = existingHours[0];
     endH = existingHours[existingHours.length - 1] + 1;
   }
-
 
   timeRangeForm.value = {
     dayValue: day.value,
@@ -432,12 +354,6 @@ const applyTimeRange = () => {
 
   const updated = new Set(targetSet.value);
   const updatedOther = new Set(otherSet.value);
-
-
-const endSelection = () => {
-  if (isSelecting.value) {
-    // Keep currentSelection for marking operations
-
   // Clear existing slots for this day in both sets
   for (const key of [...updated]) {
     if (key.startsWith(`${dayValue}-`)) updated.delete(key);
@@ -445,60 +361,6 @@ const endSelection = () => {
   for (const key of [...updatedOther]) {
     if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
   }
-
-const markAsAvailable = () => {
-  currentSelection.value.forEach(slot => {
-    availableSlots.value.add(slot)
-    unavailableSlots.value.delete(slot)
-  })
-  currentSelection.value.clear()
-}
-
-const markAsUnavailable = () => {
-  currentSelection.value.forEach(slot => {
-    unavailableSlots.value.add(slot)
-    availableSlots.value.delete(slot)
-  })
-  currentSelection.value.clear()
-}
-
-const clearAll = () => {
-  availableSlots.value.clear()
-  unavailableSlots.value.clear()
-  currentSelection.value.clear()
-  successMessage.value = ''
-  errorMessage.value = ''
-}
-
-const hasChanges = computed(() => {
-  const existingAvailable = new Set()
-  const existingUnavailable = new Set()
-  
-  existingAvailability.value.forEach(avail => {
-    const startHour = parseInt(avail.startTime.split(':')[0])
-    const endHour = parseInt(avail.endTime.split(':')[0])
-    
-    for (let h = startHour; h < endHour; h++) {
-      const timeStr = h.toString().padStart(2, '0') + ':00'
-      if (avail.availabilityType === 'available') {
-        existingAvailable.add(`${avail.dayOfWeek}-${timeStr}`)
-      } else {
-        existingUnavailable.add(`${avail.dayOfWeek}-${timeStr}`)
-      }
-    }
-  })
-  
-  // Check if available slots changed
-  if (availableSlots.value.size !== existingAvailable.size) return true
-  for (const slot of availableSlots.value) {
-    if (!existingAvailable.has(slot)) return true
-  }
-  
-  // Check if unavailable slots changed
-  if (unavailableSlots.value.size !== existingUnavailable.size) return true
-  for (const slot of unavailableSlots.value) {
-    if (!existingUnavailable.has(slot)) return true
-
   // Fill slots for the range (round to full hours)
   const effectiveStart = startH;
   const effectiveEnd = endM > 0 ? endH + 1 : endH;

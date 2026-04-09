@@ -371,11 +371,32 @@ const loadTimeOffRequests = async () => {
 const loadSwapRequests = async () => {
   swapsLoading.value = true
   try {
-    // Shift swaps come from the trade board / shift acknowledgements with swap type
-    const response = await apiClient.get(`/shift-acknowledgements?type=swap&departmentId=${currentDeptId || ''}`)
-    swapRequests.value = response?.data?.data || response?.data || []
+    // Manager swap/cover requests that need approval (status = manager_pending)
+    // Pass ?status=all to also see already-reviewed ones
+    const response = await apiClient.get('/manager/swap-requests')
+    const raw = response?.data?.data || response?.data || []
+    swapRequests.value = raw.map((item) => ({
+      id: item.id,
+      status: item.status === 'manager_pending' ? 'pending' : item.status,
+      requestType: item.type === 'find_cover' ? 'Find Cover' : 'Swap',
+      requestedBy: item.requester
+        ? `${item.requester.fName} ${item.requester.lName}`
+        : 'Unknown Worker',
+      claimedBy: item.respondent
+        ? `${item.respondent.fName} ${item.respondent.lName}`
+        : null,
+      dateLabel: item.requesterShift?.shift_date
+        ? new Date(item.requesterShift.shift_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        : '—',
+      timeRange:
+        item.requesterShift?.start_time && item.requesterShift?.end_time
+          ? `${item.requesterShift.start_time.slice(0, 5)} – ${item.requesterShift.end_time.slice(0, 5)}`
+          : '—',
+      location: item.requesterShift?.department?.department_name || '—',
+      reason: item.reason || null,
+      _raw: item,
+    }))
   } catch (err) {
-    // If the endpoint isn't fully wired yet, fall back to empty
     swapRequests.value = []
     console.warn('Swap requests endpoint not available:', err.message)
   } finally {
@@ -422,14 +443,24 @@ const actionTimeOff = async (req, status) => {
   }
 }
 
-const approveSwap = (swap) => {
-  swap.status = 'approved'
-  showSnackbar('Swap approved', 'success')
+const approveSwap = async (swap) => {
+  try {
+    await apiClient.put(`/manager/swap-requests/${swap.id}`, { action: 'approve' })
+    swap.status = 'approved'
+    showSnackbar('Swap approved', 'success')
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to approve swap', 'error')
+  }
 }
 
-const denySwap = (swap) => {
-  swap.status = 'denied'
-  showSnackbar('Swap denied', 'success')
+const denySwap = async (swap) => {
+  try {
+    await apiClient.put(`/manager/swap-requests/${swap.id}`, { action: 'decline' })
+    swap.status = 'denied'
+    showSnackbar('Swap denied', 'success')
+  } catch (err) {
+    showSnackbar(err?.response?.data?.message || 'Failed to deny swap', 'error')
+  }
 }
 
 const formatDate = (dateStr) => {

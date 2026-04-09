@@ -1,9 +1,18 @@
 <template>
   <div class="student-dashboard pa-6">
     <!-- Header -->
+
+    <div class="dashboard-header d-flex align-center justify-space-between mb-6">
+      <div>
+        <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
+        <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
+      </div>
+      <NotificationDropdown />
+
     <div class="dashboard-header mb-6">
       <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
       <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
+
     </div>
 
     <!-- Clock Status Banner -->
@@ -248,16 +257,18 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+
+import NotificationDropdown from "../components/NotificationDropdown.vue";
+
 import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
+
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
 
-const router = useRouter();
 const user = ref(Utils.getStore("user") || {});
 
 // State
@@ -600,6 +611,7 @@ async function handleEndBreak() {
   }
 }
 
+
 function openSwapDialog(shift) {
   swapShift.value = shift;
   swapDialogOpen.value = true;
@@ -614,6 +626,7 @@ function handleSwapSubmit() {
   showSnack("Request submitted!");
   loadDashboard();
 }
+
 
 onMounted(loadDashboard);
 </script>

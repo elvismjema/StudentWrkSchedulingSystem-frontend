@@ -26,6 +26,21 @@
       </div>
     </div>
 
+    <!-- Position Color Legend -->
+    <div v-if="positions.length > 0" class="position-legend">
+      <span class="legend-label">Key:</span>
+      <div class="legend-items">
+        <div v-for="pos in positions" :key="pos.position_id" class="legend-item">
+          <span class="legend-swatch" :style="{ backgroundColor: pos.color || '#8B1538' }"></span>
+          <span class="legend-text">{{ pos.position_name }}</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch legend-swatch-unfilled"></span>
+          <span class="legend-text">Unfilled</span>
+        </div>
+      </div>
+    </div>
+
     <div class="calendar-scroll-container" v-if="!shiftsLoading">
       <div class="calendar-container fullcalendar-wrap">
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
@@ -629,6 +644,14 @@ const filteredShifts = computed(() => {
   return shifts.value
 })
 
+const hexToRgba = (hex, alpha) => {
+  const cleaned = (hex || '#8B1538').replace('#', '')
+  const r = parseInt(cleaned.slice(0, 2), 16)
+  const g = parseInt(cleaned.slice(2, 4), 16)
+  const b = parseInt(cleaned.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 const calendarEvents = computed(() => {
   return shifts.value
     .filter((shift) => !!shift.shift_date)
@@ -637,17 +660,27 @@ const calendarEvents = computed(() => {
       const end = `${shift.shift_date}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
       const title = shift.position?.position_name || 'Shift'
       const department = shift.department?.department_name || 'Department'
+      const isUnfilled = !shift.assigned_user_id
+      const posColor = shift.position?.color || '#8B1538'
+      const bgColor = isUnfilled ? hexToRgba(posColor, 0.45) : posColor
+      const borderClr = selectedShift.value?.shift_id === shift.shift_id ? '#00c853' : posColor
       return {
         id: String(shift.shift_id),
         title,
         start,
         end,
-        backgroundColor: '#8B1538',
-        borderColor: selectedShift.value?.shift_id === shift.shift_id ? '#00c853' : '#8B1538',
-        classNames: selectedShift.value?.shift_id === shift.shift_id ? ['fc-shift-selected'] : [],
+        backgroundColor: bgColor,
+        borderColor: borderClr,
+        textColor: isUnfilled ? '#333333' : '#ffffff',
+        classNames: [
+          ...(selectedShift.value?.shift_id === shift.shift_id ? ['fc-shift-selected'] : []),
+          ...(isUnfilled ? ['fc-shift-unfilled'] : []),
+        ],
         extendedProps: {
           shift,
           department,
+          isUnfilled,
+          posColor,
         },
       }
     })
@@ -688,6 +721,42 @@ const calendarOptions = computed(() => ({
   height: 760,
   contentHeight: 700,
   expandRows: true,
+  eventContent: (arg) => {
+    const shift = arg.event.extendedProps?.shift
+    const isUnfilled = arg.event.extendedProps?.isUnfilled
+    const positionName = shift?.position?.position_name || arg.event.title || 'Shift'
+    const worker = shift?.assignedUser
+    const workerName = worker
+      ? `${worker.fName || ''} ${worker.lName || ''}`.trim() || 'Worker'
+      : null
+
+    const container = document.createElement('div')
+    container.className = 'fc-event-custom'
+
+    const timeEl = document.createElement('div')
+    timeEl.className = 'fc-event-custom-time'
+    timeEl.textContent = arg.timeText
+    container.appendChild(timeEl)
+
+    const posEl = document.createElement('div')
+    posEl.className = 'fc-event-custom-position'
+    posEl.textContent = positionName
+    container.appendChild(posEl)
+
+    if (isUnfilled) {
+      const unfilledEl = document.createElement('div')
+      unfilledEl.className = 'fc-event-custom-unfilled'
+      unfilledEl.textContent = '⚠ UNFILLED'
+      container.appendChild(unfilledEl)
+    } else if (workerName) {
+      const workerEl = document.createElement('div')
+      workerEl.className = 'fc-event-custom-worker'
+      workerEl.textContent = workerName
+      container.appendChild(workerEl)
+    }
+
+    return { domNodes: [container] }
+  },
 }))
 
 const formatTime = (hour) => {
@@ -1551,13 +1620,57 @@ onMounted(async () => {
   border-radius: 6px;
   padding: 2px 4px;
   font-size: 12px;
-  border: 2px solid #8B1538;
-  background-color: #8B1538;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-event.fc-shift-unfilled) {
+  border-style: dashed;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event.fc-shift-selected) {
   border-color: #00c853;
   box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom) {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px 2px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom-time) {
+  font-size: 10px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom-position) {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom-worker) {
+  font-size: 11px;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom-unfilled) {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-highlight) {
@@ -1570,8 +1683,55 @@ onMounted(async () => {
   opacity: 0.85;
 }
 
-.fullcalendar-wrap :deep(.fc .fc-event-title) {
+/* Legend */
+.position-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+}
+
+.legend-label {
+  font-size: 12px;
   font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-swatch-unfilled {
+  background-color: rgba(139, 21, 56, 0.35);
+  border: 2px dashed #8B1538;
+}
+
+.legend-text {
+  font-size: 12px;
+  color: #374151;
+  white-space: nowrap;
 }
 
 .tasks-section {

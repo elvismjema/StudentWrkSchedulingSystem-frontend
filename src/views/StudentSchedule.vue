@@ -439,24 +439,36 @@ function normalizeOpenShiftPayload(payload) {
 async function loadShifts() {
   loading.value = true;
   error.value = null;
-  const userId = user.value?.userId || user.value?.id;
   try {
-    const [shiftsRes, openRes, acksRes] = await Promise.allSettled([
-      studentService.getShifts({ assigned_user_id: userId, is_published: true }),
+    // Use a wide date window so calendar navigation works without re-fetching.
+    // getMySchedule embeds each shift's acknowledgements in a single call —
+    // this is the single source of truth that eliminates the two-source sync bug.
+    const now = new Date();
+    const wideStart = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().slice(0, 10);
+    const wideEnd = new Date(now.getFullYear(), now.getMonth() + 6, 0).toISOString().slice(0, 10);
+
+    const [scheduleRes, openRes] = await Promise.allSettled([
+      studentService.getMySchedule({ startDate: wideStart, endDate: wideEnd }),
       studentService.getOpenShifts(),
-      studentService.getPendingAcknowledgements(),
     ]);
-    if (shiftsRes.status === "fulfilled") {
-      allShifts.value = shiftsRes.value?.data?.data || shiftsRes.value?.data || [];
+
+    if (scheduleRes.status === "fulfilled") {
+      const shifts = scheduleRes.value?.data?.data || scheduleRes.value?.data || [];
+      allShifts.value = shifts;
+      // Derive pending acks directly from the embedded acknowledgements on each shift.
+      // This ensures allShifts and pendingAcks are always in sync.
+      pendingAcks.value = shifts
+        .filter((s) => s.acknowledgements?.some((a) => !a.acknowledged))
+        .map((s) => {
+          const ack = s.acknowledgements.find((a) => !a.acknowledged);
+          return { id: ack.id, acknowledged: ack.acknowledged, acknowledgedAt: ack.acknowledgedAt, shift: s };
+        });
     }
+
     if (openRes.status === "fulfilled") {
       openShifts.value = normalizeOpenShiftPayload(
         openRes.value?.data?.data || openRes.value?.data
       );
-    }
-    if (acksRes.status === "fulfilled") {
-      pendingAcks.value = (acksRes.value?.data?.data || acksRes.value?.data || [])
-        .filter((a) => !a.acknowledged && !a.acknowledgedAt && !a.acknowledged_at);
     }
   } catch (err) {
     error.value = "Failed to load schedule. Please try again.";

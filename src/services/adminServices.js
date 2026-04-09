@@ -1,34 +1,4 @@
-import axios from "axios";
-import Utils from "../config/utils.js";
-
-let baseurl = import.meta.env.VITE_API_BASE;
-if (!baseurl) {
-  if (import.meta.env.DEV) {
-    baseurl = "http://localhost/workerscheduling-t2";
-  } else {
-    baseurl = "/workerscheduling-t2";
-  }
-}
-
-const apiClient = axios.create({
-  baseURL: baseurl,
-  withCredentials: true,
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest",
-  },
-  transformRequest: (data, headers) => {
-    let user = Utils.getStore("user");
-    if (user != null) {
-      let token = user.token;
-      let authHeader = "";
-      if (token != null && token != "") authHeader = "Bearer " + token;
-      headers["Authorization"] = authHeader;
-    }
-    return JSON.stringify(data);
-  },
-});
+import apiClient from "./services.js";
 
 const AdminServices = {
   // ─── Users ─────────────────────────────────────────────────────────────────

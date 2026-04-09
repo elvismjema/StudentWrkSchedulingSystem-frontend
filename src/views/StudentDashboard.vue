@@ -7,6 +7,64 @@
       <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
     </div>
 
+    <!-- ═══ Pending Shift Acknowledgements — TOP PRIORITY ═══ -->
+    <v-alert
+      v-if="pendingAcknowledgements.length > 0"
+      type="warning"
+      variant="tonal"
+      prominent
+      border="start"
+      class="mb-6 ack-alert"
+    >
+      <template #title>
+        <span class="text-subtitle-1 font-weight-bold">
+          {{ pendingAcknowledgements.length }} new shift{{ pendingAcknowledgements.length > 1 ? 's' : '' }} assigned to you
+        </span>
+      </template>
+      <template #text>
+        <div class="mt-2">
+          <v-card
+            v-for="ack in pendingAcknowledgements"
+            :key="ack.id"
+            class="mb-2 ack-card"
+            elevation="0"
+            rounded="lg"
+            color="white"
+          >
+            <div class="ack-card__bar"></div>
+            <div class="pa-4 d-flex align-center justify-space-between flex-wrap" style="gap: 12px; flex: 1">
+              <div>
+                <div class="text-subtitle-2 font-weight-bold mb-1">
+                  {{ ack.shift?.department?.department_name || 'New Shift Assigned' }}
+                </div>
+                <div class="d-flex align-center flex-wrap text-body-2 text-medium-emphasis" style="gap: 12px">
+                  <span v-if="ack.shift?.shift_date">
+                    <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
+                    {{ new Date(ack.shift.shift_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}
+                  </span>
+                  <span v-if="ack.shift?.start_time && ack.shift?.end_time">
+                    <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                    {{ ack.shift.start_time.slice(0, 5) }} – {{ ack.shift.end_time.slice(0, 5) }}
+                  </span>
+                </div>
+              </div>
+              <v-btn
+                color="success"
+                variant="flat"
+                size="small"
+                :loading="acknowledgingId === ack.id"
+                :disabled="acknowledgingId !== null"
+                prepend-icon="mdi-check-circle"
+                @click="acknowledgeShift(ack)"
+              >
+                Acknowledge
+              </v-btn>
+            </div>
+          </v-card>
+        </div>
+      </template>
+    </v-alert>
+
     <!-- Clock Status Banner -->
     <ClockStatusBanner
       :clocked-in="clockStatus.isClockedIn"
@@ -19,56 +77,6 @@
       @start-break="handleStartBreak"
       @end-break="handleEndBreak"
     />
-
-    <!-- Shift Acknowledgements Banner -->
-    <template v-if="pendingAcknowledgements.length > 0">
-      <div class="mb-6">
-        <div class="d-flex align-center mb-3">
-          <v-icon size="18" color="warning" class="mr-2">mdi-alert-circle-outline</v-icon>
-          <span class="text-subtitle-2 font-weight-bold">
-            {{ pendingAcknowledgements.length }} shift{{ pendingAcknowledgements.length > 1 ? 's' : '' }} need{{ pendingAcknowledgements.length === 1 ? 's' : '' }} your acknowledgement
-          </span>
-        </div>
-        <v-card
-          v-for="ack in pendingAcknowledgements"
-          :key="ack.id"
-          class="mb-2 ack-card"
-          elevation="0"
-          rounded="lg"
-          border
-        >
-          <div class="ack-card__bar"></div>
-          <div class="pa-4 d-flex align-center justify-space-between flex-wrap" style="gap: 12px; flex: 1">
-            <div>
-              <div class="text-subtitle-2 font-weight-bold mb-1">
-                {{ ack.shift?.department?.department_name || 'New Shift Assigned' }}
-              </div>
-              <div class="d-flex align-center flex-wrap text-body-2 text-medium-emphasis" style="gap: 12px">
-                <span v-if="ack.shift?.shift_date">
-                  <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
-                  {{ new Date(ack.shift.shift_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}
-                </span>
-                <span v-if="ack.shift?.start_time && ack.shift?.end_time">
-                  <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                  {{ ack.shift.start_time.slice(0, 5) }} – {{ ack.shift.end_time.slice(0, 5) }}
-                </span>
-              </div>
-            </div>
-            <v-btn
-              color="primary"
-              variant="tonal"
-              size="small"
-              :loading="acknowledgingId === ack.id"
-              :disabled="acknowledgingId !== null"
-              prepend-icon="mdi-check"
-              @click="acknowledgeShift(ack)"
-            >
-              Acknowledge
-            </v-btn>
-          </div>
-        </v-card>
-      </div>
-    </template>
 
     <!-- Loading skeleton -->
     <template v-if="loading">
@@ -186,13 +194,18 @@
                 </v-btn>
               </div>
               <template v-if="topOpenShifts.length">
-                <ShiftCard
+                <div
                   v-for="shift in topOpenShifts"
                   :key="shift.id"
-                  :shift="shift"
-                  :show-actions="false"
-                  class="mb-2"
-                />
+                  class="open-shift-item mb-2"
+                  @click="goToOpenShiftsForDept(shift)"
+                >
+                  <ShiftCard
+                    :shift="shift"
+                    :show-actions="false"
+                    :is-open-shift="true"
+                  />
+                </div>
               </template>
               <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
                 No open shifts available right now
@@ -299,6 +312,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
 
@@ -309,6 +323,7 @@ import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
 
+const router = useRouter();
 const user = ref(Utils.getStore("user") || {});
 
 // State
@@ -677,12 +692,23 @@ async function acknowledgeShift(ack) {
   try {
     await studentService.acknowledgeShift(ack.id);
     pendingAcknowledgements.value = pendingAcknowledgements.value.filter((a) => a.id !== ack.id);
-    showSnack("Shift acknowledged!");
+    showSnack("Shift acknowledged! You can now clock in when your shift starts.");
+    // Reload the full dashboard so next shift / clock status reflect the newly acknowledged shift
+    await loadDashboard();
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to acknowledge shift.", "error");
   } finally {
     acknowledgingId.value = null;
   }
+}
+
+function goToOpenShiftsForDept(shift) {
+  const deptId = shift.department_id || shift.department?.id || '';
+  const deptName = shift.department_name || shift.department?.department_name || '';
+  router.push({
+    name: 'student-schedule',
+    query: { tab: 'open', department: deptId || deptName },
+  });
 }
 
 function openSwapDialog(shift) {
@@ -728,5 +754,13 @@ onMounted(loadDashboard);
   width: 5px;
   flex-shrink: 0;
   background: #F57C00;
+}
+
+.ack-alert {
+  border-left-width: 4px !important;
+}
+
+.open-shift-item {
+  cursor: pointer;
 }
 </style>

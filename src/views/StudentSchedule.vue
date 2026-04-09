@@ -121,10 +121,28 @@
 
       <!-- Open Shifts Tab -->
       <div v-else>
-        <template v-if="openShifts.length">
+        <!-- Department filter -->
+        <div v-if="openShifts.length > 0" class="d-flex align-center mb-4 flex-wrap" style="gap: 12px">
+          <v-select
+            v-model="departmentFilter"
+            :items="openShiftDepartments"
+            item-title="title"
+            item-value="value"
+            label="Filter by Department"
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="max-width: 280px"
+          />
+          <span class="text-body-2 text-medium-emphasis">
+            {{ filteredOpenShifts.length }} shift{{ filteredOpenShifts.length !== 1 ? 's' : '' }} available
+          </span>
+        </div>
+
+        <template v-if="filteredOpenShifts.length">
           <v-row>
             <v-col
-              v-for="shift in openShifts"
+              v-for="shift in filteredOpenShifts"
               :key="shift.id"
               cols="12"
               sm="6"
@@ -174,10 +192,22 @@
 
         <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
           <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-briefcase-off</v-icon>
-          <div class="text-body-1 text-medium-emphasis">No open shifts available</div>
-          <div class="text-caption text-medium-emphasis">
-            Check back later — new shifts get posted regularly
+          <div class="text-body-1 text-medium-emphasis">
+            {{ departmentFilter ? 'No open shifts in this department' : 'No open shifts available' }}
           </div>
+          <div class="text-caption text-medium-emphasis">
+            {{ departmentFilter ? 'Try clearing the filter or check back later' : 'Check back later \u2014 new shifts get posted regularly' }}
+          </div>
+          <v-btn
+            v-if="departmentFilter"
+            variant="text"
+            color="primary"
+            size="small"
+            class="mt-2"
+            @click="departmentFilter = ''"
+          >
+            Clear Filter
+          </v-btn>
         </v-card>
       </div>
     </template>
@@ -223,6 +253,7 @@ const allShifts = ref([]);
 const openShifts = ref([]);
 const pendingAcks = ref([]);
 const coworkers = ref([]);
+const departmentFilter = ref(route.query.department || '');
 
 // Swap dialog
 const swapDialogOpen = ref(false);
@@ -274,6 +305,27 @@ const selectedDayShifts = computed(() => {
 const selectedDayLabel = computed(() => {
   const d = new Date(selectedDate.value + "T00:00:00");
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+});
+
+// Unique departments from open shifts for the filter dropdown
+const openShiftDepartments = computed(() => {
+  const depts = new Map();
+  openShifts.value.forEach((s) => {
+    const id = String(s.department_id || s.department?.id || '');
+    const name = s.department_name || s.department?.department_name || 'Unknown';
+    if (id || name) depts.set(id || name, name);
+  });
+  return [{ value: '', title: 'All Departments' }, ...Array.from(depts, ([value, title]) => ({ value, title }))];
+});
+
+// Filtered open shifts by selected department
+const filteredOpenShifts = computed(() => {
+  if (!departmentFilter.value) return openShifts.value;
+  return openShifts.value.filter((s) => {
+    const id = String(s.department_id || s.department?.id || '');
+    const name = s.department_name || s.department?.department_name || '';
+    return id === departmentFilter.value || name === departmentFilter.value;
+  });
 });
 
 // Data loading
@@ -341,8 +393,8 @@ async function claimShift(shift) {
   try {
     await studentService.claimOpenShift(shift.shift_id || shift.id);
     openShifts.value = openShifts.value.filter((s) => (s.shift_id || s.id) !== (shift.shift_id || shift.id));
-    showSnack("Shift claimed!");
-    // Reload my shifts
+    showSnack("Shift picked up! Waiting for manager approval.");
+    // Reload my shifts so it shows in My Schedule
     const userId = user.value?.userId || user.value?.id;
     const res = await studentService.getShifts({ assigned_user_id: userId, is_published: true });
     allShifts.value = res?.data?.data || res?.data || [];
@@ -351,7 +403,7 @@ async function claimShift(shift) {
     if (msg?.toLowerCase().includes("conflict")) {
       shift._conflict = msg;
     } else {
-      showSnack(msg || "Failed to claim shift", "error");
+      showSnack(msg || "Failed to pick up shift", "error");
     }
   } finally {
     shift._claiming = false;

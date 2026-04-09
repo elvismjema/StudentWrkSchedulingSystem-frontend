@@ -314,7 +314,7 @@ function onDatesSet(info) {
   const opts = { timeZone: TZ, month: "long", day: "numeric" };
   weekRangeLabel.value =
     start.toLocaleDateString("en-US", opts) +
-    " â€“ " +
+    " \u2013 " +
     end.toLocaleDateString("en-US", { ...opts, year: "numeric" });
 }
 

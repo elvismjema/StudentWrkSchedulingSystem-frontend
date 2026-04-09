@@ -163,14 +163,31 @@
                   v-for="req in pendingRequests"
                   :key="req.id"
                   class="d-flex align-center justify-space-between py-2"
+                  style="gap: 8px"
                 >
-                  <div class="d-flex align-center">
-                    <v-icon size="18" :color="req.iconColor" class="mr-2">{{ req.icon }}</v-icon>
-                    <span class="text-body-2">{{ req.label }}</span>
+                  <!-- Icon + label -->
+                  <div class="d-flex align-center flex-grow-1" style="min-width: 0">
+                    <v-icon size="18" :color="req.iconColor" class="mr-2 flex-shrink-0">{{ req.icon }}</v-icon>
+                    <span class="text-body-2 text-truncate">{{ req.label }}</span>
                   </div>
-                  <v-chip :color="req.statusColor" size="x-small" variant="tonal">
-                    {{ req.status }}
+
+                  <!-- Status chip -->
+                  <v-chip :color="req.statusColor" size="x-small" variant="tonal" class="flex-shrink-0">
+                    {{ req.statusLabel }}
                   </v-chip>
+
+                  <!-- Cancel button — only for pending time-off requests -->
+                  <v-btn
+                    v-if="req.type === 'time_off' && req.status === 'pending'"
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    :loading="req.cancelling"
+                    icon="mdi-close"
+                    aria-label="Cancel request"
+                    class="flex-shrink-0"
+                    @click.stop="cancelRequest(req)"
+                  />
                 </div>
               </template>
               <div v-else class="text-body-2 text-medium-emphasis text-center pa-3">
@@ -320,6 +337,64 @@ function showSnack(text, color = "success") {
   snackbar.show = true;
 }
 
+/**
+ * Map a raw request object (time-off or swap) from the API into the
+ * display shape used by the Pending Requests card.
+ */
+function mapRequest(r) {
+  const statusLabelMap = {
+    pending:          "Pending",
+    manager_pending:  "Awaiting Manager",
+    approved:         "Approved",
+    declined:         "Declined",
+    rejected:         "Rejected",
+    cancelled:        "Cancelled",
+    accepted:         "Accepted",
+  };
+  const statusColorMap = {
+    pending:          "warning",
+    manager_pending:  "orange",
+    approved:         "success",
+    declined:         "error",
+    rejected:         "error",
+    cancelled:        "grey",
+    accepted:         "info",
+  };
+  const status = r.status || "pending";
+  return {
+    id:          r.id,
+    type:        r.type || "time_off",
+    label:       r.type === "time_off"
+                   ? `Time off: ${r.startDate ?? r.start_date} – ${r.endDate ?? r.end_date}`
+                   : r.type === "find_cover"
+                     ? `Cover request – ${r.shiftDate ?? r.shift_date ?? ""}`
+                     : r.label || "Swap request",
+    icon:        r.type === "time_off" ? "mdi-calendar-remove" : "mdi-swap-horizontal",
+    iconColor:   r.type === "time_off" ? "orange" : "blue",
+    status,
+    statusLabel: statusLabelMap[status] || status,
+    statusColor: statusColorMap[status] || "warning",
+    cancelling:  false,
+  };
+}
+
+/**
+ * Cancel a pending time-off request from the Pending Requests card.
+ * Uses the DELETE /student/time-off/:id endpoint.
+ */
+async function cancelRequest(req) {
+  req.cancelling = true;
+  try {
+    await studentService.cancelTimeOff(req.id);
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== req.id);
+    showSnack("Time-off request cancelled.");
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Failed to cancel request.", "error");
+  } finally {
+    req.cancelling = false;
+  }
+}
+
 function normalizeOpenShiftPayload(payload) {
   if (Array.isArray(payload)) {
     return {
@@ -379,14 +454,7 @@ async function loadDashboard() {
               status: "Pending",
             }))
         : [];
-    pendingRequests.value = rawRequests.map((r) => ({
-      id: r.id,
-      label: r.type === "time_off" ? `Time off: ${r.startDate} – ${r.endDate}` : r.label || "Request",
-      icon: r.type === "time_off" ? "mdi-calendar-remove" : "mdi-swap-horizontal",
-      iconColor: r.type === "time_off" ? "orange" : "blue",
-      status: r.status || "Pending",
-      statusColor: r.status === "approved" ? "success" : r.status === "denied" ? "error" : "warning",
-    }));
+    pendingRequests.value = rawRequests.map((r) => mapRequest(r));
 
     // Clock status
     if (data.clockStatus) {

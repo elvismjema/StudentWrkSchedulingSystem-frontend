@@ -131,12 +131,12 @@
             {{ nextShift.department_name || nextShift.department?.department_name || "Shift" }}
           </div>
           <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1">
-            <v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>
-            {{ formatTimeRange(nextShift) }}
+            <v-icon size="16" class="mr-1">mdi-calendar</v-icon>
+            {{ formatShiftDate(nextShift) }}
           </div>
           <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1">
-            <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
-            {{ nextShift.position_name || nextShift.location || nextShift.department_name || "TBD" }}
+            <v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>
+            {{ formatTimeRange(nextShift) }}
           </div>
           <div v-if="nextShift.supervisor_name" class="d-flex align-center text-body-2 text-medium-emphasis mb-3">
             <v-icon size="16" class="mr-1">mdi-account-tie</v-icon>
@@ -316,7 +316,7 @@ import { useRouter } from "vue-router";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
 
-import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
+import { shiftStartDT, shiftEndDT, formatTimeRange, formatShiftDate as _formatShiftDate, shiftDateStr } from "../utils/shiftDateTime.js";
 import { TZ, localDateStr } from "../utils/tz.js";
 
 import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
@@ -400,6 +400,12 @@ const nextShiftColor = computed(() => {
   return "#80162B";
 });
 
+
+function formatShiftDate(shift) {
+  if (!shift) return '';
+  const dateStr = shift.shift_date || shiftDateStr(shift);
+  return _formatShiftDate(dateStr);
+}
 
 function showSnack(text, color = "success") {
   snackbar.text = text;

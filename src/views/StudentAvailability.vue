@@ -28,7 +28,15 @@
       >
         Save Changes
       </v-btn>
-      <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
+      <v-btn variant="outlined" @click="clearAll">Clear Manual Blocks</v-btn>
+      <v-btn
+        variant="tonal"
+        color="primary"
+        :loading="syncingClassSchedule"
+        @click="syncClassSchedule"
+      >
+        Sync Class Schedule
+      </v-btn>
     </div>
 
     <!-- Legend -->
@@ -40,6 +48,10 @@
       <span class="legend-item">
         <span class="legend-dot unavailable-dot" />
         Unavailable
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot class-dot" />
+        Class Time (auto-synced, locked)
       </span>
     </div>
 
@@ -276,6 +288,7 @@ const calendarRef = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
+const syncingClassSchedule = ref(false);
 const gridMode = ref("available");
 
 // blocks: array of { tempId, dayOfWeek, startTime (HH:mm), endTime (HH:mm), availabilityType }
@@ -332,6 +345,12 @@ const normalizeToHHMM = (t) => (t ? String(t).slice(0, 5) : "");
 const notify = (text, color = "success") => { snackbar.value = { show: true, text, color }; };
 const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
 
+const isClassScheduleRecord = (record) =>
+  record?.recurrencePattern === "class_schedule";
+
+const isClassScheduleBlock = (block) =>
+  block?.sourceType === "class_schedule";
+
 const blocksFingerprint = (bs) =>
   JSON.stringify(
     [...bs]
@@ -359,22 +378,42 @@ const formatDate = (value) => {
 };
 
 // --- Computed ---
-const hasChanges = computed(() => blocksFingerprint(blocks.value) !== initialFingerprint.value);
+const manualBlocks = computed(() => blocks.value.filter((b) => !isClassScheduleBlock(b)));
+const hasChanges = computed(() => blocksFingerprint(manualBlocks.value) !== initialFingerprint.value);
 
 const exceptions = computed(() =>
   existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
 );
 
 const calendarEvents = computed(() =>
-  blocks.value.map((b) => ({
-    id: b.tempId,
-    title: b.availabilityType === "available" ? "Available" : "Unavailable",
-    start: `${DOW_TO_DATE[b.dayOfWeek]}T${b.startTime}`,
-    end: `${DOW_TO_DATE[b.dayOfWeek]}T${b.endTime}`,
-    backgroundColor: b.availabilityType === "available" ? "#0D9488" : "#DC2626",
-    borderColor: b.availabilityType === "available" ? "#0D9488" : "#DC2626",
-    extendedProps: { block: b },
-  }))
+  blocks.value.map((b) => {
+    const isClassBlock = b.sourceType === "class_schedule";
+    return {
+      id: b.tempId,
+      title: isClassBlock
+        ? "Class Time"
+        : b.availabilityType === "available"
+          ? "Available"
+          : "Unavailable",
+      start: `${DOW_TO_DATE[b.dayOfWeek]}T${b.startTime}`,
+      end: `${DOW_TO_DATE[b.dayOfWeek]}T${b.endTime}`,
+      backgroundColor: isClassBlock
+        ? "#9A3412"
+        : b.availabilityType === "available"
+          ? "#0D9488"
+          : "#DC2626",
+      borderColor: isClassBlock
+        ? "#9A3412"
+        : b.availabilityType === "available"
+          ? "#0D9488"
+          : "#DC2626",
+      classNames: isClassBlock ? ["class-synced-event"] : [],
+      editable: !isClassBlock,
+      startEditable: !isClassBlock,
+      durationEditable: !isClassBlock,
+      extendedProps: { block: b },
+    };
+  })
 );
 
 // --- FullCalendar callbacks ---
@@ -409,6 +448,10 @@ const confirmCreate = () => {
 
 const onEventClick = (clickInfo) => {
   const block = clickInfo.event.extendedProps.block;
+  if (isClassScheduleBlock(block)) {
+    notify("Class-synced blocks are locked. Update your course schedule and re-sync.", "info");
+    return;
+  }
   editForm.value = { ...block };
   showEditDialog.value = true;
 };
@@ -436,27 +479,40 @@ const deleteBlock = () => {
 
 const onEventDrop = (dropInfo) => {
   const tempId = dropInfo.event.id;
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx === -1) return;
+
+  if (isClassScheduleBlock(blocks.value[idx])) {
+    dropInfo.revert();
+    notify("Class-synced blocks cannot be moved.", "info");
+    return;
+  }
+
   const newDateStr = dropInfo.event.startStr.split("T")[0];
   const newDow = new Date(`${newDateStr}T12:00:00`).getDay();
   const newStart = dropInfo.event.startStr.split("T")[1].slice(0, 5);
   const newEnd = dropInfo.event.endStr.split("T")[1].slice(0, 5);
-  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
-  if (idx !== -1) {
-    const updated = [...blocks.value];
-    updated[idx] = { ...updated[idx], dayOfWeek: newDow, startTime: newStart, endTime: newEnd };
-    blocks.value = updated;
-  }
+
+  const updated = [...blocks.value];
+  updated[idx] = { ...updated[idx], dayOfWeek: newDow, startTime: newStart, endTime: newEnd };
+  blocks.value = updated;
 };
 
 const onEventResize = (resizeInfo) => {
   const tempId = resizeInfo.event.id;
-  const newEnd = resizeInfo.event.endStr.split("T")[1].slice(0, 5);
   const idx = blocks.value.findIndex((b) => b.tempId === tempId);
-  if (idx !== -1) {
-    const updated = [...blocks.value];
-    updated[idx] = { ...updated[idx], endTime: newEnd };
-    blocks.value = updated;
+  if (idx === -1) return;
+
+  if (isClassScheduleBlock(blocks.value[idx])) {
+    resizeInfo.revert();
+    notify("Class-synced blocks cannot be resized.", "info");
+    return;
   }
+
+  const newEnd = resizeInfo.event.endStr.split("T")[1].slice(0, 5);
+  const updated = [...blocks.value];
+  updated[idx] = { ...updated[idx], endTime: newEnd };
+  blocks.value = updated;
 };
 
 // --- Calendar options ---
@@ -491,7 +547,7 @@ const calendarOptions = computed(() => ({
 }));
 
 const clearAll = () => {
-  blocks.value = [];
+  blocks.value = blocks.value.filter((b) => isClassScheduleBlock(b));
 };
 
 // --- API ---
@@ -511,9 +567,10 @@ const loadAvailabilities = async () => {
         startTime: normalizeToHHMM(r.startTime),
         endTime: normalizeToHHMM(r.endTime),
         availabilityType: r.availabilityType || "available",
+        sourceType: isClassScheduleRecord(r) ? "class_schedule" : "manual",
       }));
     blocks.value = loadedBlocks;
-    initialFingerprint.value = blocksFingerprint(loadedBlocks);
+    initialFingerprint.value = blocksFingerprint(loadedBlocks.filter((b) => !isClassScheduleBlock(b)));
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
@@ -525,13 +582,17 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
-    // Delete all existing recurring records first
-    const recurringRecords = existingRecords.value.filter((r) => !r.specificDate || r.isRecurring);
-    for (const rec of recurringRecords) {
+    // Delete only manual recurring records (preserve class-synced recurring records)
+    const recurringManualRecords = existingRecords.value.filter(
+      (r) => (r.isRecurring || !r.specificDate) && !isClassScheduleRecord(r)
+    );
+    for (const rec of recurringManualRecords) {
       await availabilityService.remove(rec.id);
     }
-    // Re-create all current blocks sequentially to avoid race conditions
-    for (const block of blocks.value) {
+
+    // Re-create only manual blocks sequentially to avoid race conditions
+    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
+    for (const block of manualOnlyBlocks) {
       await availabilityService.create({
         userId,
         dayOfWeek: block.dayOfWeek,
@@ -581,6 +642,26 @@ const removeException = async (exc) => {
     await loadAvailabilities();
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to remove exception.", "error");
+  }
+};
+
+const syncClassSchedule = async () => {
+  syncingClassSchedule.value = true;
+  try {
+    const response = await availabilityService.syncClassSchedule();
+    const data = response?.data?.data || {};
+    notify(
+      `Class schedule synced. Added ${data.created || 0}, removed ${data.deleted || 0}.`,
+      "success"
+    );
+    await loadAvailabilities();
+  } catch (error) {
+    notify(
+      error?.response?.data?.message || "Failed to sync class schedule.",
+      "error"
+    );
+  } finally {
+    syncingClassSchedule.value = false;
   }
 };
 
@@ -658,6 +739,10 @@ onMounted(loadAvailabilities);
   background-color: #DC2626;
 }
 
+.class-dot {
+  background-color: #9A3412;
+}
+
 /* Calendar card */
 .calendar-card {
   background: white;
@@ -687,7 +772,12 @@ onMounted(loadAvailabilities);
   font-weight: 600;
 }
 
-/* Selection highlight and mirror â€” teal for available mode, red for unavailable mode */
+.calendar-card :deep(.fc .class-synced-event) {
+  opacity: 0.95;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+/* Selection highlight and mirror — teal for available mode, red for unavailable mode */
 .mode-available :deep(.fc .fc-highlight) {
   background-color: rgba(13, 148, 136, 0.15);
 }

@@ -28,5 +28,9 @@ export default {
   remove(id) {
     return apiClient.delete(`/availabilities/${id}`);
   },
+
+  syncClassSchedule(payload = {}) {
+    return apiClient.post('/student/availability/sync-class-schedule', payload);
+  },
 };
 

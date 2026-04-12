@@ -872,10 +872,8 @@ const getDepartmentHoursForDate = (dateValue) => {
 const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }) => {
   const dayHours = getDepartmentHoursForDate(shift_date)
   if (!dayHours || !dayHours.open_time || !dayHours.close_time) {
-    return {
-      valid: false,
-      message: 'Department hours are not configured for this day. Update Department Settings before creating a shift.'
-    }
+    // Relaxed mode: allow shift operations when department hours are not configured.
+    return { valid: true, message: '' }
   }
 
   const shiftStart = toMinutes(start_time)

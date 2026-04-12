@@ -502,6 +502,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import departmentServices from '../services/departmentServices.js'
 import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 import { TZ, localDateStr } from '../utils/tz.js'
@@ -526,6 +527,8 @@ const filters = ref({
   position_id: null,
   shift_date: null
 })
+const calendarHours = ref({ slotMinTime: '05:00:00', slotMaxTime: '24:00:00' })
+const departmentHoursByDay = ref({})
 
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
@@ -703,8 +706,8 @@ const calendarOptions = computed(() => ({
   headerToolbar: false,
   allDaySlot: false,
   events: calendarEvents.value,
-  slotMinTime: '05:00:00',
-  slotMaxTime: '24:00:00',
+  slotMinTime: calendarHours.value.slotMinTime,
+  slotMaxTime: calendarHours.value.slotMaxTime,
   slotDuration: '00:15:00',
   slotLabelInterval: '01:00:00',
   snapDuration: '00:15:00',
@@ -843,6 +846,59 @@ const normalizeUserId = (value) => {
   if (value === null || value === undefined || value === '') return null
   const numeric = Number(value)
   return Number.isNaN(numeric) ? null : numeric
+}
+
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time)
+  if (!valid.length) return { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort()
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort()
+  return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] }
+}
+
+const getDayOfWeekFromDate = (dateValue) => {
+  if (!dateValue) return null
+  const date = new Date(`${dateValue}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date.getDay()
+}
+
+const getDepartmentHoursForDate = (dateValue) => {
+  const day = getDayOfWeekFromDate(dateValue)
+  if (day == null) return null
+  return departmentHoursByDay.value[day] || null
+}
+
+const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }) => {
+  const dayHours = getDepartmentHoursForDate(shift_date)
+  if (!dayHours || !dayHours.open_time || !dayHours.close_time) {
+    return {
+      valid: false,
+      message: 'Department hours are not configured for this day. Update Department Settings before creating a shift.'
+    }
+  }
+
+  const shiftStart = toMinutes(start_time)
+  const shiftEnd = toMinutes(end_time)
+  const openMins = toMinutes(dayHours.open_time)
+  const closeMins = toMinutes(dayHours.close_time)
+
+  if ([shiftStart, shiftEnd, openMins, closeMins].some((mins) => mins == null)) {
+    return {
+      valid: false,
+      message: 'Unable to validate shift hours. Please confirm start/end times and department hours.'
+    }
+  }
+
+  if (shiftStart < openMins || shiftEnd > closeMins) {
+    const format = (timeValue) => formatTimeDisplay(String(timeValue).slice(0, 5))
+    return {
+      valid: false,
+      message: `Shift must be within department hours (${format(dayHours.open_time)} - ${format(dayHours.close_time)}).`
+    }
+  }
+
+  return { valid: true, message: '' }
 }
 
 const syncTimePartsFromForm = (target, timeValue) => {
@@ -1150,6 +1206,18 @@ const onShiftDrop = async (isoDate, hour) => {
   const newStartTime = `${String(Math.floor(newStartMin / 60)).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
   const newEndTime = `${String(Math.min(Math.floor(newEndMin / 60), 23)).padStart(2, '0')}:${String(newEndMin % 60).padStart(2, '0')}`
   if (shift.shift_date === isoDate && normalizeTimeInput(shift.start_time) === newStartTime) return
+
+  const validation = validateShiftWithinDepartmentHours({
+    shift_date: isoDate,
+    start_time: newStartTime,
+    end_time: newEndTime,
+  })
+  if (!validation.valid) {
+    errorMessage.value = validation.message
+    showError.value = true
+    return
+  }
+
   try {
     rescheduling.value = true
     await shiftService.updateShift(shift.shift_id, {
@@ -1206,6 +1274,28 @@ const openAddToSchedule = () => {
     return
   }
   showAssignDialog.value = true
+}
+
+const loadDepartmentCalendarHours = async () => {
+  if (!currentDeptId) {
+    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    departmentHoursByDay.value = {}
+    return
+  }
+
+  try {
+    const response = await departmentServices.getDepartmentHours(currentDeptId)
+    const rows = response?.data?.data || []
+    calendarHours.value = pickCalendarBoundsFromHours(rows)
+    departmentHoursByDay.value = rows.reduce((acc, row) => {
+      const day = Number(row?.day_of_week)
+      if (!Number.isNaN(day)) acc[day] = row
+      return acc
+    }, {})
+  } catch {
+    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    departmentHoursByDay.value = {}
+  }
 }
 
 const loadShifts = async () => {
@@ -1282,6 +1372,13 @@ const createShift = async () => {
   const { valid } = await createFormRef.value.validate()
   if (!valid) return
 
+  const validation = validateShiftWithinDepartmentHours(newShift.value)
+  if (!validation.valid) {
+    errorMessage.value = validation.message
+    showError.value = true
+    return
+  }
+
   try {
     creating.value = true
 
@@ -1340,6 +1437,13 @@ const createShift = async () => {
 
 const saveShiftEdits = async () => {
   if (isEditSaveDisabled.value) return
+
+  const validation = validateShiftWithinDepartmentHours(editShift.value)
+  if (!validation.valid) {
+    errorMessage.value = validation.message
+    showError.value = true
+    return
+  }
 
   try {
     editing.value = true
@@ -1456,6 +1560,7 @@ onMounted(async () => {
   }
 
   await Promise.all([
+    loadDepartmentCalendarHours(),
     loadShifts(),
     loadPositions(),
     loadDepartmentWorkers()

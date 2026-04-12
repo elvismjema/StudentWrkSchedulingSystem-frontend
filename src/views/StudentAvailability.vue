@@ -55,6 +55,31 @@
       </span>
     </div>
 
+    <v-alert
+      :type="statusTone"
+      variant="tonal"
+      border="start"
+      density="comfortable"
+      class="mb-4"
+    >
+      <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 8px">
+        <div>
+          <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
+          <div class="text-caption text-medium-emphasis">
+            Last synced: {{ formatDateTime(syncStatus.lastSyncedAt) }}
+            <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
+          </div>
+        </div>
+        <v-progress-circular
+          v-if="loadingSyncStatus"
+          indeterminate
+          size="18"
+          width="2"
+          :color="statusTone === 'error' ? 'error' : 'primary'"
+        />
+      </div>
+    </v-alert>
+
     <!-- Loading Indicator -->
     <v-progress-linear v-if="loading" indeterminate :color="UI_COLORS.brand" class="mb-4" />
 
@@ -277,6 +302,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
+import departmentServices from "../services/departmentServices.js";
+import studentService from "../services/studentService.js";
 
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
@@ -296,6 +323,13 @@ const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
 const syncingClassSchedule = ref(false);
+const loadingSyncStatus = ref(false);
+const syncStatus = ref({
+  status: "never_synced",
+  lastSyncedAt: null,
+  error: null,
+});
+const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
 const gridMode = ref("available");
 
 // blocks: array of { tempId, dayOfWeek, startTime (HH:mm), endTime (HH:mm), availabilityType }
@@ -386,6 +420,55 @@ const formatDate = (value) => {
   });
 };
 
+const formatDateTime = (value) => {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Never";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const statusTone = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "success";
+  if (status === "failed") return "error";
+  return "warning";
+});
+
+const statusLabel = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "Synced";
+  if (status === "failed") return "Sync Failed";
+  return "Not Synced Yet";
+});
+
+const hasClassConflict = (candidate) => {
+  if (!candidate) return false;
+  const type = String(candidate.availabilityType || "available").toLowerCase();
+  if (!["available", "preferred"].includes(type)) return false;
+  return blocks.value
+    .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(candidate.dayOfWeek))
+    .some((cls) =>
+      candidate.startTime < cls.endTime && candidate.endTime > cls.startTime
+    );
+};
+
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time);
+  if (!valid.length) return { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort();
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort();
+  return {
+    slotMinTime: mins[0],
+    slotMaxTime: maxs[maxs.length - 1],
+  };
+};
+
 // --- Computed ---
 const manualBlocks = computed(() => blocks.value.filter((b) => !isClassScheduleBlock(b)));
 const hasChanges = computed(() => blocksFingerprint(manualBlocks.value) !== initialFingerprint.value);
@@ -448,6 +531,10 @@ const confirmCreate = () => {
     notify("End time must be after start time.", "error");
     return;
   }
+  if (hasClassConflict({ dayOfWeek, startTime, endTime, availabilityType })) {
+    notify("This block overlaps locked class time. Choose a different time.", "error");
+    return;
+  }
   blocks.value = [
     ...blocks.value,
     { tempId: `blk-${++tempIdCounter}`, dayOfWeek, startTime, endTime, availabilityType },
@@ -475,7 +562,16 @@ const confirmEdit = () => {
   const idx = blocks.value.findIndex((b) => b.tempId === tempId);
   if (idx !== -1) {
     const updated = [...blocks.value];
-    updated[idx] = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    const candidate = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    const withoutCurrent = updated.filter((b) => b.tempId !== tempId);
+    const classConflict = withoutCurrent
+      .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(dayOfWeek))
+      .some((cls) => startTime < cls.endTime && endTime > cls.startTime && ["available", "preferred"].includes(String(availabilityType || "available")));
+    if (classConflict) {
+      notify("This update overlaps locked class time. Choose a different time.", "error");
+      return;
+    }
+    updated[idx] = candidate;
     blocks.value = updated;
   }
   showEditDialog.value = false;
@@ -534,8 +630,8 @@ const calendarOptions = computed(() => ({
   firstDay: 1,
   dayHeaderFormat: { weekday: "short" },
   validRange: { start: "2024-01-01", end: "2024-01-08" },
-  slotMinTime: "05:00:00",
-  slotMaxTime: "24:00:00",
+  slotMinTime: calendarHours.value.slotMinTime,
+  slotMaxTime: calendarHours.value.slotMaxTime,
   slotDuration: "00:15:00",
   slotLabelInterval: "01:00:00",
   snapDuration: "00:15:00",
@@ -560,6 +656,55 @@ const clearAll = () => {
 };
 
 // --- API ---
+const loadClassSyncStatus = async () => {
+  loadingSyncStatus.value = true;
+  try {
+    const response = await availabilityService.getClassSyncStatus();
+    const data = response?.data?.data || {};
+    syncStatus.value = {
+      status: data.status || "never_synced",
+      lastSyncedAt: data.lastSyncedAt || null,
+      error: data.error || null,
+    };
+  } catch {
+    syncStatus.value = {
+      status: "never_synced",
+      lastSyncedAt: null,
+      error: null,
+    };
+  } finally {
+    loadingSyncStatus.value = false;
+  }
+};
+
+const loadDepartmentCalendarHours = async () => {
+  const deptContext = Utils.getStore("currentDepartmentContext") || {};
+  let departmentId = Number(deptContext.department_id || 0);
+  if (!departmentId) {
+    try {
+      const membershipsRes = await studentService.getUserDepartments();
+      const memberships = membershipsRes?.data?.data || membershipsRes?.data || [];
+      const activeMembership = memberships.find((m) => m.is_active || String(m.request_status || "").toLowerCase() === "approved");
+      departmentId = Number(activeMembership?.department_id || activeMembership?.department?.department_id || 0);
+    } catch {
+      departmentId = 0;
+    }
+  }
+
+  if (!departmentId) {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+    return;
+  }
+
+  try {
+    const response = await departmentServices.getDepartmentHours(departmentId);
+    const rows = response?.data?.data || [];
+    calendarHours.value = pickCalendarBoundsFromHours(rows);
+  } catch {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  }
+};
+
 const loadAvailabilities = async () => {
   if (!userId) return;
   loading.value = true;
@@ -593,6 +738,13 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
+    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
+    const hasConflict = manualOnlyBlocks.some((block) => hasClassConflict(block));
+    if (hasConflict) {
+      notify("One or more manual availability blocks overlap locked class time.", "error");
+      return;
+    }
+
     // Delete only manual recurring records (preserve class-synced recurring records)
     const recurringManualRecords = existingRecords.value.filter(
       (r) => (r.isRecurring || !r.specificDate) && !isClassScheduleRecord(r)
@@ -602,7 +754,6 @@ const saveChanges = async () => {
     }
 
     // Re-create only manual blocks sequentially to avoid race conditions
-    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
     for (const block of manualOnlyBlocks) {
       await availabilityService.create({
         userId,
@@ -666,17 +817,25 @@ const syncClassSchedule = async () => {
       "success"
     );
     await loadAvailabilities();
+    await loadClassSyncStatus();
   } catch (error) {
     notify(
       error?.response?.data?.message || "Failed to sync class schedule.",
       "error"
     );
+    await loadClassSyncStatus();
   } finally {
     syncingClassSchedule.value = false;
   }
 };
 
-onMounted(loadAvailabilities);
+onMounted(async () => {
+  await Promise.all([
+    loadDepartmentCalendarHours(),
+    loadAvailabilities(),
+    loadClassSyncStatus(),
+  ]);
+});
 </script>
 
 <style scoped>

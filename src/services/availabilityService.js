@@ -32,5 +32,9 @@ export default {
   syncClassSchedule(payload = {}) {
     return apiClient.post('/student/availability/sync-class-schedule', payload);
   },
+
+  getClassSyncStatus() {
+    return apiClient.get('/student/availability/class-sync-status');
+  },
 };
 

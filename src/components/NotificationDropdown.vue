@@ -112,7 +112,7 @@
           class="view-all-btn"
           @click="handleViewAll"
         >
-          View All Notifications
+          View all notifications
         </v-btn>
       </div>
     </v-card>
@@ -124,10 +124,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
 import Utils from '../config/utils'
+import { resolveNotificationLink, isExternalNotificationLink } from '../utils/notificationLinks'
 
 const emit = defineEmits(['notification-click'])
 const router = useRouter()
 const currentUser = Utils.getStore("user") || {}
+const currentRole = String(currentUser.role || '').toLowerCase()
 
 const isOpen = ref(false)
 const notifications = ref([])
@@ -155,6 +157,20 @@ const handleNotificationClick = async (notification) => {
       console.error('Error marking notification as read:', error)
     }
   }
+
+  const targetLink = resolveNotificationLink(notification, currentRole)
+  if (targetLink) {
+    try {
+      if (isExternalNotificationLink(targetLink)) {
+        window.location.href = targetLink
+      } else {
+        await router.push(targetLink)
+      }
+    } catch {
+      window.location.href = Utils.resolveAppUrl(targetLink)
+    }
+  }
+
   emit('notification-click', notification)
   isOpen.value = false
 }
@@ -244,7 +260,7 @@ onUnmounted(() => {
 .header-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .header-actions {
@@ -276,7 +292,7 @@ onUnmounted(() => {
   font-size: 13px;
   color: #666;
   background: #f5f5f5;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 12px;
 }
 
@@ -288,7 +304,7 @@ onUnmounted(() => {
 .notification-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;

@@ -10,7 +10,7 @@
 
     <!-- Mode Toggle + Action Buttons -->
     <div class="action-buttons">
-      <v-btn-toggle v-model="gridMode" mandatory color="#0D9488" rounded="lg" density="comfortable">
+      <v-btn-toggle v-model="gridMode" mandatory :color="UI_COLORS.available" rounded="lg" density="comfortable">
         <v-btn value="available" prepend-icon="mdi-calendar-check">
           Mark Available
         </v-btn>
@@ -20,7 +20,7 @@
       </v-btn-toggle>
       <v-spacer />
       <v-btn
-        color="#0D9488"
+        :color="UI_COLORS.available"
         variant="flat"
         :loading="saving"
         :disabled="!hasChanges"
@@ -55,8 +55,33 @@
       </span>
     </div>
 
+    <v-alert
+      :type="statusTone"
+      variant="tonal"
+      border="start"
+      density="comfortable"
+      class="mb-4"
+    >
+      <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 8px">
+        <div>
+          <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
+          <div class="text-caption text-medium-emphasis">
+            Last synced: {{ formatDateTime(syncStatus.lastSyncedAt) }}
+            <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
+          </div>
+        </div>
+        <v-progress-circular
+          v-if="loadingSyncStatus"
+          indeterminate
+          size="18"
+          width="2"
+          :color="statusTone === 'error' ? 'error' : 'primary'"
+        />
+      </div>
+    </v-alert>
+
     <!-- Loading Indicator -->
-    <v-progress-linear v-if="loading" indeterminate color="#8B1538" class="mb-4" />
+    <v-progress-linear v-if="loading" indeterminate :color="UI_COLORS.brand" class="mb-4" />
 
     <!-- FullCalendar weekly availability grid -->
     <div :class="['calendar-card', gridMode === 'unavailable' ? 'mode-unavailable' : 'mode-available']">
@@ -79,7 +104,7 @@
             rounded="lg"
             class="mb-4"
           >
-            <v-btn value="available" :color="createForm.availabilityType === 'available' ? '#0D9488' : undefined">
+            <v-btn value="available" :color="createForm.availabilityType === 'available' ? UI_COLORS.available : undefined">
               <v-icon start>mdi-calendar-check</v-icon>
               Available
             </v-btn>
@@ -112,7 +137,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showCreateDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" @click="confirmCreate">Add</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmCreate">Add</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -132,7 +157,7 @@
             rounded="lg"
             class="mb-4"
           >
-            <v-btn value="available" :color="editForm.availabilityType === 'available' ? '#0D9488' : undefined">
+            <v-btn value="available" :color="editForm.availabilityType === 'available' ? UI_COLORS.available : undefined">
               <v-icon start>mdi-calendar-check</v-icon>
               Available
             </v-btn>
@@ -169,7 +194,7 @@
           </v-btn>
           <v-spacer />
           <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" @click="confirmEdit">Save</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmEdit">Save</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -258,7 +283,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showExceptionDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -277,9 +302,18 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
+import departmentServices from "../services/departmentServices.js";
+import studentService from "../services/studentService.js";
 
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
+
+const UI_COLORS = Object.freeze({
+  available: "#0D9488",
+  unavailable: "#DC2626",
+  classSchedule: "#9A3412",
+  brand: "#8B1538",
+});
 
 // --- FullCalendar ref ---
 const calendarRef = ref(null);
@@ -289,6 +323,13 @@ const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
 const syncingClassSchedule = ref(false);
+const loadingSyncStatus = ref(false);
+const syncStatus = ref({
+  status: "never_synced",
+  lastSyncedAt: null,
+  error: null,
+});
+const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
 const gridMode = ref("available");
 
 // blocks: array of { tempId, dayOfWeek, startTime (HH:mm), endTime (HH:mm), availabilityType }
@@ -346,10 +387,12 @@ const notify = (text, color = "success") => { snackbar.value = { show: true, tex
 const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
 
 const isClassScheduleRecord = (record) =>
-  record?.recurrencePattern === "class_schedule";
+  record?.sourceType === "class_schedule"
+  || record?.recurrencePattern === "class_schedule"
+  || Boolean(record?.isSystemManaged);
 
 const isClassScheduleBlock = (block) =>
-  block?.sourceType === "class_schedule";
+  block?.sourceType === "class_schedule" || Boolean(block?.isSystemManaged);
 
 const blocksFingerprint = (bs) =>
   JSON.stringify(
@@ -377,6 +420,55 @@ const formatDate = (value) => {
   });
 };
 
+const formatDateTime = (value) => {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Never";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const statusTone = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "success";
+  if (status === "failed") return "error";
+  return "warning";
+});
+
+const statusLabel = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "Synced";
+  if (status === "failed") return "Sync Failed";
+  return "Not Synced Yet";
+});
+
+const hasClassConflict = (candidate) => {
+  if (!candidate) return false;
+  const type = String(candidate.availabilityType || "available").toLowerCase();
+  if (!["available", "preferred"].includes(type)) return false;
+  return blocks.value
+    .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(candidate.dayOfWeek))
+    .some((cls) =>
+      candidate.startTime < cls.endTime && candidate.endTime > cls.startTime
+    );
+};
+
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time);
+  if (!valid.length) return { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort();
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort();
+  return {
+    slotMinTime: mins[0],
+    slotMaxTime: maxs[maxs.length - 1],
+  };
+};
+
 // --- Computed ---
 const manualBlocks = computed(() => blocks.value.filter((b) => !isClassScheduleBlock(b)));
 const hasChanges = computed(() => blocksFingerprint(manualBlocks.value) !== initialFingerprint.value);
@@ -398,15 +490,15 @@ const calendarEvents = computed(() =>
       start: `${DOW_TO_DATE[b.dayOfWeek]}T${b.startTime}`,
       end: `${DOW_TO_DATE[b.dayOfWeek]}T${b.endTime}`,
       backgroundColor: isClassBlock
-        ? "#9A3412"
+        ? UI_COLORS.classSchedule
         : b.availabilityType === "available"
-          ? "#0D9488"
-          : "#DC2626",
+          ? UI_COLORS.available
+          : UI_COLORS.unavailable,
       borderColor: isClassBlock
-        ? "#9A3412"
+        ? UI_COLORS.classSchedule
         : b.availabilityType === "available"
-          ? "#0D9488"
-          : "#DC2626",
+          ? UI_COLORS.available
+          : UI_COLORS.unavailable,
       classNames: isClassBlock ? ["class-synced-event"] : [],
       editable: !isClassBlock,
       startEditable: !isClassBlock,
@@ -439,6 +531,10 @@ const confirmCreate = () => {
     notify("End time must be after start time.", "error");
     return;
   }
+  if (hasClassConflict({ dayOfWeek, startTime, endTime, availabilityType })) {
+    notify("This block overlaps locked class time. Choose a different time.", "error");
+    return;
+  }
   blocks.value = [
     ...blocks.value,
     { tempId: `blk-${++tempIdCounter}`, dayOfWeek, startTime, endTime, availabilityType },
@@ -466,7 +562,16 @@ const confirmEdit = () => {
   const idx = blocks.value.findIndex((b) => b.tempId === tempId);
   if (idx !== -1) {
     const updated = [...blocks.value];
-    updated[idx] = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    const candidate = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    const withoutCurrent = updated.filter((b) => b.tempId !== tempId);
+    const classConflict = withoutCurrent
+      .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(dayOfWeek))
+      .some((cls) => startTime < cls.endTime && endTime > cls.startTime && ["available", "preferred"].includes(String(availabilityType || "available")));
+    if (classConflict) {
+      notify("This update overlaps locked class time. Choose a different time.", "error");
+      return;
+    }
+    updated[idx] = candidate;
     blocks.value = updated;
   }
   showEditDialog.value = false;
@@ -525,8 +630,8 @@ const calendarOptions = computed(() => ({
   firstDay: 1,
   dayHeaderFormat: { weekday: "short" },
   validRange: { start: "2024-01-01", end: "2024-01-08" },
-  slotMinTime: "05:00:00",
-  slotMaxTime: "24:00:00",
+  slotMinTime: calendarHours.value.slotMinTime,
+  slotMaxTime: calendarHours.value.slotMaxTime,
   slotDuration: "00:15:00",
   slotLabelInterval: "01:00:00",
   snapDuration: "00:15:00",
@@ -551,6 +656,55 @@ const clearAll = () => {
 };
 
 // --- API ---
+const loadClassSyncStatus = async () => {
+  loadingSyncStatus.value = true;
+  try {
+    const response = await availabilityService.getClassSyncStatus();
+    const data = response?.data?.data || {};
+    syncStatus.value = {
+      status: data.status || "never_synced",
+      lastSyncedAt: data.lastSyncedAt || null,
+      error: data.error || null,
+    };
+  } catch {
+    syncStatus.value = {
+      status: "never_synced",
+      lastSyncedAt: null,
+      error: null,
+    };
+  } finally {
+    loadingSyncStatus.value = false;
+  }
+};
+
+const loadDepartmentCalendarHours = async () => {
+  const deptContext = Utils.getStore("currentDepartmentContext") || {};
+  let departmentId = Number(deptContext.department_id || 0);
+  if (!departmentId) {
+    try {
+      const membershipsRes = await studentService.getUserDepartments();
+      const memberships = membershipsRes?.data?.data || membershipsRes?.data || [];
+      const activeMembership = memberships.find((m) => m.is_active || String(m.request_status || "").toLowerCase() === "approved");
+      departmentId = Number(activeMembership?.department_id || activeMembership?.department?.department_id || 0);
+    } catch {
+      departmentId = 0;
+    }
+  }
+
+  if (!departmentId) {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+    return;
+  }
+
+  try {
+    const response = await departmentServices.getDepartmentHours(departmentId);
+    const rows = response?.data?.data || [];
+    calendarHours.value = pickCalendarBoundsFromHours(rows);
+  } catch {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  }
+};
+
 const loadAvailabilities = async () => {
   if (!userId) return;
   loading.value = true;
@@ -567,7 +721,9 @@ const loadAvailabilities = async () => {
         startTime: normalizeToHHMM(r.startTime),
         endTime: normalizeToHHMM(r.endTime),
         availabilityType: r.availabilityType || "available",
-        sourceType: isClassScheduleRecord(r) ? "class_schedule" : "manual",
+        sourceType: isClassScheduleRecord(r) ? "class_schedule" : (r.sourceType || "manual"),
+        sourceRef: r.sourceRef || null,
+        isSystemManaged: Boolean(r.isSystemManaged || isClassScheduleRecord(r)),
       }));
     blocks.value = loadedBlocks;
     initialFingerprint.value = blocksFingerprint(loadedBlocks.filter((b) => !isClassScheduleBlock(b)));
@@ -582,6 +738,13 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
+    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
+    const hasConflict = manualOnlyBlocks.some((block) => hasClassConflict(block));
+    if (hasConflict) {
+      notify("One or more manual availability blocks overlap locked class time.", "error");
+      return;
+    }
+
     // Delete only manual recurring records (preserve class-synced recurring records)
     const recurringManualRecords = existingRecords.value.filter(
       (r) => (r.isRecurring || !r.specificDate) && !isClassScheduleRecord(r)
@@ -591,7 +754,6 @@ const saveChanges = async () => {
     }
 
     // Re-create only manual blocks sequentially to avoid race conditions
-    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
     for (const block of manualOnlyBlocks) {
       await availabilityService.create({
         userId,
@@ -651,30 +813,53 @@ const syncClassSchedule = async () => {
     const response = await availabilityService.syncClassSchedule();
     const data = response?.data?.data || {};
     notify(
-      `Class schedule synced. Added ${data.created || 0}, removed ${data.deleted || 0}.`,
+      `Class schedule synced. Added ${data.created || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
       "success"
     );
     await loadAvailabilities();
+    await loadClassSyncStatus();
   } catch (error) {
     notify(
       error?.response?.data?.message || "Failed to sync class schedule.",
       "error"
     );
+    await loadClassSyncStatus();
   } finally {
     syncingClassSchedule.value = false;
   }
 };
 
-onMounted(loadAvailabilities);
+onMounted(async () => {
+  await Promise.all([
+    loadDepartmentCalendarHours(),
+    loadAvailabilities(),
+    loadClassSyncStatus(),
+  ]);
+});
 </script>
 
 <style scoped>
 .availability-container {
-  padding: 24px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --color-text-primary: #333;
+  --color-text-secondary: #666;
+  --color-text-muted: #555;
+  --color-surface: #fff;
+  --color-border-subtle: #e0e0e0;
+  --color-available: #0D9488;
+  --color-unavailable: #DC2626;
+  --color-class: #9A3412;
+  padding: var(--space-6);
 }
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   animation: slideIn 0.3s ease;
 }
 
@@ -692,28 +877,28 @@ onMounted(loadAvailabilities);
 .page-title {
   font-size: 24px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: #666;
-  margin-top: 4px;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
 }
 
 .action-buttons {
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .legend-row {
   display: flex;
-  gap: 20px;
-  margin-bottom: 16px;
+  gap: calc(var(--space-4) + var(--space-1));
+  margin-bottom: var(--space-4);
 }
 
 .legend-item {
@@ -721,7 +906,7 @@ onMounted(loadAvailabilities);
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #555;
+  color: var(--color-text-muted);
 }
 
 .legend-dot {
@@ -732,24 +917,24 @@ onMounted(loadAvailabilities);
 }
 
 .available-dot {
-  background-color: #0D9488;
+  background-color: var(--color-available);
 }
 
 .unavailable-dot {
-  background-color: #DC2626;
+  background-color: var(--color-unavailable);
 }
 
 .class-dot {
-  background-color: #9A3412;
+  background-color: var(--color-class);
 }
 
 /* Calendar card */
 .calendar-card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  padding: 8px 10px 12px;
-  margin-bottom: 32px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  padding: var(--space-2) 10px var(--space-3);
+  margin-bottom: calc(var(--space-6) + var(--space-2));
   overflow: visible;
 }
 
@@ -784,7 +969,7 @@ onMounted(loadAvailabilities);
 
 .mode-available :deep(.fc .fc-event.fc-mirror) {
   background-color: rgba(13, 148, 136, 0.75);
-  border-color: #0D9488;
+  border-color: var(--color-available);
 }
 
 .mode-unavailable :deep(.fc .fc-highlight) {
@@ -793,35 +978,35 @@ onMounted(loadAvailabilities);
 
 .mode-unavailable :deep(.fc .fc-event.fc-mirror) {
   background-color: rgba(220, 38, 38, 0.7);
-  border-color: #DC2626;
+  border-color: var(--color-unavailable);
 }
 
 /* Exceptions Section */
 .exceptions-section {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  padding: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  padding: var(--space-6);
 }
 
 .exceptions-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 6px 0;
 }
 
 .exceptions-subtitle {
   font-size: 13px;
-  color: #666;
-  margin: 0 0 12px 0;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3) 0;
 }
 
 .exceptions-list {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .exception-card {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 </style>

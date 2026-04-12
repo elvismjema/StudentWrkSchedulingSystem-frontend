@@ -160,6 +160,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+import departmentServices from "../services/departmentServices.js";
 import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
 import { TZ } from "../utils/tz.js";
 import SwapDialog from "../components/student/SwapDialog.vue";
@@ -176,6 +177,7 @@ const openShifts = ref([]);
 const pendingAcks = ref([]);
 const coworkers = ref([]);
 const weekRangeLabel = ref("");
+const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
 
 // Swap dialog
 const swapDialogOpen = ref(false);
@@ -290,8 +292,8 @@ const calendarOptions = computed(() => ({
   headerToolbar: false,
   allDaySlot: false,
   events: calendarEvents.value,
-  slotMinTime: "05:00:00",
-  slotMaxTime: "24:00:00",
+  slotMinTime: calendarHours.value.slotMinTime,
+  slotMaxTime: calendarHours.value.slotMaxTime,
   slotDuration: "00:30:00",
   slotLabelInterval: "01:00:00",
   scrollTime: "07:00:00",
@@ -436,6 +438,30 @@ function normalizeOpenShiftPayload(payload) {
   return [];
 }
 
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time);
+  if (!valid.length) return { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort();
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort();
+  return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] };
+};
+
+const loadDepartmentCalendarHours = async (departmentIds = []) => {
+  const uniq = [...new Set((departmentIds || []).map((id) => Number(id)).filter(Boolean))];
+  if (!uniq.length) {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+    return;
+  }
+
+  try {
+    const responses = await Promise.all(uniq.map((deptId) => departmentServices.getDepartmentHours(deptId)));
+    const allRows = responses.flatMap((res) => res?.data?.data || []);
+    calendarHours.value = pickCalendarBoundsFromHours(allRows);
+  } catch {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  }
+};
+
 async function loadShifts() {
   loading.value = true;
   error.value = null;
@@ -470,6 +496,12 @@ async function loadShifts() {
         openRes.value?.data?.data || openRes.value?.data
       );
     }
+
+    const departmentIds = [
+      ...allShifts.value.map((s) => s.department_id || s.department?.department_id || s.department?.id),
+      ...openShifts.value.map((s) => s.department_id || s.department?.department_id || s.department?.id),
+    ];
+    await loadDepartmentCalendarHours(departmentIds);
   } catch (err) {
     error.value = "Failed to load schedule. Please try again.";
     console.error("Schedule load failed:", err);

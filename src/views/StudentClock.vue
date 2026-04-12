@@ -450,10 +450,34 @@ const weeklyEarnings = computed(() =>
   (parseFloat(weeklyTotal.value) * (hourlyRate.value || 0)).toFixed(2)
 );
 
+const combineDateAndTime = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return null;
+  return `${String(dateStr).slice(0, 10)}T${String(timeStr).slice(0, 8)}`;
+};
+
 const normalizeTimesheetEntries = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === 'object' && Array.isArray(payload.entries)) return payload.entries;
-  return [];
+  const rawEntries = Array.isArray(payload)
+    ? payload
+    : (payload && typeof payload === 'object' && Array.isArray(payload.entries) ? payload.entries : []);
+
+  return rawEntries.map((entry) => {
+    const date = entry.date || entry.shift_date || null;
+    const scheduledStart = entry.scheduledStart || entry.scheduled_start || entry.scheduled_start_time || null;
+    const scheduledEnd = entry.scheduledEnd || entry.scheduled_end || entry.scheduled_end_time || null;
+    const workedMinutes = Number(entry.netMinutes ?? entry.net_minutes ?? entry.workedMinutes ?? entry.worked_minutes ?? 0);
+    const breakMinutes = Number(entry.breakMinutes ?? entry.break_minutes ?? 0);
+
+    return {
+      ...entry,
+      date,
+      scheduled_start: combineDateAndTime(date, scheduledStart),
+      scheduled_end: combineDateAndTime(date, scheduledEnd),
+      actual_start: entry.clockIn || entry.clock_in || entry.actual_start || null,
+      actual_end: entry.clockOut || entry.clock_out || entry.actual_end || null,
+      break_minutes: Number.isFinite(breakMinutes) ? breakMinutes : 0,
+      total_hours: Number.isFinite(workedMinutes) ? (workedMinutes / 60) : 0,
+    };
+  });
 };
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -529,8 +553,9 @@ const fetchActiveShift = async () => {
         end_date: toDateStr(nextWeek),
         is_published: true,
       });
-      const futureShifts = (futureRes?.data?.data || futureRes?.data || [])
-        .filter(Array.isArray([]) ? () => true : s => s)
+      const futureRaw = futureRes?.data?.data || futureRes?.data || [];
+      const futureShifts = (Array.isArray(futureRaw) ? futureRaw : [])
+        .filter(Boolean)
         .sort((a, b) =>
           new Date(buildDT(a, 'start_time') || a.start_time).getTime() -
           new Date(buildDT(b, 'start_time') || b.start_time).getTime()
@@ -626,8 +651,8 @@ const doStartBreak = async () => {
   breakLoading.value = true;
   try {
     await studentService.startBreak(currentRecordId.value);
-    onBreak.value = true;
     startBreakDialog.value = false;
+    await fetchClockStatus();
     showSnackbar('Break started.', 'info');
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to start break.', 'error');
@@ -640,8 +665,8 @@ const doEndBreak = async () => {
   breakLoading.value = true;
   try {
     await studentService.endBreak(currentRecordId.value);
-    onBreak.value = false;
     endBreakDialog.value = false;
+    await fetchClockStatus();
     showSnackbar('Break ended.', 'success');
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to end break.', 'error');

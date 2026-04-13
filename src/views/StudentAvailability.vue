@@ -62,6 +62,9 @@
           <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
           <div class="text-caption text-medium-emphasis">
             Last synced: {{ formatDateTime(syncStatus.lastSyncedAt) }}
+            · Term: {{ syncStatus.termCode || 'N/A' }}
+            · Class blocks: {{ syncStatus.totalClassBlocks ?? 0 }}
+            · Updated this sync: {{ syncStatus.updated ?? 0 }}
             <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
           </div>
         </div>
@@ -334,6 +337,9 @@ const loadingSyncStatus = ref(false);
 const syncStatus = ref({
   status: "never_synced",
   lastSyncedAt: null,
+  termCode: null,
+  totalClassBlocks: 0,
+  updated: 0,
   error: null,
 });
 const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
@@ -671,6 +677,9 @@ const loadClassSyncStatus = async () => {
     const normalized = {
       status: data.status || "never_synced",
       lastSyncedAt: data.lastSyncedAt || null,
+      termCode: data.termCode || null,
+      totalClassBlocks: Number(data.totalClassBlocks || 0),
+      updated: Number(data.updated || 0),
       error: data.error || null,
     };
 
@@ -691,6 +700,9 @@ const loadClassSyncStatus = async () => {
     syncStatus.value = {
       status: "never_synced",
       lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
       error: syncStatus.value.error || null,
     };
   } finally {
@@ -836,13 +848,16 @@ const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } 
 
     syncStatus.value = {
       status: "success",
-      lastSyncedAt: new Date().toISOString(),
+      lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
+      termCode: data.termCode || syncStatus.value.termCode || null,
+      totalClassBlocks: Number((data.created || 0) + (data.updated || 0) + (data.unchanged || 0)),
+      updated: Number(data.updated || 0),
       error: null,
     };
 
     if (!silent) {
       notify(
-        `Class schedule synced. Added ${data.created || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
+        `Class schedule synced. Added ${data.created || 0}, updated ${data.updated || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
         "success"
       );
     }
@@ -855,6 +870,9 @@ const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } 
     syncStatus.value = {
       status: "failed",
       lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
       error: message,
     };
 

@@ -29,14 +29,9 @@
         Save Changes
       </v-btn>
       <v-btn variant="outlined" @click="clearAll">Clear Manual Blocks</v-btn>
-      <v-btn
-        variant="tonal"
-        color="primary"
-        :loading="syncingClassSchedule"
-        @click="syncClassSchedule"
-      >
-        Sync Class Schedule
-      </v-btn>
+      <v-chip size="small" variant="tonal" color="primary">
+        Class schedule auto-sync: ON
+      </v-chip>
     </div>
 
     <!-- Legend -->
@@ -67,16 +62,31 @@
           <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
           <div class="text-caption text-medium-emphasis">
             Last synced: {{ formatDateTime(syncStatus.lastSyncedAt) }}
+            · Term: {{ syncStatus.termCode || 'N/A' }}
+            · Class blocks: {{ syncStatus.totalClassBlocks ?? 0 }}
+            · Updated this sync: {{ syncStatus.updated ?? 0 }}
             <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
           </div>
         </div>
-        <v-progress-circular
-          v-if="loadingSyncStatus"
-          indeterminate
-          size="18"
-          width="2"
-          :color="statusTone === 'error' ? 'error' : 'primary'"
-        />
+        <div class="d-flex align-center" style="gap: 8px">
+          <v-btn
+            size="x-small"
+            variant="text"
+            color="primary"
+            :loading="syncingClassSchedule"
+            :disabled="loadingSyncStatus"
+            @click="syncClassSchedule()"
+          >
+            Re-sync now
+          </v-btn>
+          <v-progress-circular
+            v-if="loadingSyncStatus"
+            indeterminate
+            size="18"
+            width="2"
+            :color="statusTone === 'error' ? 'error' : 'primary'"
+          />
+        </div>
       </div>
     </v-alert>
 
@@ -327,6 +337,9 @@ const loadingSyncStatus = ref(false);
 const syncStatus = ref({
   status: "never_synced",
   lastSyncedAt: null,
+  termCode: null,
+  totalClassBlocks: 0,
+  updated: 0,
   error: null,
 });
 const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
@@ -661,16 +674,36 @@ const loadClassSyncStatus = async () => {
   try {
     const response = await availabilityService.getClassSyncStatus();
     const data = response?.data?.data || {};
-    syncStatus.value = {
+    const normalized = {
       status: data.status || "never_synced",
       lastSyncedAt: data.lastSyncedAt || null,
+      termCode: data.termCode || null,
+      totalClassBlocks: Number(data.totalClassBlocks || 0),
+      updated: Number(data.updated || 0),
       error: data.error || null,
     };
+
+    const shouldPreserveLastSyncError =
+      syncStatus.value.status === "failed"
+      && Boolean(syncStatus.value.error)
+      && normalized.status === "never_synced"
+      && !normalized.error;
+
+    syncStatus.value = shouldPreserveLastSyncError
+      ? {
+        ...normalized,
+        status: "failed",
+        error: syncStatus.value.error,
+      }
+      : normalized;
   } catch {
     syncStatus.value = {
       status: "never_synced",
-      lastSyncedAt: null,
-      error: null,
+      lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
+      error: syncStatus.value.error || null,
     };
   } finally {
     loadingSyncStatus.value = false;
@@ -807,34 +840,62 @@ const removeException = async (exc) => {
   }
 };
 
-const syncClassSchedule = async () => {
+const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } = {}) => {
   syncingClassSchedule.value = true;
   try {
     const response = await availabilityService.syncClassSchedule();
     const data = response?.data?.data || {};
-    notify(
-      `Class schedule synced. Added ${data.created || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
-      "success"
-    );
-    await loadAvailabilities();
-    await loadClassSyncStatus();
+
+    syncStatus.value = {
+      status: "success",
+      lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
+      termCode: data.termCode || syncStatus.value.termCode || null,
+      totalClassBlocks: Number((data.created || 0) + (data.updated || 0) + (data.unchanged || 0)),
+      updated: Number(data.updated || 0),
+      error: null,
+    };
+
+    if (!silent) {
+      notify(
+        `Class schedule synced. Added ${data.created || 0}, updated ${data.updated || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
+        "success"
+      );
+    }
+
+    await Promise.all([loadAvailabilities(), loadClassSyncStatus()]);
+    return data;
   } catch (error) {
-    notify(
-      error?.response?.data?.message || "Failed to sync class schedule.",
-      "error"
-    );
-    await loadClassSyncStatus();
+    const message = error?.response?.data?.message || "Failed to sync class schedule.";
+
+    syncStatus.value = {
+      status: "failed",
+      lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
+      error: message,
+    };
+
+    if (!suppressErrorToast) {
+      notify(message, "error");
+    }
+
+    return null;
   } finally {
     syncingClassSchedule.value = false;
   }
 };
 
 onMounted(async () => {
-  await Promise.all([
-    loadDepartmentCalendarHours(),
-    loadAvailabilities(),
-    loadClassSyncStatus(),
-  ]);
+  await loadDepartmentCalendarHours();
+  const autoSyncResult = await syncClassSchedule({ silent: true, suppressErrorToast: true });
+
+  if (!autoSyncResult) {
+    await Promise.all([
+      loadAvailabilities(),
+      loadClassSyncStatus(),
+    ]);
+  }
 });
 </script>
 

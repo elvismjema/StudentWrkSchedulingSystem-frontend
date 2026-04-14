@@ -200,11 +200,7 @@ const router = createRouter({
         {
           path: "reports",
           name: "manager-reports",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Reports",
-            description: "Generate operational and staffing reports.",
-          },
+          component: () => import("./views/ManagerReports.vue"),
         },
         {
           path: "notifications",
@@ -268,19 +264,13 @@ const router = createRouter({
         {
           path: "reports",
           name: "admin-reports",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Reports",
-            description:
-              "View system-wide staffing and operations reports.",
-          },
+          component: () => import("./views/ManagerReports.vue"),
         },
 
         {
           path: "settings",
           name: "admin-settings",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: { title: "System Settings", description: "Configure system-wide settings and preferences." }
+          component: () => import("./views/AdminSystemSettings.vue"),
         }
       ]
     }

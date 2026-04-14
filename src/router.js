@@ -195,11 +195,7 @@ const router = createRouter({
         {
           path: "tasks",
           name: "manager-tasks",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Tasks",
-            description: "Assign and monitor worker tasks.",
-          },
+          component: () => import("./views/ManagerTasks.vue"),
         },
         {
           path: "reports",

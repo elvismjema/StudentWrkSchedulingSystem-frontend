@@ -1,6 +1,6 @@
 <template>
-  <div class="student-clock pa-6" role="main" aria-label="Time and Attendance">
-    <h1 class="text-h5 font-weight-bold mb-4">Time &amp; Attendance</h1>
+  <div :class="['student-clock', mobile ? 'pa-3' : 'pa-6']" role="main" aria-label="Time and Attendance">
+    <h1 :class="[mobile ? 'text-h6' : 'text-h5', 'font-weight-bold', mobile ? 'mb-3' : 'mb-4']">Time &amp; Attendance</h1>
 
     <!-- Loading -->
     <template v-if="loading">
@@ -12,16 +12,16 @@
     <template v-else>
       <!-- ── #1: Inline Clock Status (replaces ClockStatusBanner) ────────── -->
       <v-card
-        class="mb-4 pa-4 d-flex align-center"
+        :class="[mobile ? 'mb-3 pa-4' : 'mb-4 pa-4', 'd-flex', mobile ? 'flex-column align-center text-center' : 'align-center']"
         :style="{ backgroundColor: statusBg, color: statusFg }"
         elevation="0"
         rounded="lg"
       >
-        <v-icon :color="statusFg" size="22" class="mr-3">{{ statusIcon }}</v-icon>
+        <v-icon :color="statusFg" :size="mobile ? 28 : 22" :class="mobile ? 'mb-2' : 'mr-3'">{{ statusIcon }}</v-icon>
         <div class="flex-grow-1">
-          <div class="text-body-1 font-weight-semibold">{{ statusLabel }}</div>
-          <!-- #2: Live elapsed timer when clocked in -->
-          <div v-if="clockedIn" class="text-h5 font-weight-bold" style="font-variant-numeric: tabular-nums; letter-spacing: 1px;">
+          <div :class="[mobile ? 'text-body-1' : 'text-body-1', 'font-weight-semibold']">{{ statusLabel }}</div>
+          <!-- #2: Live elapsed timer when clocked in — large on mobile -->
+          <div v-if="clockedIn" :class="[mobile ? 'text-h4' : 'text-h5', 'font-weight-bold']" style="font-variant-numeric: tabular-nums; letter-spacing: 1px;">
             {{ elapsed }}
           </div>
           <!-- #2: Countdown to clock-in window when not clocked in -->
@@ -65,7 +65,7 @@
       </v-card>
 
       <!-- Clock In/Out Actions -->
-      <div class="text-center mb-6">
+      <div :class="['text-center', mobile ? 'mb-4' : 'mb-6']">
         <!-- Not clocked in -->
         <v-btn
           v-if="!clockedIn"
@@ -75,22 +75,25 @@
           rounded="pill"
           :disabled="!canClockIn"
           :loading="clockingIn"
-          class="clock-btn"
+          :class="['clock-btn', { 'clock-btn--mobile': mobile }]"
           aria-label="Clock in"
           @click="confirmClockIn"
         >
-          <v-icon start size="28">mdi-login</v-icon>
+          <v-icon start :size="mobile ? 32 : 28">mdi-login</v-icon>
           Clock In
         </v-btn>
 
         <!-- Clocked in -->
-        <div v-else class="d-flex flex-column align-center gap-3">
-          <div v-if="!onBreak" class="d-flex gap-2">
+        <div v-else :class="['d-flex', 'flex-column', 'align-center', mobile ? 'gap-3' : 'gap-3']">
+          <div v-if="!onBreak" :class="['d-flex', mobile ? 'flex-column gap-3' : 'gap-2']" :style="mobile ? 'width:100%;max-width:320px' : ''">
             <!-- #5: Start Break with confirmation -->
             <v-btn
               color="warning"
               variant="flat"
               rounded="pill"
+              :size="mobile ? 'large' : 'default'"
+              :block="mobile"
+              :min-height="mobile ? 52 : undefined"
               :loading="breakLoading"
               aria-label="Start break"
               @click="startBreakDialog = true"
@@ -102,6 +105,9 @@
               color="error"
               variant="flat"
               rounded="pill"
+              :size="mobile ? 'large' : 'default'"
+              :block="mobile"
+              :min-height="mobile ? 52 : undefined"
               :loading="clockingOut"
               aria-label="Clock out"
               @click="confirmClockOut"
@@ -117,6 +123,8 @@
             color="success"
             variant="flat"
             rounded="pill"
+            :size="mobile ? 'x-large' : 'default'"
+            :min-height="mobile ? 56 : undefined"
             :loading="breakLoading"
             aria-label="End break"
             @click="endBreakDialog = true"
@@ -257,9 +265,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useDisplay } from 'vuetify';
 import Utils from '../config/utils.js';
 import { TZ } from '../utils/tz.js';
 import studentService from '../services/studentService.js';
+
+const { mobile } = useDisplay();
 
 const user = Utils.getStore('user');
 
@@ -691,6 +702,14 @@ onMounted(fetchAll);
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+.clock-btn--mobile {
+  width: 100%;
+  max-width: 320px;
+  height: 72px !important;
+  font-size: 22px;
+  letter-spacing: 1px;
 }
 
 .gap-2 { gap: 8px; }

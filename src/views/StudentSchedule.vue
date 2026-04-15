@@ -1,21 +1,22 @@
 ﻿<template>
-  <div class="student-schedule pa-4">
+  <PullToRefresh @refresh="handlePullRefresh">
+  <div :class="['student-schedule', mobile ? 'pa-3' : 'pa-4']">
 
     <!-- Header row -->
     <div class="d-flex align-center justify-space-between mb-4 flex-wrap" style="gap:12px">
-      <div class="text-h4 font-weight-bold">Schedule</div>
-      <div class="text-body-1 text-medium-emphasis font-weight-medium">{{ weekRangeLabel }}</div>
+      <div :class="[mobile ? 'text-h5' : 'text-h4', 'font-weight-bold']">Schedule</div>
+      <div class="text-body-2 text-medium-emphasis font-weight-medium">{{ weekRangeLabel }}</div>
     </div>
 
     <!-- Controls row -->
-    <div class="d-flex align-center justify-space-between mb-3 flex-wrap" style="gap:12px">
+    <div :class="['d-flex', 'align-center', mobile ? 'flex-column' : 'justify-space-between', 'mb-3', 'flex-wrap']" style="gap:12px">
       <!-- Week navigation -->
       <div class="d-flex align-center" style="gap:8px">
-        <v-btn icon variant="outlined" size="small" @click="prevWeek">
+        <v-btn icon variant="outlined" :size="mobile ? 'default' : 'small'" :min-height="mobile ? 48 : undefined" :min-width="mobile ? 48 : undefined" @click="prevWeek">
           <v-icon>mdi-chevron-left</v-icon>
         </v-btn>
-        <v-btn variant="outlined" size="small" style="min-width:70px" @click="goToToday">TODAY</v-btn>
-        <v-btn icon variant="outlined" size="small" @click="nextWeek">
+        <v-btn variant="outlined" :size="mobile ? 'default' : 'small'" style="min-width:70px" :min-height="mobile ? 48 : undefined" @click="goToToday">TODAY</v-btn>
+        <v-btn icon variant="outlined" :size="mobile ? 'default' : 'small'" :min-height="mobile ? 48 : undefined" :min-width="mobile ? 48 : undefined" @click="nextWeek">
           <v-icon>mdi-chevron-right</v-icon>
         </v-btn>
       </div>
@@ -151,12 +152,15 @@
       </template>
     </v-snackbar>
   </div>
+  </PullToRefresh>
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from "vue";
+import { ref, computed, reactive, onMounted, watch } from "vue";
+import { useDisplay } from "vuetify";
 import FullCalendar from "@fullcalendar/vue3";
 import timeGridPlugin from "@fullcalendar/timegrid";
+import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
@@ -164,6 +168,9 @@ import departmentServices from "../services/departmentServices.js";
 import { shiftStartDT, shiftEndDT, formatTimeRange } from "../utils/shiftDateTime.js";
 import { TZ } from "../utils/tz.js";
 import SwapDialog from "../components/student/SwapDialog.vue";
+import PullToRefresh from "../components/mobile/PullToRefresh.vue";
+
+const { mobile } = useDisplay();
 
 const user = ref(Utils.getStore("user") || {});
 const calendarRef = ref(null);
@@ -286,27 +293,38 @@ const calendarEvents = computed(() => {
 });
 
 // â”€â”€ Calendar options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const calendarOptions = computed(() => ({
-  plugins: [timeGridPlugin, interactionPlugin],
-  initialView: "timeGridWeek",
-  headerToolbar: false,
-  allDaySlot: false,
-  events: calendarEvents.value,
-  slotMinTime: calendarHours.value.slotMinTime,
-  slotMaxTime: calendarHours.value.slotMaxTime,
-  slotDuration: "00:30:00",
-  slotLabelInterval: "01:00:00",
-  scrollTime: "07:00:00",
-  nowIndicator: true,
-  editable: false,
-  selectable: false,
-  eventClick: onEventClick,
-  datesSet: onDatesSet,
-  eventTimeFormat: { hour: "numeric", minute: "2-digit", meridiem: "short" },
-  dayHeaderFormat: { weekday: "short", month: "numeric", day: "numeric", omitCommas: true },
-  height: 700,
-  expandRows: true,
-}));
+const calendarOptions = computed(() => {
+  const isMobile = mobile.value;
+  return {
+    plugins: [timeGridPlugin, listPlugin, interactionPlugin],
+    initialView: isMobile ? "listWeek" : "timeGridWeek",
+    headerToolbar: false,
+    allDaySlot: false,
+    events: calendarEvents.value,
+    slotMinTime: calendarHours.value.slotMinTime,
+    slotMaxTime: calendarHours.value.slotMaxTime,
+    slotDuration: "00:30:00",
+    slotLabelInterval: "01:00:00",
+    scrollTime: "07:00:00",
+    nowIndicator: true,
+    editable: false,
+    selectable: false,
+    eventClick: onEventClick,
+    datesSet: onDatesSet,
+    eventTimeFormat: { hour: "numeric", minute: "2-digit", meridiem: "short" },
+    dayHeaderFormat: { weekday: "short", month: "numeric", day: "numeric", omitCommas: true },
+    height: isMobile ? "auto" : 700,
+    expandRows: true,
+  };
+});
+
+// Switch calendar view when breakpoint changes
+watch(mobile, (isMobile) => {
+  const api = getCalendarApi();
+  if (api) {
+    api.changeView(isMobile ? "listWeek" : "timeGridWeek");
+  }
+});
 
 // â”€â”€ Calendar callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function onDatesSet(info) {
@@ -510,6 +528,11 @@ async function loadShifts() {
   }
 }
 
+async function handlePullRefresh(done) {
+  await loadShifts();
+  done();
+}
+
 onMounted(loadShifts);
 </script>
 
@@ -575,12 +598,25 @@ onMounted(loadShifts);
   padding: 2px 5px;
 }
 
-/* Now indicator â€” maroon */
+/* Now indicator — maroon */
 .calendar-wrap :deep(.fc-timegrid-now-indicator-line) {
   border-color: #80162B;
 }
 .calendar-wrap :deep(.fc-timegrid-now-indicator-arrow) {
   border-top-color: #80162B;
   border-bottom-color: #80162B;
+}
+
+/* List view (mobile) — larger tap targets */
+.calendar-wrap :deep(.fc-list-event) {
+  cursor: pointer;
+}
+.calendar-wrap :deep(.fc-list-event td) {
+  padding: 10px 8px;
+  min-height: 48px;
+}
+.calendar-wrap :deep(.fc-list-day-cushion) {
+  padding: 10px 8px;
+  font-weight: 600;
 }
 </style>

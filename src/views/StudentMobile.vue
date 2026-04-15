@@ -9,17 +9,22 @@
  *   - Safe area handling for iPhone notch/home indicator
  *   - Page transitions between routes
  */
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import NotificationDropdown from '../components/NotificationDropdown.vue';
+import NotificationService from '../services/notifications.js';
+import studentService from '../services/studentService.js';
 
 const route = useRoute();
 const router = useRouter();
 const user = ref(Utils.getStore('user') || {});
 const resolvedDepartmentName = ref('');
 const menuOpen = ref(false);
+const unreadNotifications = ref(0);
+const isClockedIn = ref(false);
+let notifPollTimer = null;
 
 // ─── User display ───
 const displayName = computed(() => {
@@ -101,6 +106,27 @@ watch(
   }
 );
 
+// ─── Notification badge count ───
+async function fetchUnreadCount() {
+  try {
+    const notifications = await NotificationService.getNotifications();
+    unreadNotifications.value = notifications.filter(n => n.unread).length;
+  } catch {
+    // silent
+  }
+}
+
+// ─── Clock status for pulse ───
+async function fetchClockStatus() {
+  try {
+    const res = await studentService.getOpenClockRecord();
+    const record = res?.data?.data || res?.data;
+    isClockedIn.value = !!(record && !record.clock_out && !record.clock_out_time);
+  } catch {
+    isClockedIn.value = false;
+  }
+}
+
 // ─── Department name ───
 onMounted(async () => {
   const context = Utils.getStore('currentDepartmentContext');
@@ -127,6 +153,15 @@ onMounted(async () => {
       }
     }
   }
+
+  fetchUnreadCount();
+  fetchClockStatus();
+  // Poll notifications every 60s
+  notifPollTimer = setInterval(fetchUnreadCount, 60000);
+});
+
+onUnmounted(() => {
+  if (notifPollTimer) clearInterval(notifPollTimer);
 });
 
 const handleSignOut = () => {
@@ -226,7 +261,7 @@ const handleSignOut = () => {
       </v-btn>
 
       <v-btn value="clock" @click="navigateTab('clock')" class="nav-tab clock-tab">
-        <div class="clock-icon-wrapper">
+        <div :class="['clock-icon-wrapper', { 'clock-pulse': !isClockedIn }]">
           <v-icon icon="mdi-clock-check-outline" size="24" color="white" />
         </div>
         <span class="nav-label clock-label">Clock In</span>
@@ -238,7 +273,16 @@ const handleSignOut = () => {
       </v-btn>
 
       <v-btn value="more" @click="navigateTab('more')" class="nav-tab">
-        <v-icon :icon="activeTab === 'more' ? 'mdi-dots-horizontal-circle' : 'mdi-dots-horizontal-circle-outline'" />
+        <v-badge
+          :content="unreadNotifications"
+          :model-value="unreadNotifications > 0"
+          color="error"
+          floating
+          offset-x="-2"
+          offset-y="2"
+        >
+          <v-icon :icon="activeTab === 'more' ? 'mdi-dots-horizontal-circle' : 'mdi-dots-horizontal-circle-outline'" />
+        </v-badge>
         <span class="nav-label">More</span>
       </v-btn>
     </v-bottom-navigation>
@@ -311,6 +355,23 @@ const handleSignOut = () => {
 .clock-label {
   color: #80162B;
   font-weight: 600;
+}
+
+/* Subtle pulse when user is NOT clocked in — draws attention */
+.clock-pulse {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(128, 22, 43, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(128, 22, 43, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(128, 22, 43, 0);
+  }
 }
 
 /* Active tab state */

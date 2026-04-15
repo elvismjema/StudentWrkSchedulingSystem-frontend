@@ -1,9 +1,10 @@
 <template>
-  <div class="student-dashboard pa-6">
+  <PullToRefresh @refresh="handlePullRefresh">
+  <div :class="['student-dashboard', mobile ? 'pa-3' : 'pa-6']">
     <!-- Header -->
 
-    <div class="dashboard-header mb-6">
-      <div class="text-h4 font-weight-bold">Hi, {{ firstName }}!</div>
+    <div :class="['dashboard-header', mobile ? 'mb-3' : 'mb-6']">
+      <div :class="[mobile ? 'text-h5' : 'text-h4', 'font-weight-bold']">Hi, {{ firstName }}!</div>
       <div class="text-body-1 text-medium-emphasis">{{ todayLabel }}</div>
     </div>
 
@@ -14,7 +15,7 @@
       variant="tonal"
       prominent
       border="start"
-      class="mb-6 ack-alert"
+      :class="[mobile ? 'mb-3' : 'mb-6', 'ack-alert']"
     >
       <template #title>
         <span class="text-subtitle-1 font-weight-bold">
@@ -84,7 +85,7 @@
       :clock-in-time="clockStatus.clockInTime"
       :on-break="clockStatus.onBreak"
       :loading="clockingIn"
-      class="mb-6"
+      :class="mobile ? 'mb-3' : 'mb-6'"
       @clock-in="handleClockIn"
       @clock-out="handleClockOut"
       @start-break="handleStartBreak"
@@ -130,13 +131,13 @@
       <!-- Primary Card: Next / Current Shift — full width -->
       <v-card
         v-if="nextShift"
-        class="next-shift-card mb-6"
+        :class="['next-shift-card', mobile ? 'mb-3' : 'mb-6']"
         elevation="0"
         rounded="lg"
         border
       >
         <div class="next-shift-card__bar" :style="{ backgroundColor: nextShiftColor }"></div>
-        <div class="pa-5 flex-grow-1">
+        <div :class="[mobile ? 'pa-4' : 'pa-5', 'flex-grow-1']">
           <v-chip size="x-small" color="primary" variant="tonal" class="mb-2">
             {{ nextShiftLabel }}
           </v-chip>
@@ -160,6 +161,8 @@
             <v-btn
               variant="outlined"
               color="primary"
+              :size="mobile ? 'default' : 'default'"
+              :min-height="mobile ? 48 : undefined"
               @click="openSwapDialog(nextShift)"
               aria-label="Find cover for this shift"
             >
@@ -171,7 +174,7 @@
       </v-card>
 
       <!-- Empty state: no upcoming shift -->
-      <v-card v-else class="mb-6 pa-8 text-center" elevation="0" rounded="lg" border>
+      <v-card v-else :class="[mobile ? 'mb-3 pa-5' : 'mb-6 pa-8', 'text-center']" elevation="0" rounded="lg" border>
         <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank</v-icon>
         <div class="text-body-1 text-medium-emphasis">No upcoming shifts</div>
         <div class="text-caption text-medium-emphasis">Check the Open Shifts tab for available shifts</div>
@@ -181,17 +184,45 @@
       <WeekStrip
         :selected-date="selectedDate"
         :shift-dates="shiftDates"
-        class="mb-6"
+        :class="mobile ? 'mb-3' : 'mb-6'"
         @select-day="selectedDate = $event"
         @change-week="onWeekChange"
       />
 
-      <!-- 3-column grid: Open Shifts, Pending Requests, Weekly Summary -->
+      <!-- 3-column grid: Weekly Summary (first on mobile), Open Shifts, Pending Requests -->
       <v-row>
-        <!-- Open Shifts Card -->
-        <v-col cols="12" md="4">
+        <!-- Weekly Summary — shown first on mobile for prominence -->
+        <v-col cols="12" sm="6" md="4" :order="mobile ? 0 : 2">
           <v-card class="fill-height" elevation="0" rounded="lg" border>
-            <v-card-text class="pa-4">
+            <v-card-text :class="mobile ? 'pa-3' : 'pa-4'">
+              <div class="text-subtitle-1 font-weight-bold mb-3">
+                <v-icon size="20" class="mr-1">mdi-chart-bar</v-icon>
+                This Week
+              </div>
+              <div :class="['d-flex', mobile ? 'flex-row justify-space-around' : 'flex-column', 'ga-4']">
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #80162B">{{ weeklyHours }}</div>
+                  <div class="text-caption text-medium-emphasis">Hours</div>
+                </div>
+                <v-divider v-if="!mobile" />
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #196CA2">{{ weeklyShifts }}</div>
+                  <div class="text-caption text-medium-emphasis">Shifts</div>
+                </div>
+                <v-divider v-if="!mobile" />
+                <div class="text-center">
+                  <div class="text-h5 font-weight-bold" style="color: #2e7d32">${{ estimatedEarnings }}</div>
+                  <div class="text-caption text-medium-emphasis">Earnings</div>
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <!-- Open Shifts Card -->
+        <v-col cols="12" sm="6" md="4" :order="mobile ? 1 : 0">
+          <v-card class="fill-height" elevation="0" rounded="lg" border>
+            <v-card-text :class="mobile ? 'pa-3' : 'pa-4'">
               <div class="d-flex align-center justify-space-between mb-2">
                 <div class="text-subtitle-1 font-weight-bold">
                   <v-icon size="20" class="mr-1">mdi-briefcase-plus</v-icon>
@@ -201,6 +232,7 @@
                   variant="text"
                   color="primary"
                   size="small"
+                  :min-height="mobile ? 48 : undefined"
                   @click="$router.push({ name: 'student-schedule', query: { tab: 'open' } })"
                 >
                   See All ({{ openShiftsCount }})
@@ -228,9 +260,9 @@
         </v-col>
 
         <!-- Pending Requests -->
-        <v-col cols="12" md="4">
+        <v-col cols="12" sm="6" md="4" :order="mobile ? 2 : 1">
           <v-card class="fill-height" elevation="0" rounded="lg" border>
-            <v-card-text class="pa-4">
+            <v-card-text :class="mobile ? 'pa-3' : 'pa-4'">
               <div class="text-subtitle-1 font-weight-bold mb-2">
                 <v-icon size="20" class="mr-1">mdi-clipboard-text-clock</v-icon>
                 Pending Requests
@@ -274,33 +306,6 @@
           </v-card>
         </v-col>
 
-        <!-- Weekly Summary -->
-        <v-col cols="12" md="4">
-          <v-card class="fill-height" elevation="0" rounded="lg" border>
-            <v-card-text class="pa-4">
-              <div class="text-subtitle-1 font-weight-bold mb-3">
-                <v-icon size="20" class="mr-1">mdi-chart-bar</v-icon>
-                This Week
-              </div>
-              <div class="d-flex flex-column ga-4">
-                <div class="text-center">
-                  <div class="text-h5 font-weight-bold" style="color: #80162B">{{ weeklyHours }}</div>
-                  <div class="text-caption text-medium-emphasis">Hours Scheduled</div>
-                </div>
-                <v-divider />
-                <div class="text-center">
-                  <div class="text-h5 font-weight-bold" style="color: #196CA2">{{ weeklyShifts }}</div>
-                  <div class="text-caption text-medium-emphasis">Shifts</div>
-                </div>
-                <v-divider />
-                <div class="text-center">
-                  <div class="text-h5 font-weight-bold" style="color: #2e7d32">${{ estimatedEarnings }}</div>
-                  <div class="text-caption text-medium-emphasis">Est. Earnings</div>
-                </div>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
       </v-row>
     </template>
 
@@ -321,11 +326,13 @@
       </template>
     </v-snackbar>
   </div>
+  </PullToRefresh>
 </template>
 
 <script setup>
 import { ref, computed, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { useDisplay } from "vuetify";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
 
@@ -336,6 +343,9 @@ import ClockStatusBanner from "../components/student/ClockStatusBanner.vue";
 import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
+import PullToRefresh from "../components/mobile/PullToRefresh.vue";
+
+const { mobile } = useDisplay();
 
 const router = useRouter();
 const user = ref(Utils.getStore("user") || {});
@@ -809,6 +819,11 @@ function handleSwapSubmit() {
   loadDashboard();
 }
 
+
+async function handlePullRefresh(done) {
+  await loadDashboard();
+  done();
+}
 
 onMounted(loadDashboard);
 </script>

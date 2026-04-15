@@ -1,9 +1,10 @@
 <template>
-  <div class="trade-board-page pa-6">
-    <div class="d-flex align-center justify-space-between mb-6">
+  <PullToRefresh @refresh="handlePullRefresh">
+  <div :class="['trade-board-page', mobile ? 'pa-3' : 'pa-6']">
+    <div :class="['d-flex', mobile ? 'flex-column' : 'align-center justify-space-between', mobile ? 'mb-3' : 'mb-6']" style="gap:12px">
       <div>
-        <h1 class="text-h4 font-weight-bold">Shift Trade Board</h1>
-        <p class="text-body-1 text-medium-emphasis mt-1">
+        <h1 :class="[mobile ? 'text-h5' : 'text-h4', 'font-weight-bold']">Shift Trade Board</h1>
+        <p v-if="!mobile" class="text-body-1 text-medium-emphasis mt-1">
           Browse open requests, manage your trades, and respond to incoming swap requests
         </p>
       </div>
@@ -11,13 +12,15 @@
         color="#8B1538"
         variant="flat"
         prepend-icon="mdi-plus"
+        :block="mobile"
+        :min-height="mobile ? 48 : undefined"
         @click="showPostDialog = true"
       >
         Post Trade Request
       </v-btn>
     </div>
 
-    <v-tabs v-model="activeTab" color="#8B1538" class="mb-6">
+    <v-tabs v-model="activeTab" color="#8B1538" :class="mobile ? 'mb-3' : 'mb-6'">
       <v-tab value="open">
         Open Requests
         <v-badge
@@ -106,8 +109,9 @@
                 <v-btn
                   color="#8B1538"
                   variant="flat"
-                  size="small"
+                  :size="mobile ? 'default' : 'small'"
                   block
+                  :min-height="mobile ? 48 : undefined"
                   :loading="req._loading"
                   @click="pickUpRequest(req)"
                   class="mt-2"
@@ -179,8 +183,9 @@
                   v-if="(req.status || '').toLowerCase() === 'pending' || (req.status || '').toLowerCase() === 'open'"
                   color="error"
                   variant="outlined"
-                  size="small"
+                  :size="mobile ? 'default' : 'small'"
                   block
+                  :min-height="mobile ? 48 : undefined"
                   :loading="req._loading"
                   @click="cancelRequest(req)"
                 >
@@ -261,8 +266,9 @@
                   <v-btn
                     color="success"
                     variant="flat"
-                    size="small"
+                    :size="mobile ? 'default' : 'small'"
                     class="flex-grow-1"
+                    :min-height="mobile ? 48 : undefined"
                     :loading="req._accepting"
                     @click="acceptIncoming(req)"
                   >
@@ -271,8 +277,9 @@
                   <v-btn
                     color="error"
                     variant="outlined"
-                    size="small"
+                    :size="mobile ? 'default' : 'small'"
                     class="flex-grow-1"
+                    :min-height="mobile ? 48 : undefined"
                     :loading="req._declining"
                     @click="declineIncoming(req)"
                   >
@@ -378,12 +385,17 @@
       </template>
     </v-snackbar>
   </div>
+  </PullToRefresh>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import Utils from '../config/utils.js';
 import studentService from '../services/studentService.js';
+import PullToRefresh from '../components/mobile/PullToRefresh.vue';
+
+const { mobile } = useDisplay();
 
 const user = ref(Utils.getStore('user') || {});
 const userId = computed(() => user.value?.userId || user.value?.id);
@@ -620,6 +632,11 @@ watch(showPostDialog, (open) => {
     loadMyShifts();
   }
 });
+
+async function handlePullRefresh(done) {
+  await loadAllSwapRequests();
+  done();
+}
 
 onMounted(() => {
   loadAllSwapRequests();

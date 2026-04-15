@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from "vue";
+import { Capacitor } from "@capacitor/core";
 import AuthServices from "../services/authServices";
 import Utils from "../config/utils.js";
 import { useRouter, useRoute } from "vue-router";
@@ -10,27 +11,9 @@ const fName = ref("");
 const lName = ref("");
 const user = ref({});
 const loginError = ref("");
+const isNative = Capacitor.isNativePlatform();
 
-const loginWithGoogle = () => {
-  loginError.value = "";
-  window.handleCredentialResponse = handleCredentialResponse;
-  const client = import.meta.env.VITE_APP_CLIENT_ID;
-  console.log(client);
-  window.google.accounts.id.initialize({
-    client_id: client,
-    cancel_on_tap_outside: false,
-    auto_select: true,
-    callback: window.handleCredentialResponse,
-  });
-  window.google.accounts.id.renderButton(document.getElementById("parent_id"), {
-    type: "standard",
-    theme: "outline",
-    size: "large",
-    text: "signin_with",
-    width: 400,
-  });
-};
-
+// ─── Shared: process the credential token from either flow ───
 const handleCredentialResponse = async (response) => {
   loginError.value = "";
   let token = {
@@ -72,15 +55,92 @@ const handleCredentialResponse = async (response) => {
     });
 };
 
+// ─── Native (iOS / Android): Capacitor Google Auth plugin ───
+const signInNative = async () => {
+  loginError.value = "";
+  try {
+    const { GoogleAuth } = await import("@southdevs/capacitor-google-auth");
+    const googleUser = await GoogleAuth.signIn();
+    // The plugin returns authentication.idToken which is the same
+    // credential the backend expects from the web GIS flow.
+    const idToken = googleUser.authentication?.idToken;
+    if (!idToken) {
+      loginError.value = "Google sign-in did not return a token. Please try again.";
+      return;
+    }
+    await handleCredentialResponse({ credential: idToken });
+  } catch (err) {
+    console.error("Native Google sign-in error:", err);
+    // User cancelled — not a real error
+    if (err?.message?.includes("canceled") || err?.message?.includes("cancelled")) {
+      return;
+    }
+    loginError.value = "Google sign-in failed. Please try again.";
+  }
+};
+
+// ─── Web: existing Google Identity Services flow ───
+const loginWithGoogle = () => {
+  loginError.value = "";
+  window.handleCredentialResponse = handleCredentialResponse;
+  const client = import.meta.env.VITE_APP_CLIENT_ID;
+  console.log(client);
+  window.google.accounts.id.initialize({
+    client_id: client,
+    cancel_on_tap_outside: false,
+    auto_select: true,
+    callback: window.handleCredentialResponse,
+  });
+  window.google.accounts.id.renderButton(document.getElementById("parent_id"), {
+    type: "standard",
+    theme: "outline",
+    size: "large",
+    text: "signin_with",
+    width: 400,
+  });
+};
+
+// ─── Init: pick the right flow based on platform ───
+const initNativeAuth = async () => {
+  try {
+    const { GoogleAuth } = await import("@southdevs/capacitor-google-auth");
+    GoogleAuth.initialize({
+      clientId: '249489666247-vpkk3eqqsubpekr5pt166prhhi32t4to.apps.googleusercontent.com',
+      scopes: ['profile', 'email'],
+      grantOfflineAccess: true,
+    });
+  } catch (err) {
+    console.error("Failed to initialize native GoogleAuth:", err);
+  }
+};
+
 onMounted(() => {
-  loginWithGoogle();
+  if (isNative) {
+    initNativeAuth();
+  } else {
+    loginWithGoogle();
+  }
 });
 </script>
 
 <template>
   <div class="signup-buttons">
     <v-row justify="center">
-      <div display="flex" id="parent_id"></div>
+      <!-- Web: Google renders its own button here -->
+      <div v-if="!isNative" display="flex" id="parent_id"></div>
+
+      <!-- Native: custom button that triggers Capacitor plugin -->
+      <v-btn
+        v-if="isNative"
+        variant="outlined"
+        size="large"
+        class="text-none"
+        prepend-icon="mdi-google"
+        @click="signInNative"
+        style="min-width: 300px;"
+      >
+        Sign in with Google
+      </v-btn>
     </v-row>
     <v-alert
       v-if="loginError"

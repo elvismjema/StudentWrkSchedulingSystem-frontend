@@ -25,6 +25,14 @@ const config: CapacitorConfig = {
       style: 'DARK',                       // light text on dark background
       backgroundColor: '#80162B',
     },
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      // Web client ID (same one used by the backend to verify tokens)
+      serverClientId: '249489666247-vpkk3eqqsubpekr5pt166prhhi32t4to.apps.googleusercontent.com',
+      // iOS-specific client ID
+      iosClientId: '249489666247-vhnci059dbsgp2i8mm8gh40fjlargsrk.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
   },
 
   // iOS-specific

@@ -11,3 +11,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Capacitor native projects (generated — rebuild with `npx cap add ios/android`)
+ios/
+android/

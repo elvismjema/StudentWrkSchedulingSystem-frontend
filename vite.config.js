@@ -6,8 +6,11 @@ import dns from "dns";
 
 dns.setDefaultResultOrder("verbatim");
 
+// Capacitor builds must use "/" so the WebView can resolve assets.
+// The university web deploy keeps "/sev2026/t2/".
+const isCapacitor = process.env.CAPACITOR_BUILD === 'true';
 const baseURL =
-  process.env.APP_ENV === "development" ? "/" : "/sev2026/t2/";
+  isCapacitor || process.env.APP_ENV === "development" ? "/" : "/sev2026/t2/";
 
 export default defineConfig({
   plugins: [vue(), vuetify({ autoImport: true })],

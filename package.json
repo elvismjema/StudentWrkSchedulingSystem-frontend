@@ -9,9 +9,18 @@
     "preview": "vite preview",
     "bundle": "mv .env dist",
     "test": "cypress run",
-    "test:open": "cypress open"
+    "test:open": "cypress open",
+    "cap:build": "cross-env CAPACITOR_BUILD=true APP_ENV=production vite build",
+    "cap:sync": "npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android",
+    "cap:run:ios": "npm run cap:build && npx cap sync ios && npx cap open ios",
+    "cap:run:android": "npm run cap:build && npx cap sync android && npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.1",
+    "@capacitor/core": "^7.6.1",
+    "@capacitor/ios": "^7.6.1",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
@@ -29,10 +38,12 @@
     "webfontloader": "^1.6.28"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.1",
     "@mdi/js": "^7.0.96",
     "@vitejs/plugin-vue": "^4.1.0",
     "cross-env": "^7.0.3",
     "cypress": "^12.9.0",
+    "typescript": "^6.0.2",
     "vite": "^4.2.1"
   }
 }

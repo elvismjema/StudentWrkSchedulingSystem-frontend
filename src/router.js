@@ -8,7 +8,7 @@ import AddTutorial from "./views/AddTutorial.vue";
 import ViewTutorial from "./views/ViewTutorial.vue";
 import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
-import Student from "./views/Student.vue";
+import StudentShell from "./views/StudentShell.vue";
 import Manager from "./views/Manager.vue";
 import Admin from "./views/Admin.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
@@ -71,7 +71,7 @@ const router = createRouter({
     {
       path: "/student",
       name: "student",
-      component: Student,
+      component: StudentShell,
       redirect: { name: "student-dashboard" },
       children: [
         {
@@ -94,10 +94,10 @@ const router = createRouter({
           name: "student-more",
           component: () => import("./views/StudentMore.vue"),
         },
-        // Legacy routes — redirect to new structure
         {
           path: "departments",
-          redirect: { name: "student-dashboard" },
+          name: "student-departments",
+          component: () => import("./views/StudentDepartments.vue"),
         },
         {
           path: "availability",
@@ -122,7 +122,12 @@ const router = createRouter({
         {
           path: "profile",
           name: "student-profile",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentProfile.vue"),
+        },
+        {
+          path: "qualifications",
+          name: "student-qualifications",
+          component: () => import("./views/StudentQualifications.vue"),
         },
         {
           path: "settings",

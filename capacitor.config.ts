@@ -1,4 +1,14 @@
+/// <reference types="@southdevs/capacitor-google-auth" />
+import "dotenv/config";
 import type { CapacitorConfig } from '@capacitor/cli';
+
+const DEFAULT_WEB_CLIENT_ID =
+  '249489666247-vpkk3eqqsubpekr5pt166prhhi32t4to.apps.googleusercontent.com';
+const DEFAULT_IOS_CLIENT_ID =
+  '249489666247-vhnci059dbsgp2i8mm8gh40fjlargsrk.apps.googleusercontent.com';
+
+const webClientId = process.env.VITE_APP_CLIENT_ID ?? DEFAULT_WEB_CLIENT_ID;
+const iosClientId = process.env.VITE_APP_IOS_CLIENT_ID ?? DEFAULT_IOS_CLIENT_ID;
 
 const config: CapacitorConfig = {
   appId: 'edu.oc.workerscheduling',
@@ -15,6 +25,12 @@ const config: CapacitorConfig = {
   // },
 
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email', 'openid'],
+      iosClientId,
+      serverClientId: webClientId,
+      forceCodeForRefreshToken: true,
+    },
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 2000,
@@ -24,14 +40,6 @@ const config: CapacitorConfig = {
     StatusBar: {
       style: 'DARK',                       // light text on dark background
       backgroundColor: '#80162B',
-    },
-    GoogleAuth: {
-      scopes: ['profile', 'email'],
-      // Web client ID (same one used by the backend to verify tokens)
-      serverClientId: '249489666247-vpkk3eqqsubpekr5pt166prhhi32t4to.apps.googleusercontent.com',
-      // iOS-specific client ID
-      iosClientId: '249489666247-vhnci059dbsgp2i8mm8gh40fjlargsrk.apps.googleusercontent.com',
-      forceCodeForRefreshToken: true,
     },
   },
 

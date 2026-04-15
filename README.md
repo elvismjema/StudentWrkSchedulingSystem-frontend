@@ -58,6 +58,7 @@ npm install cross-env
 7. Add a local **.env** file and make sure the **client ID** and **client secret** are the values you have registered with Google and that the **refresh token** is the value you generated through the OAuth 2.0 Playground.
 
    - VITE_APP_CLIENT_ID = '**your-google-client-id**'
+   - VITE_APP_IOS_CLIENT_ID = '**your-google-ios-client-id**' (required for Capacitor iOS native sign-in)
    - VITE_APP_CLIENT_SECRET = '**your-google-client-secret**'
    - VITE_APP_REFRESH_TOKEN = '**your-google-refresh-token**'
    - VITE_APP_CLIENT_URL = 'http://localhost:8081'
@@ -103,4 +104,25 @@ npm run build
 
 ```
 npm run lint
+```
+
+## Capacitor iOS Google Sign-In
+
+The Capacitor iOS app uses native Google sign-in instead of the browser GIS button.
+
+Before running on iOS:
+
+1. Make sure the iOS OAuth client exists for bundle id `edu.oc.workerscheduling`.
+2. Open the generated Xcode workspace.
+3. Add this reversed iOS client ID under `Targets > App > Info > URL Types`:
+
+```
+com.googleusercontent.apps.249489666247-vhnci059dbsgp2i8mm8gh40fjlargsrk
+```
+
+4. Re-run:
+
+```
+npm run cap:build
+npx cap sync ios
 ```

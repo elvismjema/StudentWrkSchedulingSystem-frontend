@@ -21,10 +21,10 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Don't precache API calls
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: [/^\/api/, /^\/workerscheduling-t2/],
         runtimeCaching: [
           {
-            urlPattern: /\/api\//,
+            urlPattern: /\/(api|workerscheduling-t2)(\/|$)/,
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

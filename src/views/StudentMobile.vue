@@ -249,6 +249,7 @@ const handleSignOut = () => {
       height="64"
       bg-color="white"
       elevation="8"
+      :style="{ position: 'fixed', bottom: '0', left: '0', right: '0', zIndex: 1000 }"
     >
       <v-btn value="dashboard" @click="navigateTab('dashboard')" class="nav-tab">
         <v-icon :icon="activeTab === 'dashboard' ? 'mdi-view-dashboard' : 'mdi-view-dashboard-outline'" />
@@ -319,7 +320,12 @@ const handleSignOut = () => {
 /* ─── Bottom Navigation ─── */
 .mobile-bottom-nav {
   border-top: 1px solid #eee;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
 }
 
 .nav-tab {

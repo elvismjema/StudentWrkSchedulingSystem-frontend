@@ -1,5 +1,249 @@
 ﻿<template>
-  <div class="availability-container">
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MOBILE LAYOUT                               -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div v-if="mobile" class="hours-screen">
+
+    <!-- Segmented control -->
+    <div class="m-segment-wrap">
+      <div class="m-segment">
+        <button
+          class="m-seg-btn"
+          :class="{ 'm-seg-btn--active': mobileTab === 'availability' }"
+          @click="mobileTab = 'availability'"
+        >My Availability</button>
+        <button
+          class="m-seg-btn"
+          :class="{ 'm-seg-btn--active': mobileTab === 'timeoff' }"
+          @click="mobileTab = 'timeoff'"
+        >
+          Time Off
+          <span v-if="exceptions.length" class="m-seg-badge">{{ exceptions.length }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="m-loading">
+      <v-progress-circular indeterminate size="28" width="2" color="#80162B" />
+    </div>
+
+    <!-- ─── AVAILABILITY TAB ─── -->
+    <div v-if="mobileTab === 'availability'" class="m-tab-content">
+
+      <!-- Sync status card (compact) -->
+      <div class="m-sync-card" :class="'m-sync-card--' + statusTone">
+        <div class="m-sync-row">
+          <v-icon
+            :icon="statusTone === 'success' ? 'mdi-check-circle' : statusTone === 'error' ? 'mdi-alert-circle' : 'mdi-information'"
+            size="18"
+            :color="statusTone === 'success' ? '#0D9488' : statusTone === 'error' ? '#DC2626' : '#F59E0B'"
+          />
+          <span class="m-sync-label">Class sync: {{ statusLabel }}</span>
+          <button class="m-sync-action" :disabled="syncingClassSchedule" @click="syncClassSchedule()">
+            {{ syncingClassSchedule ? 'Syncing...' : 'Sync' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- View toggle: Week / Day -->
+      <div class="m-view-toggle">
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'week' }" @click="mobileViewMode = 'week'">Week</button>
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'day' }" @click="mobileViewMode = 'day'">Day</button>
+      </div>
+
+      <!-- Day selector (only in day view) -->
+      <div v-if="mobileViewMode === 'day'" class="m-day-selector">
+        <button
+          v-for="dow in [1, 2, 3, 4, 5, 6, 0]"
+          :key="dow"
+          class="m-day-pill"
+          :class="{ 'm-day-pill--active': mobileDayIndex === dow }"
+          @click="mobileDayIndex = dow"
+        >{{ DOW_LABELS[dow].slice(0, 3) }}</button>
+      </div>
+
+      <!-- Day-by-day blocks list -->
+      <div v-if="mobileFilteredBlocks.length" class="m-day-list">
+        <div v-for="group in mobileFilteredBlocks" :key="group.dow" class="m-day-group">
+          <div class="m-day-label">{{ group.label }}</div>
+          <div class="m-block-cards">
+            <div
+              v-for="block in group.blocks"
+              :key="block.tempId"
+              class="m-block-card"
+              :class="{
+                'm-block-card--available': block.availabilityType === 'available' && !isClassScheduleBlock(block),
+                'm-block-card--unavailable': block.availabilityType === 'unavailable' && !isClassScheduleBlock(block),
+                'm-block-card--class': isClassScheduleBlock(block),
+              }"
+              @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+            >
+              <div class="m-block-accent"></div>
+              <div class="m-block-info">
+                <div class="m-block-time">{{ formatTimeLabel(block.startTime) }} - {{ formatTimeLabel(block.endTime) }}</div>
+                <div class="m-block-type">
+                  {{ isClassScheduleBlock(block) ? 'Class Time' : block.availabilityType === 'available' ? 'Available' : 'Unavailable' }}
+                  <span v-if="isClassScheduleBlock(block)" class="m-block-locked">
+                    <v-icon icon="mdi-lock" size="10" /> Locked
+                  </span>
+                </div>
+              </div>
+              <v-icon v-if="!isClassScheduleBlock(block)" icon="mdi-chevron-right" size="18" color="#bbb" class="m-block-chevron" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="!loading" class="m-empty">
+        <v-icon icon="mdi-calendar-blank-outline" size="48" color="#ccc" />
+        <div class="m-empty-title">No availability set</div>
+        <div class="m-empty-sub">Tap the + button to add your weekly hours</div>
+      </div>
+
+      <!-- Floating Add button -->
+      <button class="m-fab" @click="showMobileAddSheet = true">
+        <v-icon icon="mdi-plus" size="24" color="white" />
+      </button>
+
+      <!-- Save bar (shows when changes exist) -->
+      <transition name="slide-up">
+        <div v-if="hasChanges" class="m-save-bar">
+          <button class="m-save-btn" :disabled="saving" @click="saveChanges">
+            {{ saving ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </transition>
+    </div>
+
+    <!-- ─── TIME OFF TAB ─── -->
+    <div v-if="mobileTab === 'timeoff'" class="m-tab-content">
+
+      <div v-if="exceptions.length" class="m-timeoff-list">
+        <div v-for="exc in exceptions" :key="exc.id" class="m-timeoff-card">
+          <div class="m-timeoff-date">{{ formatDate(exc.specificDate) }}</div>
+          <div class="m-timeoff-detail">
+            <span>{{ formatTimeLabel(exc.startTime) }} - {{ formatTimeLabel(exc.endTime) }}</span>
+            <span class="m-timeoff-chip" :class="exc.availabilityType === 'unavailable' ? 'm-timeoff-chip--off' : 'm-timeoff-chip--on'">
+              {{ exc.availabilityType === 'unavailable' ? 'Off' : 'Available' }}
+            </span>
+          </div>
+          <button class="m-timeoff-remove" @click="removeException(exc)">
+            <v-icon icon="mdi-close" size="16" color="#999" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else class="m-empty">
+        <v-icon icon="mdi-calendar-check" size="48" color="#ccc" />
+        <div class="m-empty-title">No time-off requests</div>
+        <div class="m-empty-sub">Request specific dates off and your manager will review them</div>
+      </div>
+
+      <!-- Add time off button -->
+      <button class="m-fab" @click="showExceptionDialog = true">
+        <v-icon icon="mdi-plus" size="24" color="white" />
+      </button>
+    </div>
+
+    <!-- ─── MOBILE ADD AVAILABILITY BOTTOM SHEET ─── -->
+    <v-dialog v-model="showMobileAddSheet" :fullscreen="false" max-width="100vw" transition="dialog-bottom-transition" content-class="m-bottom-sheet-dialog">
+      <v-card class="m-bottom-sheet">
+        <div class="m-sheet-handle"></div>
+        <div class="m-sheet-title">Add Availability Block</div>
+
+        <div class="m-sheet-field">
+          <label class="m-sheet-label">Day</label>
+          <select v-model="createForm.dayOfWeek" class="m-sheet-select">
+            <option v-for="(label, dow) in DOW_LABELS" :key="dow" :value="Number(dow)">{{ label }}</option>
+          </select>
+        </div>
+
+        <div class="m-sheet-type-row">
+          <button
+            class="m-type-btn" :class="{ 'm-type-btn--active-avail': createForm.availabilityType === 'available' }"
+            @click="createForm.availabilityType = 'available'"
+          >Available</button>
+          <button
+            class="m-type-btn" :class="{ 'm-type-btn--active-unavail': createForm.availabilityType === 'unavailable' }"
+            @click="createForm.availabilityType = 'unavailable'"
+          >Unavailable</button>
+        </div>
+
+        <div class="m-sheet-time-row">
+          <div class="m-sheet-field m-sheet-field--half">
+            <label class="m-sheet-label">Start</label>
+            <input v-model="createForm.startTime" type="time" class="m-sheet-input" />
+          </div>
+          <div class="m-sheet-field m-sheet-field--half">
+            <label class="m-sheet-label">End</label>
+            <input v-model="createForm.endTime" type="time" class="m-sheet-input" />
+          </div>
+        </div>
+
+        <div class="m-sheet-actions">
+          <button class="m-sheet-cancel" @click="showMobileAddSheet = false">Cancel</button>
+          <button class="m-sheet-confirm" @click="confirmCreate(); showMobileAddSheet = false;">Add</button>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <!-- Shared dialogs (Edit block, Exception, Snackbar) -->
+    <v-dialog v-model="showEditDialog" max-width="420">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-pencil-outline" class="mr-2" />
+          Edit Block
+        </v-card-title>
+        <v-card-text>
+          <v-btn-toggle v-model="editForm.availabilityType" mandatory density="comfortable" rounded="lg" class="mb-4">
+            <v-btn value="available" :color="editForm.availabilityType === 'available' ? UI_COLORS.available : undefined">Available</v-btn>
+            <v-btn value="unavailable" :color="editForm.availabilityType === 'unavailable' ? 'error' : undefined">Unavailable</v-btn>
+          </v-btn-toggle>
+          <v-row>
+            <v-col cols="6"><v-text-field v-model="editForm.startTime" type="time" label="Start" variant="outlined" density="comfortable" /></v-col>
+            <v-col cols="6"><v-text-field v-model="editForm.endTime" type="time" label="End" variant="outlined" density="comfortable" /></v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteBlock"><v-icon start>mdi-delete</v-icon>Delete</v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmEdit">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showExceptionDialog" max-width="480">
+      <v-card>
+        <v-card-title>Request Time Off</v-card-title>
+        <v-card-text>
+          <v-form ref="exceptionFormRef" v-model="exceptionFormValid">
+            <v-text-field v-model="exceptionForm.specificDate" type="date" label="Date" variant="outlined" density="comfortable" class="mb-3" :rules="[requiredRule]" />
+            <v-row>
+              <v-col cols="6"><v-text-field v-model="exceptionForm.startTime" type="time" label="Start" variant="outlined" density="comfortable" :rules="[requiredRule]" /></v-col>
+              <v-col cols="6"><v-text-field v-model="exceptionForm.endTime" type="time" label="End" variant="outlined" density="comfortable" :rules="[requiredRule]" /></v-col>
+            </v-row>
+            <v-select v-model="exceptionForm.availabilityType" :items="['available', 'unavailable']" label="Type" variant="outlined" density="comfortable" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showExceptionDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">{{ snackbar.text }}</v-snackbar>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- DESKTOP LAYOUT (unchanged)                  -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div v-else class="availability-container">
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">My Availability</h1>
@@ -103,7 +347,7 @@
       <v-card>
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-clock-outline" class="mr-2" />
-          Add Block â€” {{ dowLabel(createForm.dayOfWeek) }}
+          Add Block — {{ dowLabel(createForm.dayOfWeek) }}
         </v-card-title>
         <v-card-text>
           <p class="text-body-2 text-grey mb-3">Choose the type and time range for this block.</p>
@@ -157,7 +401,7 @@
       <v-card>
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-pencil-outline" class="mr-2" />
-          Edit Block â€” {{ dowLabel(editForm.dayOfWeek) }}
+          Edit Block — {{ dowLabel(editForm.dayOfWeek) }}
         </v-card-title>
         <v-card-text>
           <v-btn-toggle
@@ -209,14 +453,13 @@
       </v-card>
     </v-dialog>
 
-    <!-- Time Off Requests (formerly Availability Exceptions) -->
+    <!-- Time Off Requests -->
     <div class="exceptions-section">
       <h2 class="exceptions-title">Time Off Requests</h2>
       <p class="exceptions-subtitle">
-        Request specific dates when you are unavailable â€” your manager will review and approve.
+        Request specific dates when you are unavailable — your manager will review and approve.
       </p>
 
-      <!-- Existing exceptions list -->
       <div v-if="exceptions.length" class="exceptions-list">
         <v-card
           v-for="exc in exceptions"
@@ -228,7 +471,7 @@
             <div>
               <strong>{{ formatDate(exc.specificDate) }}</strong>
               <span class="ml-2 text-grey">
-                {{ formatTimeLabel(exc.startTime) }} â€“ {{ formatTimeLabel(exc.endTime) }}
+                {{ formatTimeLabel(exc.startTime) }} — {{ formatTimeLabel(exc.endTime) }}
               </span>
               <v-chip size="x-small" class="ml-2" :color="exc.availabilityType === 'unavailable' ? 'error' : 'success'" variant="tonal">
                 {{ exc.availabilityType }}
@@ -307,6 +550,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { useDisplay } from "vuetify";
 import FullCalendar from "@fullcalendar/vue3";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -315,8 +559,15 @@ import availabilityService from "../services/availabilityService.js";
 import departmentServices from "../services/departmentServices.js";
 import studentService from "../services/studentService.js";
 
+const { mobile } = useDisplay();
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
+
+// --- Mobile tab toggle ---
+const mobileTab = ref('availability');
+const showMobileAddSheet = ref(false);
+const mobileViewMode = ref('week'); // 'week' or 'day'
+const mobileDayIndex = ref(new Date().getDay()); // 0=Sun, 1=Mon, etc.
 
 const UI_COLORS = Object.freeze({
   available: "#0D9488",
@@ -489,6 +740,26 @@ const hasChanges = computed(() => blocksFingerprint(manualBlocks.value) !== init
 const exceptions = computed(() =>
   existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
 );
+
+// --- Mobile: group availability blocks by day ---
+const mobileBlocksByDay = computed(() => {
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+  const grouped = {};
+  for (const dow of dayOrder) {
+    grouped[dow] = blocks.value
+      .filter((b) => Number(b.dayOfWeek) === dow)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+  return dayOrder
+    .filter((dow) => grouped[dow].length > 0)
+    .map((dow) => ({ dow, label: DOW_LABELS[dow], blocks: grouped[dow] }));
+});
+
+const mobileFilteredBlocks = computed(() => {
+  if (mobileViewMode.value === 'week') return mobileBlocksByDay.value;
+  // Day view — filter to selected day only
+  return mobileBlocksByDay.value.filter((g) => g.dow === mobileDayIndex.value);
+});
 
 const calendarEvents = computed(() =>
   blocks.value.map((b) => {
@@ -1069,5 +1340,420 @@ onMounted(async () => {
 
 .exception-card {
   margin-bottom: var(--space-2);
+}
+
+/* ═══════════════════════════════════════════ */
+/* MOBILE STYLES                               */
+/* ═══════════════════════════════════════════ */
+.hours-screen {
+  background: #F7F7F8;
+  min-height: 100vh;
+  padding: 0 0 100px;
+}
+
+/* Segmented control */
+.m-segment-wrap { padding: 16px 16px 0; }
+.m-segment {
+  display: flex;
+  background: #EBEBEB;
+  border-radius: 10px;
+  padding: 3px;
+}
+.m-seg-btn {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.m-seg-btn--active {
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.m-seg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #80162B;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Loading */
+.m-loading { display: flex; justify-content: center; padding: 40px 0; }
+
+/* Tab content */
+.m-tab-content { padding: 12px 16px; }
+
+/* View toggle */
+.m-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.m-view-btn {
+  padding: 6px 16px;
+  border: 1.5px solid #ddd;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.m-view-btn--active {
+  border-color: #80162B;
+  color: #80162B;
+  background: rgba(128, 22, 43, 0.06);
+}
+
+/* Day selector pills */
+.m-day-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.m-day-pill {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 16px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.m-day-pill--active {
+  background: #80162B;
+  color: #fff;
+}
+
+/* Sync card */
+.m-sync-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 3px solid #ddd;
+}
+.m-sync-card--success { border-left-color: #0D9488; }
+.m-sync-card--error { border-left-color: #DC2626; }
+.m-sync-card--warning { border-left-color: #F59E0B; }
+.m-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-sync-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #444;
+}
+.m-sync-action {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #f0f0f0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #80162B;
+  cursor: pointer;
+}
+.m-sync-action:disabled { opacity: 0.5; }
+
+/* Day groups */
+.m-day-list { }
+.m-day-group { margin-bottom: 16px; }
+.m-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
+  margin-bottom: 8px;
+}
+.m-block-cards { display: flex; flex-direction: column; gap: 8px; }
+.m-block-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.m-block-card:active { background: #f5f5f5; }
+.m-block-accent {
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.m-block-card--available .m-block-accent { background: #0D9488; }
+.m-block-card--unavailable .m-block-accent { background: #DC2626; }
+.m-block-card--class .m-block-accent { background: #9A3412; }
+.m-block-card--class { cursor: default; opacity: 0.85; }
+.m-block-info { flex: 1; min-width: 0; }
+.m-block-time {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.m-block-type {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-block-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  color: #9A3412;
+  background: rgba(154, 52, 18, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.m-block-chevron { flex-shrink: 0; }
+
+/* Empty state */
+.m-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+.m-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  margin-top: 12px;
+}
+.m-empty-sub {
+  font-size: 13px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* FAB */
+.m-fab {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #80162B;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(128, 22, 43, 0.35);
+  cursor: pointer;
+  z-index: 50;
+  transition: transform 0.15s ease;
+}
+.m-fab:active { transform: scale(0.92); }
+
+/* Save bar */
+.m-save-bar {
+  position: fixed;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid #eee;
+  z-index: 60;
+}
+.m-save-btn {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: #80162B;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-save-btn:disabled { opacity: 0.6; }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
+.slide-up-enter-from { transform: translateY(100%); opacity: 0; }
+.slide-up-leave-to { transform: translateY(100%); opacity: 0; }
+
+/* Time off list */
+.m-timeoff-list { display: flex; flex-direction: column; gap: 10px; }
+.m-timeoff-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+.m-timeoff-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.m-timeoff-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #888;
+}
+.m-timeoff-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.m-timeoff-chip--off { background: rgba(220, 38, 38, 0.1); color: #DC2626; }
+.m-timeoff-chip--on { background: rgba(13, 148, 136, 0.1); color: #0D9488; }
+.m-timeoff-remove {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Bottom sheet */
+.m-bottom-sheet {
+  border-radius: 20px 20px 0 0 !important;
+  padding: 16px 20px 24px;
+}
+.m-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ddd;
+  margin: 0 auto 16px;
+}
+.m-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+}
+.m-sheet-field { margin-bottom: 16px; }
+.m-sheet-field--half { flex: 1; }
+.m-sheet-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.m-sheet-select,
+.m-sheet-input {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #1a1a1a;
+  background: #fafafa;
+  -webkit-appearance: none;
+}
+.m-sheet-select:focus,
+.m-sheet-input:focus {
+  outline: none;
+  border-color: #80162B;
+}
+.m-sheet-type-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.m-type-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.m-type-btn--active-avail {
+  border-color: #0D9488;
+  color: #0D9488;
+  background: rgba(13, 148, 136, 0.06);
+}
+.m-type-btn--active-unavail {
+  border-color: #DC2626;
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+.m-sheet-time-row { display: flex; gap: 12px; margin-bottom: 20px; }
+.m-sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+.m-sheet-cancel {
+  flex: 1;
+  padding: 13px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+}
+.m-sheet-confirm {
+  flex: 1;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: #80162B;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
 }
 </style>

@@ -1,3 +1,15 @@
+/**
+ * studentMobileNavigation.js
+ *
+ * Single source of truth for the student mobile IA.
+ *
+ * Primary bottom nav: 5 tabs
+ *   Home · Schedule · Clock (center) · Trade · Hours
+ *
+ * Secondary pages are accessible via the profile/avatar menu in the
+ * top bar — not promoted to a bottom tab.
+ */
+
 const studentMobilePrimaryTabs = [
   {
     key: 'dashboard',
@@ -13,17 +25,17 @@ const studentMobilePrimaryTabs = [
     label: 'Schedule',
     routeName: 'student-schedule',
     title: 'My Schedule',
-    icon: 'mdi-calendar-clock',
-    iconOutline: 'mdi-calendar-clock-outline',
+    icon: 'mdi-calendar-week',
+    iconOutline: 'mdi-calendar-week-outline',
     order: 1,
   },
   {
     key: 'clock',
-    label: 'Clock In',
+    label: 'Clock',
     routeName: 'student-clock',
-    title: 'Clock In/Out',
-    icon: 'mdi-clock-check-outline',
-    iconOutline: 'mdi-clock-check-outline',
+    title: 'Clock In / Out',
+    icon: 'mdi-clock-outline',
+    iconOutline: 'mdi-clock-outline',
     isCenter: true,
     order: 2,
   },
@@ -37,10 +49,10 @@ const studentMobilePrimaryTabs = [
     order: 3,
   },
   {
-    key: 'availability',
+    key: 'hours',
     label: 'Hours',
     routeName: 'student-availability',
-    title: 'Availability',
+    title: 'Availability & Hours',
     icon: 'mdi-calendar-edit',
     iconOutline: 'mdi-calendar-edit-outline',
     order: 4,

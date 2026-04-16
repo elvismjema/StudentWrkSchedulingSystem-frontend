@@ -6,7 +6,7 @@
     <v-row dense>
       <v-col
         v-for="item in menuItems"
-        :key="item.route"
+        :key="item.routeName"
         cols="6"
         sm="4"
       >
@@ -15,7 +15,7 @@
           rounded="lg"
           border
           class="hub-card fill-height pa-4 text-center d-flex flex-column align-center justify-center"
-          @click="$router.push({ name: item.route })"
+          @click="$router.push({ name: item.routeName })"
         >
           <v-icon size="36" :color="item.color" class="mb-2">{{ item.icon }}</v-icon>
           <div class="text-body-2 font-weight-bold">{{ item.label }}</div>
@@ -27,57 +27,7 @@
 </template>
 
 <script setup>
-const menuItems = [
-  {
-    label: 'Availability',
-    description: 'Weekly hours & time off',
-    icon: 'mdi-calendar-edit',
-    color: '#0D9488',
-    route: 'student-availability',
-  },
-  {
-    label: 'Tasks',
-    description: 'Assigned tasks & to-dos',
-    icon: 'mdi-checkbox-marked-outline',
-    color: '#196CA2',
-    route: 'student-tasks',
-  },
-  {
-    label: 'Notifications',
-    description: 'Alerts & messages',
-    icon: 'mdi-bell-outline',
-    color: '#F8C545',
-    route: 'student-notifications',
-  },
-  {
-    label: 'Departments',
-    description: 'Your departments',
-    icon: 'mdi-office-building',
-    color: '#032F45',
-    route: 'student-departments',
-  },
-  {
-    label: 'Qualifications',
-    description: 'Skills & certifications',
-    icon: 'mdi-certificate',
-    color: '#63BAC0',
-    route: 'student-qualifications',
-  },
-  {
-    label: 'Profile',
-    description: 'Your account info',
-    icon: 'mdi-account',
-    color: '#80162B',
-    route: 'student-profile',
-  },
-  {
-    label: 'Settings',
-    description: 'Preferences & config',
-    icon: 'mdi-cog',
-    color: '#616161',
-    route: 'student-settings',
-  },
-];
+import { studentMoreItems as menuItems } from '../config/studentMobileNavigation.js';
 </script>
 
 <style scoped>

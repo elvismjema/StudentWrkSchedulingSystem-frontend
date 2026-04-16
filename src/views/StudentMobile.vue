@@ -12,6 +12,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
+import { studentMobileTabs, studentMobileRouteOrder } from '../config/studentMobileNavigation.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import NotificationDropdown from '../components/NotificationDropdown.vue';
 import NotificationService from '../services/notifications.js';
@@ -43,61 +44,28 @@ const displayEmail = computed(() => user.value?.email || '');
 
 // ─── Page title based on current route ───
 const pageTitle = computed(() => {
-  const titles = {
-    'student-dashboard': 'Dashboard',
-    'student-schedule': 'My Schedule',
-    'student-clock': 'Clock In/Out',
-    'student-trade-board': 'Trade Board',
-    'student-availability': 'Availability',
-    'student-tasks': 'Tasks',
-    'student-notifications': 'Notifications',
-    'student-departments': 'Departments',
-    'student-qualifications': 'Qualifications',
-    'student-profile': 'Profile',
-    'student-settings': 'Settings',
-    'student-more': 'More',
-  };
-  return titles[route.name] || resolvedDepartmentName.value || 'OC WorkSchedule';
+  return route.meta?.mobileTitle || resolvedDepartmentName.value || 'OC WorkSchedule';
 });
 
 // ─── Bottom nav ───
 const activeTab = computed(() => {
-  const name = route.name;
-  // Map child routes back to their parent tab
-  const moreRoutes = ['student-availability', 'student-tasks', 'student-notifications', 'student-departments', 'student-qualifications', 'student-profile', 'student-settings', 'student-more'];
-  if (moreRoutes.includes(name)) return 'more';
-  const tabMap = {
-    'student-dashboard': 'dashboard',
-    'student-schedule': 'schedule',
-    'student-clock': 'clock',
-    'student-trade-board': 'trade',
-  };
-  return tabMap[name] || 'dashboard';
+  return route.meta?.mobileTab || 'dashboard';
 });
 
 const navigateTab = (tab) => {
-  const routeMap = {
-    dashboard: 'student-dashboard',
-    schedule: 'student-schedule',
-    clock: 'student-clock',
-    trade: 'student-trade-board',
-    more: 'student-more',
-  };
-  const target = routeMap[tab];
-  if (target && route.name !== target) {
-    router.push({ name: target });
+  if (tab?.routeName && route.name !== tab.routeName) {
+    router.push({ name: tab.routeName });
   }
 };
 
 // ─── Transition direction ───
 const transitionName = ref('fade');
-const routeOrder = ['student-dashboard', 'student-schedule', 'student-clock', 'student-trade-board', 'student-more', 'student-availability', 'student-tasks', 'student-notifications', 'student-departments', 'student-qualifications', 'student-profile', 'student-settings'];
 
 watch(
   () => route.name,
   (to, from) => {
-    const toIdx = routeOrder.indexOf(to);
-    const fromIdx = routeOrder.indexOf(from);
+    const toIdx = studentMobileRouteOrder.indexOf(to);
+    const fromIdx = studentMobileRouteOrder.indexOf(from);
     if (toIdx < 0 || fromIdx < 0) {
       transitionName.value = 'fade';
     } else {
@@ -235,16 +203,10 @@ const handleSignOut = () => {
     <!-- ═══ Bottom Navigation ═══ -->
     <nav class="mobile-bottom-nav">
       <button
-        v-for="tab in [
-          { key: 'dashboard', label: 'Home', icon: 'mdi-view-dashboard', iconOutline: 'mdi-view-dashboard-outline' },
-          { key: 'schedule', label: 'Schedule', icon: 'mdi-calendar-clock', iconOutline: 'mdi-calendar-clock-outline' },
-          { key: 'clock', label: 'Clock In', icon: 'mdi-clock-check-outline', iconOutline: 'mdi-clock-check-outline', isCenter: true },
-          { key: 'trade', label: 'Trade', icon: 'mdi-swap-horizontal-circle', iconOutline: 'mdi-swap-horizontal-circle-outline' },
-          { key: 'more', label: 'More', icon: 'mdi-dots-horizontal-circle', iconOutline: 'mdi-dots-horizontal-circle-outline', hasBadge: true },
-        ]"
+        v-for="tab in studentMobileTabs"
         :key="tab.key"
         :class="['nav-tab', { 'nav-tab--active': activeTab === tab.key }]"
-        @click="navigateTab(tab.key)"
+        @click="navigateTab(tab)"
       >
         <!-- Center Clock In button -->
         <template v-if="tab.isCenter">

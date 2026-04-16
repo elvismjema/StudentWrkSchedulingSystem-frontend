@@ -52,7 +52,7 @@ const studentMobilePrimaryTabs = [
     key: 'hours',
     label: 'Hours',
     routeName: 'student-availability',
-    title: 'Availability & Hours',
+    title: 'Hours',
     icon: 'mdi-calendar-edit',
     iconOutline: 'mdi-calendar-edit-outline',
     order: 4,

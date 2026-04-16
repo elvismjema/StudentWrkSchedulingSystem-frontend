@@ -172,66 +172,57 @@ const handleSignOut = () => {
 </script>
 
 <template>
-  <v-app class="mobile-app">
+  <div class="mobile-app">
     <!-- ═══ Mobile Top Bar ═══ -->
-    <v-app-bar
-      flat
-      density="compact"
-      class="mobile-top-bar"
-      height="56"
-    >
-      <v-app-bar-title class="text-body-1 font-weight-bold">
-        {{ pageTitle }}
-      </v-app-bar-title>
+    <div class="mobile-top-bar">
+      <div class="mobile-top-bar-title">{{ pageTitle }}</div>
+      <div class="mobile-top-bar-actions">
+        <NotificationDropdown />
+        <v-menu
+          v-model="menuOpen"
+          :close-on-content-click="false"
+          location="bottom end"
+          offset="8"
+        >
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon variant="text" size="small" class="ml-1">
+              <v-avatar size="30" class="mobile-avatar">
+                <span class="mobile-avatar-text">{{ displayInitial }}</span>
+              </v-avatar>
+            </v-btn>
+          </template>
 
-      <v-spacer />
-
-      <NotificationDropdown />
-
-      <v-menu
-        v-model="menuOpen"
-        :close-on-content-click="false"
-        location="bottom end"
-        offset="8"
-      >
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon variant="text" size="small" class="ml-1">
-            <v-avatar size="30" class="mobile-avatar">
-              <span class="mobile-avatar-text">{{ displayInitial }}</span>
-            </v-avatar>
-          </v-btn>
-        </template>
-
-        <v-card class="profile-menu" min-width="240" rounded="lg">
-          <div class="profile-header">
-            <v-avatar size="40" class="profile-header-avatar">
-              <span class="profile-header-initial">{{ displayInitial }}</span>
-            </v-avatar>
-            <div class="profile-header-info">
-              <div class="profile-header-name">{{ displayName }}</div>
-              <div class="profile-header-email">{{ displayEmail }}</div>
+          <v-card class="profile-menu" min-width="240" rounded="lg">
+            <div class="profile-header">
+              <v-avatar size="40" class="profile-header-avatar">
+                <span class="profile-header-initial">{{ displayInitial }}</span>
+              </v-avatar>
+              <div class="profile-header-info">
+                <div class="profile-header-name">{{ displayName }}</div>
+                <div class="profile-header-email">{{ displayEmail }}</div>
+              </div>
             </div>
-          </div>
-          <v-divider />
-          <v-list density="compact">
-            <v-list-item :to="'/student/settings'" @click="menuOpen = false">
-              <template #prepend><v-icon icon="mdi-cog-outline" size="18" /></template>
-              <v-list-item-title>Settings</v-list-item-title>
-            </v-list-item>
-          </v-list>
-          <v-divider />
-          <v-list density="compact">
-            <v-list-item @click="handleSignOut">
-              <template #prepend><v-icon icon="mdi-logout" size="18" color="#d32f2f" /></template>
-              <v-list-item-title class="text-error">Sign out</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </v-menu>
-    </v-app-bar>
+            <v-divider />
+            <v-list density="compact">
+              <v-list-item :to="'/student/settings'" @click="menuOpen = false">
+                <template #prepend><v-icon icon="mdi-cog-outline" size="18" /></template>
+                <v-list-item-title>Settings</v-list-item-title>
+              </v-list-item>
+            </v-list>
+            <v-divider />
+            <v-list density="compact">
+              <v-list-item @click="handleSignOut">
+                <template #prepend><v-icon icon="mdi-logout" size="18" color="#d32f2f" /></template>
+                <v-list-item-title class="text-error">Sign out</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-card>
+        </v-menu>
+      </div>
+    </div>
 
     <!-- ═══ Content Area ═══ -->
-    <v-main class="mobile-main">
+    <div class="mobile-main">
       <div class="mobile-content">
         <router-view v-slot="{ Component }">
           <transition :name="transitionName" mode="out-in">
@@ -239,61 +230,84 @@ const handleSignOut = () => {
           </transition>
         </router-view>
       </div>
-    </v-main>
+    </div>
 
     <!-- ═══ Bottom Navigation ═══ -->
-    <v-bottom-navigation
-      :model-value="activeTab"
-      grow
-      class="mobile-bottom-nav"
-      height="64"
-      bg-color="white"
-      elevation="8"
-    >
-      <v-btn value="dashboard" @click="navigateTab('dashboard')" class="nav-tab">
-        <v-icon :icon="activeTab === 'dashboard' ? 'mdi-view-dashboard' : 'mdi-view-dashboard-outline'" />
-        <span class="nav-label">Home</span>
-      </v-btn>
+    <nav class="mobile-bottom-nav">
+      <button
+        v-for="tab in [
+          { key: 'dashboard', label: 'Home', icon: 'mdi-view-dashboard', iconOutline: 'mdi-view-dashboard-outline' },
+          { key: 'schedule', label: 'Schedule', icon: 'mdi-calendar-clock', iconOutline: 'mdi-calendar-clock-outline' },
+          { key: 'clock', label: 'Clock In', icon: 'mdi-clock-check-outline', iconOutline: 'mdi-clock-check-outline', isCenter: true },
+          { key: 'trade', label: 'Trade', icon: 'mdi-swap-horizontal-circle', iconOutline: 'mdi-swap-horizontal-circle-outline' },
+          { key: 'more', label: 'More', icon: 'mdi-dots-horizontal-circle', iconOutline: 'mdi-dots-horizontal-circle-outline', hasBadge: true },
+        ]"
+        :key="tab.key"
+        :class="['nav-tab', { 'nav-tab--active': activeTab === tab.key }]"
+        @click="navigateTab(tab.key)"
+      >
+        <!-- Center Clock In button -->
+        <template v-if="tab.isCenter">
+          <div :class="['clock-icon-wrapper', { 'clock-pulse': !isClockedIn }]">
+            <v-icon icon="mdi-clock-check-outline" size="24" color="white" />
+          </div>
+        </template>
 
-      <v-btn value="schedule" @click="navigateTab('schedule')" class="nav-tab">
-        <v-icon :icon="activeTab === 'schedule' ? 'mdi-calendar-clock' : 'mdi-calendar-clock-outline'" />
-        <span class="nav-label">Schedule</span>
-      </v-btn>
+        <!-- Regular tab with optional badge -->
+        <template v-else>
+          <div class="nav-icon-wrap">
+            <v-icon :icon="activeTab === tab.key ? tab.icon : tab.iconOutline" size="24" />
+            <span
+              v-if="tab.hasBadge && unreadNotifications > 0"
+              class="nav-badge"
+            >{{ unreadNotifications > 9 ? '9+' : unreadNotifications }}</span>
+          </div>
+        </template>
 
-      <v-btn value="clock" @click="navigateTab('clock')" class="nav-tab clock-tab">
-        <div :class="['clock-icon-wrapper', { 'clock-pulse': !isClockedIn }]">
-          <v-icon icon="mdi-clock-check-outline" size="24" color="white" />
-        </div>
-        <span class="nav-label clock-label">Clock In</span>
-      </v-btn>
-
-      <v-btn value="trade" @click="navigateTab('trade')" class="nav-tab">
-        <v-icon :icon="activeTab === 'trade' ? 'mdi-swap-horizontal-circle' : 'mdi-swap-horizontal-circle-outline'" />
-        <span class="nav-label">Trade</span>
-      </v-btn>
-
-      <v-btn value="more" @click="navigateTab('more')" class="nav-tab">
-        <v-badge
-          :content="unreadNotifications"
-          :model-value="unreadNotifications > 0"
-          color="error"
-          floating
-          offset-x="-2"
-          offset-y="2"
-        >
-          <v-icon :icon="activeTab === 'more' ? 'mdi-dots-horizontal-circle' : 'mdi-dots-horizontal-circle-outline'" />
-        </v-badge>
-        <span class="nav-label">More</span>
-      </v-btn>
-    </v-bottom-navigation>
-  </v-app>
+        <span :class="['nav-label', { 'clock-label': tab.isCenter }]">{{ tab.label }}</span>
+      </button>
+    </nav>
+  </div>
 </template>
 
 <style scoped>
+/* ─── Layout ─── */
+.mobile-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #fafafa;
+}
+
 /* ─── Top Bar ─── */
 .mobile-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 12px 0 16px;
+  background: #fff;
   border-bottom: 1px solid #eee;
-  background: #fff !important;
+}
+
+.mobile-top-bar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .mobile-avatar {
@@ -308,27 +322,82 @@ const handleSignOut = () => {
 
 /* ─── Content ─── */
 .mobile-main {
-  background: #fafafa;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-content {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-  min-height: calc(100vh - 56px);
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  min-height: 100%;
 }
 
 /* ─── Bottom Navigation ─── */
 .mobile-bottom-nav {
-  border-top: 1px solid #eee;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  height: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-top: 6px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #ffffff;
+  border-top: 1px solid #e8e8e8;
+  box-shadow: 0 -1px 12px rgba(0, 0, 0, 0.06);
 }
 
 .nav-tab {
-  min-width: 0 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  color: #999;
+  transition: color 0.15s ease;
 }
 
-.nav-tab .v-icon {
-  font-size: 22px;
-  margin-bottom: 2px;
+.nav-tab--active {
+  color: #80162B;
+}
+
+.nav-tab--active .nav-label {
+  color: #80162B;
+  font-weight: 600;
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #EE5044;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }
 
 .nav-label {
@@ -336,7 +405,8 @@ const handleSignOut = () => {
   font-weight: 500;
   letter-spacing: 0.01em;
   line-height: 1;
-  margin-top: 2px;
+  margin-top: 3px;
+  color: inherit;
 }
 
 /* ─── Clock In center button (accent) ─── */
@@ -374,15 +444,7 @@ const handleSignOut = () => {
   }
 }
 
-/* Active tab state */
-.mobile-bottom-nav .v-btn--active .v-icon {
-  color: #80162B;
-}
 
-.mobile-bottom-nav .v-btn--active .nav-label {
-  color: #80162B;
-  font-weight: 600;
-}
 
 /* ─── Profile dropdown ─── */
 .profile-menu {

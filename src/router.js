@@ -12,6 +12,7 @@ import StudentShell from "./views/StudentShell.vue";
 import Manager from "./views/Manager.vue";
 import Admin from "./views/Admin.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
+import { getStudentMobileRouteMeta } from "./config/studentMobileNavigation";
 
 const getStoredRole = () => {
   const user = Utils.getStore("user");
@@ -78,61 +79,73 @@ const router = createRouter({
           path: "dashboard",
           name: "student-dashboard",
           component: () => import("./views/StudentDashboard.vue"),
+          meta: getStudentMobileRouteMeta("student-dashboard"),
         },
         {
           path: "schedule",
           name: "student-schedule",
           component: () => import("./views/StudentSchedule.vue"),
+          meta: getStudentMobileRouteMeta("student-schedule"),
         },
         {
           path: "clock",
           name: "student-clock",
           component: () => import("./views/StudentClock.vue"),
+          meta: getStudentMobileRouteMeta("student-clock"),
         },
         {
           path: "more",
           name: "student-more",
           component: () => import("./views/StudentMore.vue"),
+          meta: getStudentMobileRouteMeta("student-more"),
         },
         {
           path: "departments",
           name: "student-departments",
           component: () => import("./views/StudentDepartments.vue"),
+          meta: getStudentMobileRouteMeta("student-departments"),
         },
         {
           path: "availability",
           name: "student-availability",
           component: () => import("./views/StudentAvailability.vue"),
+          meta: getStudentMobileRouteMeta("student-availability"),
         },
         {
           path: "trade-board",
           name: "student-trade-board",
           component: () => import("./views/StudentTradeBoard.vue"),
+          meta: getStudentMobileRouteMeta("student-trade-board"),
         },
         {
           path: "tasks",
           name: "student-tasks",
           component: () => import("./views/StudentTasks.vue"),
+          meta: getStudentMobileRouteMeta("student-tasks"),
         },
         {
           path: "notifications",
           name: "student-notifications",
           component: () => import("./views/StudentNotifications.vue"),
+          meta: getStudentMobileRouteMeta("student-notifications"),
         },
         {
           path: "profile",
           name: "student-profile",
           component: () => import("./views/StudentProfile.vue"),
+          meta: getStudentMobileRouteMeta("student-profile"),
         },
         {
           path: "qualifications",
           name: "student-qualifications",
           component: () => import("./views/StudentQualifications.vue"),
+          meta: getStudentMobileRouteMeta("student-qualifications"),
         },
         {
           path: "settings",
           name: "student-settings",
           component: () => import("./views/StudentSettings.vue"),
+          meta: getStudentMobileRouteMeta("student-settings"),
         },
         {
           path: "shifts/:id",

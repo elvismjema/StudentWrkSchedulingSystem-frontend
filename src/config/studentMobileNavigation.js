@@ -4,8 +4,8 @@ const studentMobilePrimaryTabs = [
     label: 'Home',
     routeName: 'student-dashboard',
     title: 'Dashboard',
-    icon: 'mdi-view-dashboard',
-    iconOutline: 'mdi-view-dashboard-outline',
+    icon: 'mdi-home-variant',
+    iconOutline: 'mdi-home-variant-outline',
     order: 0,
   },
   {
@@ -37,29 +37,17 @@ const studentMobilePrimaryTabs = [
     order: 3,
   },
   {
-    key: 'more',
-    label: 'More',
-    routeName: 'student-more',
-    title: 'More',
-    icon: 'mdi-dots-horizontal-circle',
-    iconOutline: 'mdi-dots-horizontal-circle-outline',
-    hasBadge: true,
+    key: 'availability',
+    label: 'Hours',
+    routeName: 'student-availability',
+    title: 'Availability',
+    icon: 'mdi-calendar-edit',
+    iconOutline: 'mdi-calendar-edit-outline',
     order: 4,
   },
 ];
 
 export const studentMoreItems = [
-  {
-    key: 'availability',
-    label: 'Availability',
-    description: 'Weekly hours & time off',
-    icon: 'mdi-calendar-edit',
-    color: '#0D9488',
-    routeName: 'student-availability',
-    title: 'Availability',
-    tab: 'more',
-    order: 5,
-  },
   {
     key: 'tasks',
     label: 'Tasks',
@@ -68,8 +56,8 @@ export const studentMoreItems = [
     color: '#196CA2',
     routeName: 'student-tasks',
     title: 'Tasks',
-    tab: 'more',
-    order: 6,
+    tab: null,
+    order: 5,
   },
   {
     key: 'notifications',
@@ -79,8 +67,8 @@ export const studentMoreItems = [
     color: '#F8C545',
     routeName: 'student-notifications',
     title: 'Notifications',
-    tab: 'more',
-    order: 7,
+    tab: null,
+    order: 6,
   },
   {
     key: 'departments',
@@ -90,8 +78,8 @@ export const studentMoreItems = [
     color: '#032F45',
     routeName: 'student-departments',
     title: 'Departments',
-    tab: 'more',
-    order: 8,
+    tab: null,
+    order: 7,
   },
   {
     key: 'qualifications',
@@ -101,8 +89,8 @@ export const studentMoreItems = [
     color: '#63BAC0',
     routeName: 'student-qualifications',
     title: 'Qualifications',
-    tab: 'more',
-    order: 9,
+    tab: null,
+    order: 8,
   },
   {
     key: 'profile',
@@ -112,8 +100,8 @@ export const studentMoreItems = [
     color: '#80162B',
     routeName: 'student-profile',
     title: 'Profile',
-    tab: 'more',
-    order: 10,
+    tab: null,
+    order: 9,
   },
   {
     key: 'settings',
@@ -123,8 +111,8 @@ export const studentMoreItems = [
     color: '#616161',
     routeName: 'student-settings',
     title: 'Settings',
-    tab: 'more',
-    order: 11,
+    tab: null,
+    order: 10,
   },
 ];
 
@@ -146,6 +134,12 @@ const studentMobileRouteConfig = [
     mobileTab: item.tab,
     mobileOrder: item.order,
   })),
+  {
+    routeName: 'student-more',
+    mobileTitle: 'More',
+    mobileTab: null,
+    mobileOrder: 11,
+  },
 ];
 
 export const studentMobileRouteOrder = studentMobileRouteConfig

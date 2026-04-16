@@ -49,7 +49,7 @@ const pageTitle = computed(() => {
 
 // ─── Bottom nav ───
 const activeTab = computed(() => {
-  return route.meta?.mobileTab || 'dashboard';
+  return route.meta?.mobileTab ?? null;
 });
 
 const navigateTab = (tab) => {
@@ -171,14 +171,7 @@ const handleSignOut = () => {
               </div>
             </div>
             <v-divider />
-            <v-list density="compact">
-              <v-list-item :to="'/student/settings'" @click="menuOpen = false">
-                <template #prepend><v-icon icon="mdi-cog-outline" size="18" /></template>
-                <v-list-item-title>Settings</v-list-item-title>
-              </v-list-item>
-            </v-list>
-            <v-divider />
-            <v-list density="compact">
+            <v-list density="compact" nav>
               <v-list-item @click="handleSignOut">
                 <template #prepend><v-icon icon="mdi-logout" size="18" color="#d32f2f" /></template>
                 <v-list-item-title class="text-error">Sign out</v-list-item-title>

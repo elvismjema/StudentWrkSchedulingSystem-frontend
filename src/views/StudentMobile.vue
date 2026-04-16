@@ -55,7 +55,6 @@ const pageTitle = computed(() => {
     'student-qualifications': 'Qualifications',
     'student-profile': 'Profile',
     'student-settings': 'Settings',
-    'student-more': 'More',
   };
   return titles[route.name] || resolvedDepartmentName.value || 'OC WorkSchedule';
 });
@@ -63,15 +62,14 @@ const pageTitle = computed(() => {
 // ─── Bottom nav ───
 const activeTab = computed(() => {
   const name = route.name;
-  // Map child routes back to their parent tab
-  const moreRoutes = ['student-availability', 'student-tasks', 'student-notifications', 'student-departments', 'student-qualifications', 'student-profile', 'student-settings', 'student-more'];
-  if (moreRoutes.includes(name)) return 'more';
   const tabMap = {
     'student-dashboard': 'dashboard',
     'student-schedule': 'schedule',
     'student-clock': 'clock',
     'student-trade-board': 'trade',
+    'student-availability': 'availability',
   };
+  // Secondary screens (reached via profile menu) don't highlight any tab
   return tabMap[name] || 'dashboard';
 });
 
@@ -81,7 +79,7 @@ const navigateTab = (tab) => {
     schedule: 'student-schedule',
     clock: 'student-clock',
     trade: 'student-trade-board',
-    more: 'student-more',
+    availability: 'student-availability',
   };
   const target = routeMap[tab];
   if (target && route.name !== target) {
@@ -91,7 +89,7 @@ const navigateTab = (tab) => {
 
 // ─── Transition direction ───
 const transitionName = ref('fade');
-const routeOrder = ['student-dashboard', 'student-schedule', 'student-clock', 'student-trade-board', 'student-more', 'student-availability', 'student-tasks', 'student-notifications', 'student-departments', 'student-qualifications', 'student-profile', 'student-settings'];
+const routeOrder = ['student-dashboard', 'student-schedule', 'student-clock', 'student-trade-board', 'student-availability'];
 
 watch(
   () => route.name,
@@ -203,14 +201,7 @@ const handleSignOut = () => {
               </div>
             </div>
             <v-divider />
-            <v-list density="compact">
-              <v-list-item :to="'/student/settings'" @click="menuOpen = false">
-                <template #prepend><v-icon icon="mdi-cog-outline" size="18" /></template>
-                <v-list-item-title>Settings</v-list-item-title>
-              </v-list-item>
-            </v-list>
-            <v-divider />
-            <v-list density="compact">
+            <v-list density="compact" nav>
               <v-list-item @click="handleSignOut">
                 <template #prepend><v-icon icon="mdi-logout" size="18" color="#d32f2f" /></template>
                 <v-list-item-title class="text-error">Sign out</v-list-item-title>
@@ -236,11 +227,11 @@ const handleSignOut = () => {
     <nav class="mobile-bottom-nav">
       <button
         v-for="tab in [
-          { key: 'dashboard', label: 'Home', icon: 'mdi-view-dashboard', iconOutline: 'mdi-view-dashboard-outline' },
+          { key: 'dashboard', label: 'Home', icon: 'mdi-home-variant', iconOutline: 'mdi-home-variant-outline' },
           { key: 'schedule', label: 'Schedule', icon: 'mdi-calendar-clock', iconOutline: 'mdi-calendar-clock-outline' },
           { key: 'clock', label: 'Clock In', icon: 'mdi-clock-check-outline', iconOutline: 'mdi-clock-check-outline', isCenter: true },
           { key: 'trade', label: 'Trade', icon: 'mdi-swap-horizontal-circle', iconOutline: 'mdi-swap-horizontal-circle-outline' },
-          { key: 'more', label: 'More', icon: 'mdi-dots-horizontal-circle', iconOutline: 'mdi-dots-horizontal-circle-outline', hasBadge: true },
+          { key: 'availability', label: 'Hours', icon: 'mdi-calendar-edit', iconOutline: 'mdi-calendar-edit-outline' },
         ]"
         :key="tab.key"
         :class="['nav-tab', { 'nav-tab--active': activeTab === tab.key }]"

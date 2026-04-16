@@ -7,11 +7,11 @@
     <div class="t-segment-wrap">
       <div class="t-segment">
         <button class="t-seg-btn" :class="{ 't-seg-btn--active': activeTab === 'open' }" @click="activeTab = 'open'">
-          Open
+          Open Shifts
           <span v-if="openRequests.length" class="t-seg-badge">{{ openRequests.length }}</span>
         </button>
         <button class="t-seg-btn" :class="{ 't-seg-btn--active': activeTab === 'mine' }" @click="activeTab = 'mine'">
-          Mine
+          My Shifts
           <span v-if="myRequests.length" class="t-seg-badge t-seg-badge--grey">{{ myRequests.length }}</span>
         </button>
         <button class="t-seg-btn" :class="{ 't-seg-btn--active': activeTab === 'incoming' }" @click="activeTab = 'incoming'">

@@ -1,5 +1,4 @@
 import apiClient from "./services.js";
-import Utils from "../config/utils.js";
 import { formatDateTime } from "../utils/tz.js";
 
 const iconForType = (type = "", title = "") => {
@@ -36,14 +35,9 @@ const toUiNotification = (item) => ({
   type: item.type || null,
 });
 
-const getCurrentUserId = () => Utils.getStore("user")?.userId;
-
 class NotificationService {
   static async getNotifications() {
-    const userId = getCurrentUserId();
-    const response = await apiClient.get("/notifications", {
-      params: userId ? { userId } : {},
-    });
+    const response = await apiClient.get("/notifications");
     const payload = response?.data?.data || [];
     return payload.map(toUiNotification);
   }
@@ -66,10 +60,7 @@ class NotificationService {
   }
 
   static async clearAllNotifications() {
-    const userId = getCurrentUserId();
-    await apiClient.delete(`/notifications`, {
-      params: userId ? { userId } : {},
-    });
+    await apiClient.delete(`/notifications`);
     return true;
   }
 

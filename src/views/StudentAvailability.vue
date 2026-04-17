@@ -53,8 +53,67 @@
         </button>
       </div>
 
+      <!-- Week / day navigation -->
+      <div class="m-range-nav">
+        <button class="m-range-nav-btn" @click="goPrevRange">
+          <v-icon icon="mdi-chevron-left" size="16" />
+        </button>
+        <div class="m-range-nav-label">{{ mobileRangeLabel }}</div>
+        <button class="m-range-nav-btn" @click="goNextRange">
+          <v-icon icon="mdi-chevron-right" size="16" />
+        </button>
+        <button
+          class="m-range-today-btn"
+          :class="{ 'm-range-today-btn--active': mobileWeekOffset === 0 }"
+          @click="goToCurrentWeek"
+        >
+          Today
+        </button>
+      </div>
+
+      <div class="m-day-selector">
+        <button
+          v-if="mobileViewMode === 'list'"
+          class="m-day-pill"
+          :class="{ 'm-day-pill--active': mobileDayIndex === -1 }"
+          @click="mobileDayIndex = -1"
+        >
+          <span class="m-day-pill-dow">All</span>
+        </button>
+        <button
+          v-for="dow in DAY_ORDER"
+          :key="`pill-${dow}`"
+          class="m-day-pill"
+          :class="{
+            'm-day-pill--active': isMobileDaySelected(dow),
+            'm-day-pill--has-class': dayHasClass(dow),
+          }"
+          @click="selectMobileDay(dow)"
+        >
+          <span class="m-day-pill-dow">{{ DOW_LABELS[dow].slice(0, 3) }}</span>
+          <span class="m-day-pill-date">{{ formatShortMonthDay(mobileWeekDatesByDow[dow]) }}</span>
+        </button>
+      </div>
+
       <!-- ═══ CALENDAR VIEW ═══ -->
       <div v-if="mobileViewMode === 'calendar'" class="m-cal">
+        <div class="m-cal-mode-toggle">
+          <button
+            class="m-cal-mode-btn"
+            :class="{ 'm-cal-mode-btn--active': mobileCalendarMode === 'week' }"
+            @click="mobileCalendarMode = 'week'"
+          >
+            Week
+          </button>
+          <button
+            class="m-cal-mode-btn"
+            :class="{ 'm-cal-mode-btn--active': mobileCalendarMode === 'day' }"
+            @click="mobileCalendarMode = 'day'"
+          >
+            Day
+          </button>
+        </div>
+
         <!-- Legend -->
         <div class="m-cal-legend">
           <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--class"></span>Class</span>
@@ -63,7 +122,7 @@
         </div>
 
         <!-- Grid -->
-        <div class="m-cal-grid">
+        <div class="m-cal-grid" :class="{ 'm-cal-grid--day': mobileCalendarMode === 'day' }">
           <!-- Time gutter -->
           <div class="m-cal-gutter">
             <div class="m-cal-gutter-header"></div>
@@ -71,50 +130,70 @@
               {{ hour > 12 ? hour - 12 : hour }}{{ hour >= 12 ? 'p' : 'a' }}
             </div>
           </div>
-          <!-- Day columns -->
-          <div v-for="dow in [1, 2, 3, 4, 5, 6, 0]" :key="dow" class="m-cal-col">
-            <div class="m-cal-col-header">{{ DOW_LABELS[dow].slice(0, 3) }}</div>
-            <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
-              <!-- Hour grid lines -->
-              <div v-for="(hour, i) in calGridHours" :key="'line-' + hour" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
-              <!-- Blocks -->
-              <div
-                v-for="block in getCalBlocksForDay(dow)"
-                :key="block.tempId"
-                class="m-cal-block"
-                :class="{
-                  'm-cal-block--class': isClassScheduleBlock(block),
-                  'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
-                  'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
-                }"
-                :style="calcBlockStyle(block)"
-                @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
-              >
-                <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
+          <!-- Week columns -->
+          <template v-if="mobileCalendarMode === 'week'">
+            <div v-for="dow in DAY_ORDER" :key="`week-col-${dow}`" class="m-cal-col">
+              <div class="m-cal-col-header">
+                <span class="m-cal-col-dow">{{ DOW_LABELS[dow].slice(0, 3) }}</span>
+                <span class="m-cal-col-date">{{ formatShortMonthDay(mobileWeekDatesByDow[dow]) }}</span>
+              </div>
+              <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
+                <!-- Hour grid lines -->
+                <div v-for="(hour, i) in calGridHours" :key="`week-line-${dow}-${hour}`" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
+                <!-- Blocks -->
+                <div
+                  v-for="block in getCalBlocksForDay(dow)"
+                  :key="block.tempId"
+                  class="m-cal-block"
+                  :class="{
+                    'm-cal-block--class': isClassScheduleBlock(block),
+                    'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
+                    'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
+                  }"
+                  :style="calcBlockStyle(block)"
+                  @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+                >
+                  <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <!-- Single-day column -->
+          <template v-else>
+            <div class="m-cal-col m-cal-col--single">
+              <div class="m-cal-col-header">
+                <span class="m-cal-col-dow">{{ DOW_LABELS[mobileCalendarDay].slice(0, 3) }}</span>
+                <span class="m-cal-col-date">{{ formatLongDate(mobileWeekDatesByDow[mobileCalendarDay]) }}</span>
+              </div>
+              <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
+                <div v-for="(hour, i) in calGridHours" :key="`day-line-${hour}`" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
+                <div
+                  v-for="block in getCalBlocksForDay(mobileCalendarDay)"
+                  :key="block.tempId"
+                  class="m-cal-block"
+                  :class="{
+                    'm-cal-block--class': isClassScheduleBlock(block),
+                    'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
+                    'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
+                  }"
+                  :style="calcBlockStyle(block)"
+                  @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+                >
+                  <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
       <!-- ═══ LIST VIEW ═══ -->
       <template v-if="mobileViewMode === 'list'">
-        <!-- Day selector pills -->
-        <div class="m-day-selector">
-          <button class="m-day-pill" :class="{ 'm-day-pill--active': mobileDayIndex === -1 }" @click="mobileDayIndex = -1">All</button>
-          <button
-            v-for="dow in [1, 2, 3, 4, 5, 6, 0]"
-            :key="dow"
-            class="m-day-pill"
-            :class="{ 'm-day-pill--active': mobileDayIndex === dow, 'm-day-pill--has-class': dayHasClass(dow) }"
-            @click="mobileDayIndex = dow"
-          >{{ DOW_LABELS[dow].slice(0, 3) }}</button>
-        </div>
-
         <!-- Day-by-day blocks list -->
         <div v-if="mobileFilteredBlocks.length" class="m-day-list">
           <div v-for="group in mobileFilteredBlocks" :key="group.dow" class="m-day-group">
-            <div class="m-day-label">{{ group.label }}</div>
+            <div class="m-day-label">{{ group.label }} · {{ group.dateLabel }}</div>
             <div class="m-block-cards">
               <div
                 v-for="block in group.blocks"
@@ -592,12 +671,16 @@ import studentService from "../services/studentService.js";
 const { mobile } = useDisplay();
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 // --- Mobile tab toggle ---
 const mobileTab = ref('availability');
 const showMobileAddSheet = ref(false);
 const mobileViewMode = ref('calendar'); // 'list' or 'calendar'
 const mobileDayIndex = ref(-1); // -1=All, 0=Sun, 1=Mon, etc.
+const mobileCalendarMode = ref("week"); // 'week' or 'day'
+const mobileWeekOffset = ref(0);
+const mobileCalendarDay = ref(new Date().getDay());
 
 const UI_COLORS = Object.freeze({
   available: "#0D9488",
@@ -675,6 +758,55 @@ const DOW_LABELS = {
 const dowLabel = (dow) => DOW_LABELS[dow] ?? "";
 
 // --- Helpers ---
+const startOfWeekMonday = (dateInput = new Date()) => {
+  const d = new Date(dateInput);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return d;
+};
+
+const addDays = (dateInput, days) => {
+  const d = new Date(dateInput);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d;
+};
+
+const formatShortMonthDay = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const formatLongDate = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatWeekRange = (start, end) => {
+  if (!start || !end) return "";
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return "";
+
+  const sameMonth = startDate.getMonth() === endDate.getMonth();
+  const sameYear = startDate.getFullYear() === endDate.getFullYear();
+
+  if (sameMonth && sameYear) {
+    return `${startDate.toLocaleDateString("en-US", { month: "short" })} ${startDate.getDate()}-${endDate.getDate()}, ${endDate.getFullYear()}`;
+  }
+
+  if (sameYear) {
+    return `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${endDate.getFullYear()}`;
+  }
+
+  return `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+};
+
 const normalizeToHHMM = (t) => (t ? String(t).slice(0, 5) : "");
 const notify = (text, color = "success") => { snackbar.value = { show: true, text, color }; };
 const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
@@ -770,24 +902,97 @@ const exceptions = computed(() =>
   existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
 );
 
+const mobileBaseWeekStart = startOfWeekMonday(new Date());
+const mobileWeekStartDate = computed(() => addDays(mobileBaseWeekStart, mobileWeekOffset.value * 7));
+const mobileWeekEndDate = computed(() => addDays(mobileWeekStartDate.value, 6));
+const mobileWeekDatesByDow = computed(() => {
+  const map = {};
+  DAY_ORDER.forEach((dow, index) => {
+    map[dow] = addDays(mobileWeekStartDate.value, index);
+  });
+  return map;
+});
+const mobileRangeLabel = computed(() => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    return `${DOW_LABELS[mobileCalendarDay.value].slice(0, 3)}, ${formatLongDate(mobileWeekDatesByDow.value[mobileCalendarDay.value])}`;
+  }
+  return formatWeekRange(mobileWeekStartDate.value, mobileWeekEndDate.value);
+});
+
 // --- Mobile: group availability blocks by day ---
 const mobileBlocksByDay = computed(() => {
-  const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
   const grouped = {};
-  for (const dow of dayOrder) {
+  for (const dow of DAY_ORDER) {
     grouped[dow] = blocks.value
       .filter((b) => Number(b.dayOfWeek) === dow)
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
-  return dayOrder
+  return DAY_ORDER
     .filter((dow) => grouped[dow].length > 0)
-    .map((dow) => ({ dow, label: DOW_LABELS[dow], blocks: grouped[dow] }));
+    .map((dow) => ({
+      dow,
+      label: DOW_LABELS[dow],
+      date: mobileWeekDatesByDow.value[dow],
+      dateLabel: formatLongDate(mobileWeekDatesByDow.value[dow]),
+      blocks: grouped[dow],
+    }));
 });
 
 const mobileFilteredBlocks = computed(() => {
   if (mobileDayIndex.value === -1) return mobileBlocksByDay.value;
   return mobileBlocksByDay.value.filter((g) => g.dow === mobileDayIndex.value);
 });
+
+const previousDay = (dow) => {
+  const idx = DAY_ORDER.indexOf(Number(dow));
+  if (idx <= 0) return { dow: DAY_ORDER[DAY_ORDER.length - 1], wrapped: true };
+  return { dow: DAY_ORDER[idx - 1], wrapped: false };
+};
+
+const nextDay = (dow) => {
+  const idx = DAY_ORDER.indexOf(Number(dow));
+  if (idx === -1 || idx >= DAY_ORDER.length - 1) return { dow: DAY_ORDER[0], wrapped: true };
+  return { dow: DAY_ORDER[idx + 1], wrapped: false };
+};
+
+const goPrevRange = () => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    const result = previousDay(mobileCalendarDay.value);
+    mobileCalendarDay.value = result.dow;
+    if (result.wrapped) mobileWeekOffset.value -= 1;
+    return;
+  }
+  mobileWeekOffset.value -= 1;
+};
+
+const goNextRange = () => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    const result = nextDay(mobileCalendarDay.value);
+    mobileCalendarDay.value = result.dow;
+    if (result.wrapped) mobileWeekOffset.value += 1;
+    return;
+  }
+  mobileWeekOffset.value += 1;
+};
+
+const goToCurrentWeek = () => {
+  mobileWeekOffset.value = 0;
+  mobileCalendarDay.value = new Date().getDay();
+};
+
+const selectMobileDay = (dow) => {
+  if (mobileViewMode.value === "list") {
+    mobileDayIndex.value = dow;
+    return;
+  }
+  mobileCalendarDay.value = dow;
+};
+
+const isMobileDaySelected = (dow) => {
+  if (mobileViewMode.value === "list") return mobileDayIndex.value === dow;
+  if (mobileCalendarMode.value === "day") return mobileCalendarDay.value === dow;
+  return Number(dow) === Number(new Date().getDay()) && mobileWeekOffset.value === 0;
+};
 
 // --- Calendar grid helpers ---
 const CAL_GRID_START = 7; // 7 AM
@@ -1475,7 +1680,7 @@ onMounted(async () => {
 .m-view-toggle {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .m-view-btn {
   padding: 6px 16px;
@@ -1494,31 +1699,91 @@ onMounted(async () => {
   background: rgba(128, 22, 43, 0.06);
 }
 
+.m-range-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.m-range-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #666;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.m-range-nav-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-range-today-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  cursor: pointer;
+}
+.m-range-today-btn--active {
+  border-color: #80162B;
+  color: #80162B;
+  background: rgba(128, 22, 43, 0.06);
+}
+
 /* Day selector pills */
 .m-day-selector {
   display: flex;
   gap: 6px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
 }
 .m-day-pill {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: none;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #fff;
-  font-size: 12px;
-  font-weight: 600;
   color: #666;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: all 0.15s ease;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
 }
 .m-day-pill--active {
   background: #80162B;
   color: #fff;
+}
+.m-day-pill-dow {
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+.m-day-pill-date {
+  font-size: 10px;
+  line-height: 1.1;
+  margin-top: 2px;
+  opacity: 0.8;
 }
 
 /* Sync card */
@@ -1843,6 +2108,28 @@ onMounted(async () => {
 .m-cal {
   margin-top: 4px;
 }
+.m-cal-mode-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 18px;
+  background: #EEEFF1;
+  margin-bottom: 10px;
+}
+.m-cal-mode-btn {
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.m-cal-mode-btn--active {
+  background: #fff;
+  color: #80162B;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
 .m-cal-legend {
   display: flex;
   gap: 14px;
@@ -1874,6 +2161,9 @@ onMounted(async () => {
   overflow: hidden;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
+.m-cal-grid--day .m-cal-col {
+  flex: 1;
+}
 
 /* Time gutter */
 .m-cal-gutter {
@@ -1882,7 +2172,7 @@ onMounted(async () => {
   border-right: 1px solid #f0f0f0;
 }
 .m-cal-gutter-header {
-  height: 28px;
+  height: 40px;
   border-bottom: 1px solid #f0f0f0;
 }
 .m-cal-gutter-label {
@@ -1907,17 +2197,29 @@ onMounted(async () => {
   border-right: none;
 }
 .m-cal-col-header {
-  height: 28px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
+  flex-direction: column;
+  gap: 2px;
   color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   border-bottom: 1px solid #f0f0f0;
   background: #FAFAFA;
+}
+.m-cal-col-dow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.m-cal-col-date {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A8A8A;
+}
+.m-cal-col--single .m-cal-col-date {
+  font-size: 10px;
 }
 .m-cal-col-body {
   position: relative;

@@ -40,28 +40,8 @@
             :color="statusTone === 'success' ? '#0D9488' : statusTone === 'error' ? '#DC2626' : '#F59E0B'"
           />
           <span class="m-sync-label">Class sync: {{ statusLabel }}</span>
-          <button class="m-sync-action" :disabled="syncingClassSchedule" @click="syncClassSchedule()">
-            {{ syncingClassSchedule ? 'Syncing...' : 'Sync' }}
-          </button>
-          <button class="m-sync-action" style="margin-left:4px;font-size:11px;opacity:0.7;" :disabled="debugLoading" @click="fetchDebugSchedule()">
-            {{ debugLoading ? '...' : 'Debug' }}
-          </button>
         </div>
       </div>
-
-      <!-- Debug dialog -->
-      <v-dialog v-model="showDebugDialog" max-width="95vw" scrollable>
-        <v-card>
-          <v-card-title class="text-subtitle-2">Raw Stingray API Response</v-card-title>
-          <v-card-text>
-            <pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:70vh;overflow:auto;">{{ JSON.stringify(debugRawResponse, null, 2) }}</pre>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn text @click="showDebugDialog = false">Close</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
 
       <!-- View toggle: List / Calendar -->
       <div class="m-view-toggle">
@@ -370,7 +350,7 @@
       density="comfortable"
       class="mb-4"
     >
-      <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 8px">
+      <div>
         <div>
           <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
           <div class="text-caption text-medium-emphasis">
@@ -380,25 +360,6 @@
             · Updated this sync: {{ syncStatus.updated ?? 0 }}
             <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
           </div>
-        </div>
-        <div class="d-flex align-center" style="gap: 8px">
-          <v-btn
-            size="x-small"
-            variant="text"
-            color="primary"
-            :loading="syncingClassSchedule"
-            :disabled="loadingSyncStatus"
-            @click="syncClassSchedule()"
-          >
-            Re-sync now
-          </v-btn>
-          <v-progress-circular
-            v-if="loadingSyncStatus"
-            indeterminate
-            size="18"
-            width="2"
-            :color="statusTone === 'error' ? 'error' : 'primary'"
-          />
         </div>
       </div>
     </v-alert>
@@ -653,7 +614,6 @@ const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
 const syncingClassSchedule = ref(false);
-const loadingSyncStatus = ref(false);
 const syncStatus = ref({
   status: "never_synced",
   lastSyncedAt: null,
@@ -1055,7 +1015,6 @@ const clearAll = () => {
 
 // --- API ---
 const loadClassSyncStatus = async () => {
-  loadingSyncStatus.value = true;
   try {
     const response = await availabilityService.getClassSyncStatus();
     const data = response?.data?.data || {};
@@ -1091,7 +1050,6 @@ const loadClassSyncStatus = async () => {
       error: syncStatus.value.error || null,
     };
   } finally {
-    loadingSyncStatus.value = false;
   }
 };
 
@@ -1268,28 +1226,6 @@ const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } 
     return null;
   } finally {
     syncingClassSchedule.value = false;
-  }
-};
-
-// ── Debug: show raw Stingray API response ──
-const debugRawResponse = ref(null);
-const showDebugDialog = ref(false);
-const debugLoading = ref(false);
-
-const fetchDebugSchedule = async () => {
-  debugLoading.value = true;
-  try {
-    const response = await availabilityService.debugClassScheduleRaw();
-    debugRawResponse.value = response?.data?.data || response?.data || {};
-    showDebugDialog.value = true;
-  } catch (error) {
-    debugRawResponse.value = {
-      error: error?.response?.data?.message || error.message,
-      status: error?.response?.status,
-    };
-    showDebugDialog.value = true;
-  } finally {
-    debugLoading.value = false;
   }
 };
 
@@ -1607,17 +1543,6 @@ onMounted(async () => {
   font-weight: 500;
   color: #444;
 }
-.m-sync-action {
-  padding: 4px 12px;
-  border: none;
-  border-radius: 6px;
-  background: #f0f0f0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #80162B;
-  cursor: pointer;
-}
-.m-sync-action:disabled { opacity: 0.5; }
 
 /* Day groups */
 .m-day-list { }

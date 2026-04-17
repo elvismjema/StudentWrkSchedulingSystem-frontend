@@ -46,61 +46,113 @@
         </div>
       </div>
 
-      <!-- View toggle: Week / Day -->
+      <!-- View toggle: List / Calendar -->
       <div class="m-view-toggle">
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'week' }" @click="mobileViewMode = 'week'">Week</button>
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'day' }" @click="mobileViewMode = 'day'">Day</button>
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'list' }" @click="mobileViewMode = 'list'">
+          <v-icon icon="mdi-format-list-bulleted" size="14" class="mr-1" />List
+        </button>
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' }" @click="mobileViewMode = 'calendar'">
+          <v-icon icon="mdi-calendar-month" size="14" class="mr-1" />Calendar
+        </button>
       </div>
 
-      <!-- Day selector (only in day view) -->
-      <div v-if="mobileViewMode === 'day'" class="m-day-selector">
-        <button
-          v-for="dow in [1, 2, 3, 4, 5, 6, 0]"
-          :key="dow"
-          class="m-day-pill"
-          :class="{ 'm-day-pill--active': mobileDayIndex === dow }"
-          @click="mobileDayIndex = dow"
-        >{{ DOW_LABELS[dow].slice(0, 3) }}</button>
-      </div>
+      <!-- ═══ CALENDAR VIEW ═══ -->
+      <div v-if="mobileViewMode === 'calendar'" class="m-cal">
+        <!-- Legend -->
+        <div class="m-cal-legend">
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--class"></span>Class</span>
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--available"></span>Available</span>
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--unavailable"></span>Unavailable</span>
+        </div>
 
-      <!-- Day-by-day blocks list -->
-      <div v-if="mobileFilteredBlocks.length" class="m-day-list">
-        <div v-for="group in mobileFilteredBlocks" :key="group.dow" class="m-day-group">
-          <div class="m-day-label">{{ group.label }}</div>
-          <div class="m-block-cards">
-            <div
-              v-for="block in group.blocks"
-              :key="block.tempId"
-              class="m-block-card"
-              :class="{
-                'm-block-card--available': block.availabilityType === 'available' && !isClassScheduleBlock(block),
-                'm-block-card--unavailable': block.availabilityType === 'unavailable' && !isClassScheduleBlock(block),
-                'm-block-card--class': isClassScheduleBlock(block),
-              }"
-              @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
-            >
-              <div class="m-block-accent"></div>
-              <div class="m-block-info">
-                <div class="m-block-time">{{ formatTimeLabel(block.startTime) }} - {{ formatTimeLabel(block.endTime) }}</div>
-                <div class="m-block-type">
-                  {{ isClassScheduleBlock(block) ? 'Class Time' : block.availabilityType === 'available' ? 'Available' : 'Unavailable' }}
-                  <span v-if="isClassScheduleBlock(block)" class="m-block-locked">
-                    <v-icon icon="mdi-lock" size="10" /> Locked
-                  </span>
-                </div>
+        <!-- Grid -->
+        <div class="m-cal-grid">
+          <!-- Time gutter -->
+          <div class="m-cal-gutter">
+            <div class="m-cal-gutter-header"></div>
+            <div v-for="hour in calGridHours" :key="hour" class="m-cal-gutter-label">
+              {{ hour > 12 ? hour - 12 : hour }}{{ hour >= 12 ? 'p' : 'a' }}
+            </div>
+          </div>
+          <!-- Day columns -->
+          <div v-for="dow in [1, 2, 3, 4, 5, 6, 0]" :key="dow" class="m-cal-col">
+            <div class="m-cal-col-header">{{ DOW_LABELS[dow].slice(0, 3) }}</div>
+            <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
+              <!-- Hour grid lines -->
+              <div v-for="(hour, i) in calGridHours" :key="'line-' + hour" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
+              <!-- Blocks -->
+              <div
+                v-for="block in getCalBlocksForDay(dow)"
+                :key="block.tempId"
+                class="m-cal-block"
+                :class="{
+                  'm-cal-block--class': isClassScheduleBlock(block),
+                  'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
+                  'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
+                }"
+                :style="calcBlockStyle(block)"
+                @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+              >
+                <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
               </div>
-              <v-icon v-if="!isClassScheduleBlock(block)" icon="mdi-chevron-right" size="18" color="#bbb" class="m-block-chevron" />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-else-if="!loading" class="m-empty">
-        <v-icon icon="mdi-calendar-blank-outline" size="48" color="#ccc" />
-        <div class="m-empty-title">No availability set</div>
-        <div class="m-empty-sub">Tap the + button to add your weekly hours</div>
-      </div>
+      <!-- ═══ LIST VIEW ═══ -->
+      <template v-if="mobileViewMode === 'list'">
+        <!-- Day selector pills -->
+        <div class="m-day-selector">
+          <button class="m-day-pill" :class="{ 'm-day-pill--active': mobileDayIndex === -1 }" @click="mobileDayIndex = -1">All</button>
+          <button
+            v-for="dow in [1, 2, 3, 4, 5, 6, 0]"
+            :key="dow"
+            class="m-day-pill"
+            :class="{ 'm-day-pill--active': mobileDayIndex === dow, 'm-day-pill--has-class': dayHasClass(dow) }"
+            @click="mobileDayIndex = dow"
+          >{{ DOW_LABELS[dow].slice(0, 3) }}</button>
+        </div>
+
+        <!-- Day-by-day blocks list -->
+        <div v-if="mobileFilteredBlocks.length" class="m-day-list">
+          <div v-for="group in mobileFilteredBlocks" :key="group.dow" class="m-day-group">
+            <div class="m-day-label">{{ group.label }}</div>
+            <div class="m-block-cards">
+              <div
+                v-for="block in group.blocks"
+                :key="block.tempId"
+                class="m-block-card"
+                :class="{
+                  'm-block-card--available': block.availabilityType === 'available' && !isClassScheduleBlock(block),
+                  'm-block-card--unavailable': block.availabilityType === 'unavailable' && !isClassScheduleBlock(block),
+                  'm-block-card--class': isClassScheduleBlock(block),
+                }"
+                @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+              >
+                <div class="m-block-accent"></div>
+                <div class="m-block-info">
+                  <div class="m-block-time">{{ formatTimeLabel(block.startTime) }} - {{ formatTimeLabel(block.endTime) }}</div>
+                  <div class="m-block-type">
+                    {{ isClassScheduleBlock(block) ? 'Class Time' : block.availabilityType === 'available' ? 'Available' : 'Unavailable' }}
+                    <span v-if="isClassScheduleBlock(block)" class="m-block-locked">
+                      <v-icon icon="mdi-lock" size="10" /> Locked
+                    </span>
+                  </div>
+                </div>
+                <v-icon v-if="!isClassScheduleBlock(block)" icon="mdi-chevron-right" size="18" color="#bbb" class="m-block-chevron" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!loading" class="m-empty">
+          <v-icon icon="mdi-calendar-blank-outline" size="48" color="#ccc" />
+          <div class="m-empty-title">No availability set</div>
+          <div class="m-empty-sub">Tap the + button to add your weekly hours</div>
+        </div>
+      </template>
 
       <!-- Floating Add button -->
       <button class="m-fab" @click="showMobileAddSheet = true">
@@ -566,8 +618,8 @@ const userId = currentUser.userId || currentUser.id;
 // --- Mobile tab toggle ---
 const mobileTab = ref('availability');
 const showMobileAddSheet = ref(false);
-const mobileViewMode = ref('week'); // 'week' or 'day'
-const mobileDayIndex = ref(new Date().getDay()); // 0=Sun, 1=Mon, etc.
+const mobileViewMode = ref('calendar'); // 'list' or 'calendar'
+const mobileDayIndex = ref(-1); // -1=All, 0=Sun, 1=Mon, etc.
 
 const UI_COLORS = Object.freeze({
   available: "#0D9488",
@@ -756,10 +808,55 @@ const mobileBlocksByDay = computed(() => {
 });
 
 const mobileFilteredBlocks = computed(() => {
-  if (mobileViewMode.value === 'week') return mobileBlocksByDay.value;
-  // Day view — filter to selected day only
+  if (mobileDayIndex.value === -1) return mobileBlocksByDay.value;
   return mobileBlocksByDay.value.filter((g) => g.dow === mobileDayIndex.value);
 });
+
+// --- Calendar grid helpers ---
+const CAL_GRID_START = 7; // 7 AM
+const CAL_GRID_END = 22;  // 10 PM
+const calGridHours = computed(() => {
+  // Find earliest/latest block to auto-size the grid
+  let minHour = CAL_GRID_START;
+  let maxHour = CAL_GRID_END;
+  for (const b of blocks.value) {
+    const sh = parseInt(String(b.startTime).split(':')[0], 10);
+    const eh = parseInt(String(b.endTime).split(':')[0], 10);
+    if (sh < minHour) minHour = sh;
+    if (eh > maxHour - 1) maxHour = eh + 1;
+  }
+  const hours = [];
+  for (let h = minHour; h < maxHour; h++) hours.push(h);
+  return hours;
+});
+
+const getCalBlocksForDay = (dow) => {
+  return blocks.value
+    .filter((b) => Number(b.dayOfWeek) === dow)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+};
+
+const calcBlockStyle = (block) => {
+  const startHour = calGridHours.value[0] || CAL_GRID_START;
+  const [sh, sm] = String(block.startTime).split(':').map(Number);
+  const [eh, em] = String(block.endTime).split(':').map(Number);
+  const startMinutes = (sh - startHour) * 60 + (sm || 0);
+  const endMinutes = (eh - startHour) * 60 + (em || 0);
+  const pxPerMin = 40 / 60; // 40px per hour row
+  return {
+    top: Math.max(0, startMinutes * pxPerMin) + 'px',
+    height: Math.max(12, (endMinutes - startMinutes) * pxPerMin) + 'px',
+  };
+};
+
+const calBlockLabel = (block) => {
+  if (isClassScheduleBlock(block)) return 'Class';
+  return block.availabilityType === 'available' ? 'Avail' : 'Off';
+};
+
+const dayHasClass = (dow) => {
+  return blocks.value.some((b) => Number(b.dayOfWeek) === dow && isClassScheduleBlock(b));
+};
 
 const calendarEvents = computed(() =>
   blocks.value.map((b) => {
@@ -1756,4 +1853,165 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Day pill with class indicator dot */
+.m-day-pill--has-class {
+  position: relative;
+}
+.m-day-pill--has-class::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #DC2626;
+}
+.m-day-pill--active.m-day-pill--has-class::after {
+  background: #fff;
+}
+
+/* ═══════════════════════════════════════════ */
+/* CALENDAR GRID VIEW                          */
+/* ═══════════════════════════════════════════ */
+.m-cal {
+  margin-top: 4px;
+}
+.m-cal-legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+.m-cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+}
+.m-cal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.m-cal-dot--class { background: #DC2626; }
+.m-cal-dot--available { background: #0D9488; }
+.m-cal-dot--unavailable { background: #9CA3AF; }
+
+.m-cal-grid {
+  display: flex;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Time gutter */
+.m-cal-gutter {
+  width: 32px;
+  flex-shrink: 0;
+  border-right: 1px solid #f0f0f0;
+}
+.m-cal-gutter-header {
+  height: 28px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.m-cal-gutter-label {
+  height: 40px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #bbb;
+  transform: translateY(-5px);
+}
+
+/* Day columns */
+.m-cal-col {
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid #f5f5f5;
+}
+.m-cal-col:last-child {
+  border-right: none;
+}
+.m-cal-col-header {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #f0f0f0;
+  background: #FAFAFA;
+}
+.m-cal-col-body {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hour grid lines */
+.m-cal-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #f5f5f5;
+}
+
+/* Blocks on the calendar */
+.m-cal-block {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.m-cal-block:active {
+  opacity: 0.75;
+}
+.m-cal-block--class {
+  background: rgba(220, 38, 38, 0.18);
+  border-left: 2px solid #DC2626;
+  cursor: default;
+}
+.m-cal-block--available {
+  background: rgba(13, 148, 136, 0.15);
+  border-left: 2px solid #0D9488;
+}
+.m-cal-block--unavailable {
+  background: rgba(156, 163, 175, 0.18);
+  border-left: 2px solid #9CA3AF;
+}
+.m-cal-block-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+}
+.m-cal-block--class .m-cal-block-label { color: #DC2626; }
+.m-cal-block--available .m-cal-block-label { color: #0D9488; }
+.m-cal-block--unavailable .m-cal-block-label { color: #6B7280; }
 </style>

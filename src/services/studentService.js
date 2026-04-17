@@ -127,10 +127,7 @@ export default {
 
   // ─── Notifications ───────────────────────────────────────────────
   getNotifications(params = {}) {
-    const userId = getUserId();
-    return apiClient.get("/notifications", {
-      params: { userId, ...params },
-    });
+    return apiClient.get("/notifications", { params });
   },
 
   markNotificationRead(id) {
@@ -142,9 +139,8 @@ export default {
   },
 
   getUnreadNotificationCount() {
-    const userId = getUserId();
     return apiClient.get("/notifications", {
-      params: { userId, unread: true },
+      params: { unread: true },
     });
   },
 

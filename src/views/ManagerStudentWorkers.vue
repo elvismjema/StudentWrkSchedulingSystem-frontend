@@ -77,15 +77,31 @@
           <!-- Availability Summary -->
           <div class="availability-section">
             <h4 class="availability-title">Weekly Availability</h4>
-            <div class="availability-grid">
+            <div class="availability-calendar availability-calendar--preview">
               <div
                 v-for="day in weekDays"
                 :key="day.key"
-                class="availability-day"
+                class="calendar-day"
               >
-                <div class="day-label">{{ day.label }}</div>
-                <div class="day-time">
-                  {{ getAvailabilityForDay(worker, day.key) }}
+                <div class="calendar-day-label">{{ day.label }}</div>
+                <div class="calendar-day-slots">
+                  <template v-if="getDaySlots(worker, day.key).length">
+                    <div
+                      v-for="slot in getPreviewDaySlots(worker, day.key)"
+                      :key="`${day.key}-${slot.startMinutes}-${slot.endMinutes}-${slot.type}`"
+                      class="calendar-slot"
+                      :class="slot.type === 'unavailable' ? 'calendar-slot--unavailable' : 'calendar-slot--available'"
+                    >
+                      <span class="calendar-slot__time">{{ slot.label }}</span>
+                    </div>
+                    <div
+                      v-if="getHiddenSlotCount(worker, day.key) > 0"
+                      class="calendar-day-more"
+                    >
+                      +{{ getHiddenSlotCount(worker, day.key) }} more
+                    </div>
+                  </template>
+                  <div v-else class="calendar-day-empty">—</div>
                 </div>
               </div>
             </div>
@@ -129,15 +145,28 @@
                 <!-- Availability in Modal -->
                 <div class="modal-availability">
                   <h4 class="section-title">Weekly Availability</h4>
-                  <div class="availability-grid">
+                  <div class="availability-calendar">
                     <div
                       v-for="day in weekDays"
                       :key="day.key"
-                      class="availability-day"
+                      class="calendar-day"
                     >
-                      <div class="day-label">{{ day.label }}</div>
-                      <div class="day-time">
-                        {{ getAvailabilityForDay(workerModal.selectedWorker, day.key) }}
+                      <div class="calendar-day-label">{{ day.label }}</div>
+                      <div class="calendar-day-slots">
+                        <template v-if="getDaySlots(workerModal.selectedWorker, day.key).length">
+                          <div
+                            v-for="slot in getDaySlots(workerModal.selectedWorker, day.key)"
+                            :key="`${day.key}-${slot.startMinutes}-${slot.endMinutes}-${slot.type}`"
+                            class="calendar-slot"
+                            :class="slot.type === 'unavailable' ? 'calendar-slot--unavailable' : 'calendar-slot--available'"
+                          >
+                            <span class="calendar-slot__time">{{ slot.label }}</span>
+                            <span class="calendar-slot__type">
+                              {{ slot.type === 'unavailable' ? 'Unavailable' : 'Available' }}
+                            </span>
+                          </div>
+                        </template>
+                        <div v-else class="calendar-day-empty">No availability set</div>
                       </div>
                     </div>
                   </div>
@@ -308,6 +337,8 @@ const weekDays = [
   { key: 'sunday', label: 'Sun' },
 ];
 
+const MAX_PREVIEW_SLOTS = 3;
+
 // Computed properties
 const filteredWorkers = computed(() => {
   if (!searchQuery.value) return workers.value;
@@ -327,24 +358,28 @@ const getWorkerInitials = (worker) => {
   return first && last ? `${first}${last}` : first || 'U';
 };
 
-const getAvailabilityForDay = (worker, dayKey) => {
-  const availability = workerAvailability.value[worker.userId || worker.id];
-  if (!availability || !availability[dayKey]) {
-    return '—';
-  }
+const getDaySlots = (worker, dayKey) => {
+  if (!worker) return [];
+  const availability = workerAvailability.value[worker.userId || worker.id] || {};
+  return availability[dayKey] || [];
+};
 
-  const dayAvailability = availability[dayKey];
-  const segments = [];
+const getPreviewDaySlots = (worker, dayKey) => {
+  return getDaySlots(worker, dayKey).slice(0, MAX_PREVIEW_SLOTS);
+};
 
-  (dayAvailability.available || []).forEach((range) => {
-    segments.push(`${range} (Available)`);
-  });
+const getHiddenSlotCount = (worker, dayKey) => {
+  const total = getDaySlots(worker, dayKey).length;
+  return total > MAX_PREVIEW_SLOTS ? total - MAX_PREVIEW_SLOTS : 0;
+};
 
-  (dayAvailability.unavailable || []).forEach((range) => {
-    segments.push(`${range} (Unavailable)`);
-  });
-
-  return segments.length ? segments.join(', ') : '—';
+const parseTimeToMinutes = (timeString) => {
+  if (!timeString) return 0;
+  const [hourRaw = '0', minuteRaw = '0'] = String(timeString).split(':');
+  const hours = Number.parseInt(hourRaw, 10);
+  const minutes = Number.parseInt(minuteRaw, 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
+  return (hours * 60) + minutes;
 };
 
 const formatTime = (timeString) => {
@@ -540,16 +575,21 @@ const loadWorkersAvailability = async () => {
         if (!dayKey || !availability.isRecurring) return;
 
         if (!availabilityMap[dayKey]) {
-          availabilityMap[dayKey] = { available: [], unavailable: [] };
+          availabilityMap[dayKey] = [];
         }
 
         const timeRange = `${formatTime(availability.startTime)} – ${formatTime(availability.endTime)}`;
         const type = String(availability.availabilityType || '').toLowerCase();
-        if (type === 'unavailable' || type === 'time_off') {
-          availabilityMap[dayKey].unavailable.push(timeRange);
-        } else {
-          availabilityMap[dayKey].available.push(timeRange);
-        }
+        availabilityMap[dayKey].push({
+          label: timeRange,
+          type: type === 'unavailable' || type === 'time_off' ? 'unavailable' : 'available',
+          startMinutes: parseTimeToMinutes(availability.startTime),
+          endMinutes: parseTimeToMinutes(availability.endTime),
+        });
+      });
+
+      Object.keys(availabilityMap).forEach((dayKey) => {
+        availabilityMap[dayKey].sort((a, b) => a.startMinutes - b.startMinutes);
       });
       
       workerAvailability.value[worker.userId || worker.id] = availabilityMap;
@@ -756,31 +796,85 @@ watch(activeTab, (nextTab) => {
   color: #667085;
 }
 
-.availability-grid {
+.availability-calendar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.availability-day {
-  text-align: center;
-  padding: 8px 4px;
-  border-radius: 6px;
+.availability-calendar--preview .calendar-slot {
+  padding: 4px 6px;
+}
+
+.availability-calendar--preview .calendar-slot__time {
+  font-size: 10px;
+}
+
+.calendar-day {
+  border: 1px solid #eaecf0;
+  border-radius: 8px;
+  background: #fcfcfd;
+  min-height: 100px;
+  overflow: hidden;
+}
+
+.calendar-day-label {
+  padding: 7px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #667085;
   background: #f9fafb;
+  border-bottom: 1px solid #eaecf0;
 }
 
-.day-label {
+.calendar-day-slots {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calendar-day-empty {
+  font-size: 11px;
+  color: #98a2b3;
+}
+
+.calendar-slot {
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 3px solid transparent;
+}
+
+.calendar-slot--available {
+  background: rgba(16, 185, 129, 0.12);
+  border-left-color: #0ea5a0;
+}
+
+.calendar-slot--unavailable {
+  background: rgba(156, 163, 175, 0.15);
+  border-left-color: #6b7280;
+}
+
+.calendar-slot__time {
   font-size: 11px;
   font-weight: 600;
-  color: #667085;
-  margin-bottom: 2px;
+  color: #1f2937;
+  line-height: 1.25;
 }
 
-.day-time {
-  font-size: 11px;
-  color: #1f2937;
-  line-height: 1.3;
-  word-break: break-word;
+.calendar-slot__type {
+  font-size: 10px;
+  color: #667085;
+}
+
+.calendar-day-more {
+  font-size: 10px;
+  color: #8b1538;
+  font-weight: 600;
+  padding: 0 2px;
 }
 
 /* Modal Styles */
@@ -964,8 +1058,9 @@ watch(activeTab, (nextTab) => {
     gap: 16px;
   }
 
-  .availability-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .availability-calendar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .modal-worker-info {
@@ -982,8 +1077,8 @@ watch(activeTab, (nextTab) => {
 }
 
 @media (max-width: 480px) {
-  .availability-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .availability-calendar {
+    grid-template-columns: 1fr;
   }
 }
 </style>

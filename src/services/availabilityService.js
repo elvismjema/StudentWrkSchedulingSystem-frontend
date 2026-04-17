@@ -37,12 +37,6 @@ export default {
     return apiClient.get('/student/availability/class-sync-status');
   },
 
-  debugClassScheduleRaw(params = {}) {
-    const query = new URLSearchParams();
-    if (params.termCode) query.append('termCode', params.termCode);
-    return apiClient.get(`/student/availability/class-schedule-debug?${query.toString()}`);
-  },
-
   getManagerWorkerBlockingAvailability(userId, params = {}) {
     const query = new URLSearchParams();
     if (params.department_id != null) query.append('department_id', params.department_id);
@@ -52,4 +46,3 @@ export default {
     return apiClient.get(`/manager/workers/${userId}/blocking-availability?${query.toString()}`);
   },
 };
-

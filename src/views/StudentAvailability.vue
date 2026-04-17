@@ -43,8 +43,25 @@
           <button class="m-sync-action" :disabled="syncingClassSchedule" @click="syncClassSchedule()">
             {{ syncingClassSchedule ? 'Syncing...' : 'Sync' }}
           </button>
+          <button class="m-sync-action" style="margin-left:4px;font-size:11px;opacity:0.7;" :disabled="debugLoading" @click="fetchDebugSchedule()">
+            {{ debugLoading ? '...' : 'Debug' }}
+          </button>
         </div>
       </div>
+
+      <!-- Debug dialog -->
+      <v-dialog v-model="showDebugDialog" max-width="95vw" scrollable>
+        <v-card>
+          <v-card-title class="text-subtitle-2">Raw Stingray API Response</v-card-title>
+          <v-card-text>
+            <pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:70vh;overflow:auto;">{{ JSON.stringify(debugRawResponse, null, 2) }}</pre>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn text @click="showDebugDialog = false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <!-- View toggle: List / Calendar -->
       <div class="m-view-toggle">
@@ -1251,6 +1268,28 @@ const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } 
     return null;
   } finally {
     syncingClassSchedule.value = false;
+  }
+};
+
+// ── Debug: show raw Stingray API response ──
+const debugRawResponse = ref(null);
+const showDebugDialog = ref(false);
+const debugLoading = ref(false);
+
+const fetchDebugSchedule = async () => {
+  debugLoading.value = true;
+  try {
+    const response = await availabilityService.debugClassScheduleRaw();
+    debugRawResponse.value = response?.data?.data || response?.data || {};
+    showDebugDialog.value = true;
+  } catch (error) {
+    debugRawResponse.value = {
+      error: error?.response?.data?.message || error.message,
+      status: error?.response?.status,
+    };
+    showDebugDialog.value = true;
+  } finally {
+    debugLoading.value = false;
   }
 };
 

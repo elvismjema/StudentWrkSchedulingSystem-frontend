@@ -86,7 +86,6 @@
           class="m-day-pill"
           :class="{
             'm-day-pill--active': isMobileDaySelected(dow),
-            'm-day-pill--has-class': dayHasClass(dow),
           }"
           @click="selectMobileDay(dow)"
         >
@@ -1034,10 +1033,6 @@ const calcBlockStyle = (block) => {
 const calBlockLabel = (block) => {
   if (isClassScheduleBlock(block)) return 'Class';
   return block.availabilityType === 'available' ? 'Avail' : 'Off';
-};
-
-const dayHasClass = (dow) => {
-  return blocks.value.some((b) => Number(b.dayOfWeek) === dow && isClassScheduleBlock(b));
 };
 
 const calendarEvents = computed(() =>
@@ -2081,25 +2076,6 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-}
-
-/* Day pill with class indicator dot */
-.m-day-pill--has-class {
-  position: relative;
-}
-.m-day-pill--has-class::after {
-  content: '';
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #DC2626;
-}
-.m-day-pill--active.m-day-pill--has-class::after {
-  background: #fff;
 }
 
 /* ═══════════════════════════════════════════ */

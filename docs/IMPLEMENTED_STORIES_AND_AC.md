@@ -1,251 +1,151 @@
 # Implemented Stories And Acceptance Criteria
 
 Last updated: April 18, 2026  
-Source of truth used: merged `dev` PRs in frontend + backend repos.
+Scope source: merged `dev` work in frontend + backend repos, plus in-flight PRs called out separately.
 
-## Scope Legend
-- `Dashboard`: Student or Manager dashboard experience
-- `Schedule`: Shift calendars and open shifts
-- `Hours`: Student availability + class sync
-- `Approvals`: Manager decision workflows
-- `Workers`: Manager student-worker management
-- `Platform`: Cross-cutting API, auth, reliability, and nav
+## 1) Shipped Stories (Merged To `dev`)
 
----
+### S-01 Student Dashboard (Mobile Shell)
+Story: As a student, I can access core flows from a mobile-first shell so I can manage shifts on phone.
 
-## Epic A: Student Mobile/PWA Experience
+Acceptance Criteria:
+- Given student mobile routes, when the app loads, then a mobile bottom navigation shell is rendered.
+- Given navigation between student core pages, when I switch tabs, then shell context is preserved.
+- Given dashboard load, when data is available, then I can see clock status, next shift, and open-shift preview.
 
-### A1. Student mobile shell with bottom navigation
-**Story**: As a student, I can use the app in a mobile-first shell with bottom navigation so I can complete core tasks on a phone.
+### S-02 Student Hours Calendar View
+Story: As a student, I can view my availability in a weekly calendar block grid.
 
-**AC**
-- Given I am on a student route on mobile, when the page loads, then I see mobile bottom navigation for core student flows.
-- Given I navigate between student tabs, when switching tabs, then I stay in the same student shell context.
-- Given I am on desktop, when loading student pages, then desktop layout remains available.
+Acceptance Criteria:
+- Given Hours > My Availability, when Calendar mode is selected, then entries render as day/time blocks.
+- Given class/available/unavailable blocks, when shown, then each type is visibly distinct.
+- Given no entries for a slot, when grid renders, then empty slots remain available for interaction.
 
-### A2. Student dashboard mobile layout and priority cards
-**Story**: As a student, I can see a mobile-optimized dashboard with key priorities first (clock status, next shift, open shifts, pending items).
+### S-03 Student Hours Week/Day Navigation
+Story: As a student, I can navigate availability across current/past/future weeks and day focus.
 
-**AC**
-- Given I am on student dashboard, when data loads, then I see clock status, next shift, and weekly summary cards.
-- Given I have pending acknowledgements, when dashboard renders, then acknowledgement actions are visible without opening another page.
-- Given dashboard data fails, when load returns error, then I see a retryable error state.
+Acceptance Criteria:
+- Given week controls, when previous/next is tapped, then displayed week changes.
+- Given Today control, when tapped, then week/day focus returns to current date.
+- Given list mode day pills, when selecting a day, then only selected day content is active.
 
-### A3. Pull-to-refresh on student mobile pages
-**Story**: As a student, I can pull down to refresh key mobile views so I can reload schedule/availability quickly.
+### S-04 Student Hours Cleanup (Debug + Dot Noise)
+Story: As a student, the Hours page is cleaner and production-safe.
 
-**AC**
-- Given I am on mobile student views that support pull-to-refresh, when I pull down, then data reload is triggered.
-- Given refresh completes, when data returns, then UI state updates without full app restart.
+Acceptance Criteria:
+- Given production Hours UI, when page loads, then debug and manual class-sync controls are not shown.
+- Given day pills in list mode, when rendered, then red dot indicators are removed.
+- Given class data exists, when calendar is visible, then class visibility still comes from class blocks.
 
-### A4. Notification-route fallback hardening
-**Story**: As a student, I am redirected to valid student pages from notifications so broken manager-only links do not block me.
+### S-05 Class-Sync Reliability
+Story: As a student, class schedule sync writes stable locked availability blocks.
 
-**AC**
-- Given a notification includes manager approvals link, when opened as student, then app redirects to a valid student page.
-- Given fallback route logic executes, when role is student, then link resolution avoids manager-only route targets.
+Acceptance Criteria:
+- Given class sync runs, when classes exist, then locked class-schedule availability blocks are created/updated.
+- Given repeated sync with same source data, when rerun, then duplicate class blocks are not created.
+- Given stale session userId shape, when sync endpoints run, then user is resolved safely from auth/session context.
 
----
+### S-06 Open Shifts Visibility Filter
+Story: As a student, I only see pickup opportunities I can actually work.
 
-## Epic B: Student Hours (Availability + Class Schedule)
+Acceptance Criteria:
+- Given shift conflicts with my unavailable/class/time-off windows, when open shifts are fetched, then it is excluded.
+- Given no conflicts, when open shifts load, then eligible shifts remain visible.
+- Given dashboard open-shift count, when preview is rendered, then count matches filtered results.
 
-### B1. Calendar grid view for student availability
-**Story**: As a student, I can view my availability in a weekly calendar block view so overlaps are easy to understand.
+### S-07 Cover-Approved Shifts Included In Open Pool
+Story: As a student, I can see shifts that were manager-approved for cover and posted open.
 
-**AC**
-- Given I open Hours > My Availability, when calendar mode is selected, then blocks render by day/time grid.
-- Given class/available/unavailable entries exist, when rendered, then each type is visually distinct.
-- Given no blocks exist for a period, when grid renders, then empty slots are shown without errors.
+Acceptance Criteria:
+- Given a shift is in cover-approved open state, when open-shifts query runs, then it appears in pickup list.
+- Given shift is no longer eligible, when query runs, then it is excluded.
 
-### B2. Week/day navigation in Hours
-**Story**: As a student, I can move across weeks and inspect day focus so I can review past and future availability.
+### S-08 Clock-In Department Edge Case Fix
+Story: As a student/worker, my own assigned shift remains clock-in visible even with active-department mismatch.
 
-**AC**
-- Given I am in Hours, when I tap previous/next controls, then week range updates.
-- Given I tap Today, when action executes, then view jumps to current week/day.
-- Given list mode day pills are used, when a day is selected, then selected day state is consistent.
+Acceptance Criteria:
+- Given my own assigned shifts query, when backend applies filters, then active-department filter does not hide my shift.
+- Given non-self scoped queries, when backend applies filters, then department scoping still applies.
 
-### B3. Class schedule sync into locked unavailable blocks
-**Story**: As a student, my class schedule is synced into availability as locked class blocks so managers cannot schedule me in class time.
+### S-09 Manager Approvals Pending-Only Consolidation
+Story: As a manager, I can review pending approvals without duplicate approval surfaces.
 
-**AC**
-- Given class sync runs successfully, when blocks are created/updated, then class entries are marked as locked class schedule.
-- Given class sync runs repeatedly, when no external class changes occurred, then sync is idempotent.
-- Given I attempt to create manual availability overlapping locked class block, when save is attempted, then request is rejected.
+Acceptance Criteria:
+- Given manager approvals page, when loaded, then pending actions are grouped by actionable type.
+- Given no pending items in a section, when rendered, then an empty-state is shown.
+- Given duplicate open-shift-claims path, when consolidation landed, then approvals flow uses canonical swap-requests path.
 
-### B4. Class sync status and diagnostics hardening
-**Story**: As a student and support/admin team, class sync status is reliable and debuggable so issues can be diagnosed.
+### S-10 Manager Approvals Visual Polish
+Story: As a manager, approvals page has cleaner hierarchy for quick actioning.
 
-**AC**
-- Given class sync is configured, when status endpoint is called, then derived sync status is returned.
-- Given stale auth/session userId shape, when class sync runs, then backend resolves user context robustly.
-- Given debug endpoints/UI were used for diagnosis, when production cleanup completed, then temporary debug controls are removed from student Hours UI.
+Acceptance Criteria:
+- Given pending approvals view, when rendered, then section hierarchy and cards are clearer for scan/read.
+- Given action buttons and states, when used, then feedback and list refresh stay coherent.
 
-### B5. Day-pill visual cleanup
-**Story**: As a student, I do not see redundant red dots under day pills because class blocks already communicate class time.
+### S-11 Manager Student Workers Readability Upgrade
+Story: As a manager, I can scan worker availability without dense raw text.
 
-**AC**
-- Given Hours day pills render, when view loads, then red dot indicators are absent.
-- Given class data exists, when calendar is shown, then class visibility remains via class blocks.
+Acceptance Criteria:
+- Given student workers page, when cards render, then weekly availability is shown in structured visual blocks.
+- Given worker details modal, when opened, then availability/class schedule sections are separated and readable.
+- Given high per-day slot count, when preview overflows, then overflow indicators (e.g., “+N more”) are shown.
 
----
+### S-12 Manager Assignable Worker Filtering (Create Shift)
+Story: As a manager, worker options in create-shift are pre-filtered by eligibility.
 
-## Epic C: Open Shifts, Cover/Pickup/Swap Flow
+Acceptance Criteria:
+- Given date/time/department inputs, when assignable-worker query runs, then conflicting workers are excluded.
+- Given position selection, when query includes position, then only qualified workers are returned.
+- Given form input changes, when manager edits shift parameters, then candidate list is refreshed.
 
-### C1. Two-stage cover request backend workflow
-**Story**: As a student, I can request cover for my shift and managers can approve progression through cover/pickup stages.
+### S-13 Notification Self-Scope Hardening
+Story: As a user, notification API calls and links do not break due to redundant/mismatched userId query assumptions.
 
-**AC**
-- Given I request cover, when manager approves stage 1, then shift is posted open for pickup workflow.
-- Given another student volunteers, when manager approves stage 2, then shift assignment transfers and acknowledgement is created.
-- Given manager declines at any stage, when decision is saved, then request status and notifications reflect the outcome.
+Acceptance Criteria:
+- Given self-scoped notifications endpoints, when frontend calls API, then unnecessary userId query args are not sent.
+- Given notification deep links across roles, when route is invalid for role, then fallback routes stay valid.
 
-### C2. Department-visible open request pool
-**Story**: As a student worker, I can see cover requests from coworkers in my department.
+### S-14 Legacy Backend Surface Cleanup
+Story: As maintainers, request approval logic uses one canonical backend model path.
 
-**AC**
-- Given cover requests exist in my department, when pool feed is queried, then eligible requests are returned.
-- Given I am not in that department, when querying pool, then unrelated requests are excluded.
+Acceptance Criteria:
+- Given legacy orphan `shift_trade` surface, when refactor merged, then dead model/controller/routes are removed.
+- Given manager approvals API usage, when reviewed, then duplicate open-shift-claims flow is not required.
 
-### C3. Hide non-pickable open shifts from students
-**Story**: As a student, I only see open shifts I can actually pick up (no class/time-off/unavailable conflicts).
+## 2) In-Flight (Not Yet Merged To `dev`)
 
-**AC**
-- Given open shifts overlap my unavailable/class/time-off windows, when dashboard or open-shifts list loads, then those shifts are excluded.
-- Given no conflicts exist, when open shifts load, then eligible shifts are shown.
-- Given counts are shown, when list is filtered, then counts match filtered data.
+### I-01 Open Shift Auto-Expiry + Pickup Hardening
+Branch/PR:
+- Backend: `fix/open-shifts-cover-approved-query`
+- PR: https://github.com/elvismjema/StudentWrkSchedulingSystem-backend/pull/122
 
-### C4. Include cover-approved shifts in open-shifts query
-**Story**: As a student, I can see shifts that were approved for cover and posted open.
+Story: As a student, expired open shifts disappear automatically and pickup does not fail on valid open states.
 
-**AC**
-- Given a shift is marked cover-approved and available, when open-shifts endpoint runs, then it appears in open shifts.
-- Given shift is cancelled or otherwise unavailable, when queried, then it does not appear.
+Acceptance Criteria:
+- Given shift end time is in the past, when open shifts or dashboard preview load, then the shift is excluded.
+- Given open shift claim path cannot find an expected cover-request row, when the shift is otherwise open, then pickup falls back to normal request creation instead of 500.
 
-### C5. Robust pickup handling + expired shift suppression
-**Story**: As a student, pickup works for valid open shifts and expired shifts are not shown.
+### I-02 Remove Standalone Trade Board
+Branch/PR:
+- Frontend: `chore/remove-trade-board`
+- PR: https://github.com/elvismjema/StudentWrkSchedulingSystem-frontend/pull/216
 
-**AC**
-- Given a shift end time is already past current time, when open shifts are fetched, then it is excluded.
-- Given a pickup request is made on a valid open shift, when backend processes claim, then a valid approval request is created/updated without orphan errors.
-- Given pickup targets invalid/missing shift state, when backend validates, then user receives deterministic failure message.
+Story: As a student, I don’t have a redundant Trade Board page; swap/pickup actions live in schedule/dashboard.
 
----
+Acceptance Criteria:
+- Given student primary nav, when app loads, then Trade tab/menu item is removed.
+- Given legacy `/student/trade-board` URL, when opened, then it redirects to `/student/schedule`.
+- Given student notification fallback to manager approvals, when opened, then fallback route resolves to student schedule.
 
-## Epic D: Manager Approvals and Approval UX
+## 3) Logic Decisions Confirmed
 
-### D1. Pending-focused approvals interface
-**Story**: As a manager, I can review pending items quickly without mixed history clutter.
+### D-01 Pickup expiration behavior
+- Open shifts should auto-expire by backend datetime filtering.
+- Manager should not manually remove already-ended pickup opportunities.
 
-**AC**
-- Given manager opens Approvals, when page loads, then pending actions are grouped by Time Off / Cover / Pickup / Swap / Acknowledgements.
-- Given there are no pending items in a section, when rendering, then clear empty states are shown.
-- Given I approve/deny, when action completes, then list refreshes and feedback snackbar appears.
+### D-02 Trade Board product direction
+- Standalone Trade Board is being removed.
+- Cover/pickup/swap actions should be embedded in schedule/dashboard flows.
 
-### D2. Remove duplicate open-shift-claims approval path
-**Story**: As a manager, there is one canonical approval flow for shift requests, reducing duplicate logic and UI confusion.
-
-**AC**
-- Given manager approvals API is used, when requests are reviewed, then `/manager/swap-requests` is the canonical path.
-- Given legacy open-shift-claims endpoints/routes, when cleanup is merged, then duplicate routes are removed.
-- Given approvals UI is loaded, when shift requests tab renders, then duplicate open-shift-claims section is absent.
-
-### D3. Terminology normalization across app
-**Story**: As any user, I see consistent request terms across pages and actions.
-
-**AC**
-- Given request-related UI labels, when rendered, then canonical terms are used: `Cover Request`, `Pickup Request`, `Swap Request`, `Time Off`, `Open Shifts`.
-- Given old labels (`Find Cover`, `Trade Board`, etc.), when terminology sweep merged, then they are replaced in primary UX surfaces.
-
----
-
-## Epic E: Manager Student Workers Experience
-
-### E1. Worker availability readability improvements
-**Story**: As a manager, I can inspect worker availability without parsing dense text blobs.
-
-**AC**
-- Given Student Workers page loads, when cards render, then weekly availability is presented in compact structured blocks.
-- Given worker details modal opens, when viewing weekly availability, then data is grouped and visually scannable.
-- Given high slot volume, when preview exceeds available space, then overflow handling communicates additional items.
-
-### E2. Student workers availability compact calendar bar preview
-**Story**: As a manager, I can scan each worker’s week quickly via compact 7-day summary.
-
-**AC**
-- Given worker card renders, when availability exists, then each day shows concise summary blocks.
-- Given available/unavailable counts, when card renders, then totals are visible and consistent with preview data.
-
-### E3. Worker class schedule retrieval in detail modal
-**Story**: As a manager, I can inspect class schedule details for a worker to make scheduling decisions.
-
-**AC**
-- Given worker detail modal class schedule tab, when opened, then current class schedule entries are shown.
-- Given schedule refresh action, when triggered, then class schedule data is reloaded.
-
----
-
-## Epic F: Manager Shift Assignment Quality
-
-### F1. Assignable-worker filtering endpoint
-**Story**: As a manager, when creating a shift I get only eligible workers for the selected window/position/department.
-
-**AC**
-- Given date/time/department context, when assignable-workers endpoint is queried, then workers with conflicts are filtered out.
-- Given position is selected, when query includes position, then only qualified workers are returned.
-- Given manager create shift form updates date/time/position, when inputs change, then worker options refresh accordingly.
-
-### F2. Assignment conflict hard validation
-**Story**: As a manager, invalid assignments are blocked server-side, not just warned.
-
-**AC**
-- Given assignment conflicts with worker availability/time-off/class constraints, when create/update is attempted, then API returns conflict response.
-- Given no conflict exists, when create/update is attempted, then assignment persists successfully.
-
----
-
-## Epic G: Clock-In Reliability
-
-### G1. Own-shifts clock-in visibility across department edge cases
-**Story**: As a student worker, my assigned shift appears for clock-in even if active-department context is stale/misaligned.
-
-**AC**
-- Given my shift is assigned to me, when clock-in list is loaded with own-shift query, then shift is visible for clock-in logic.
-- Given I am not querying my own shifts, when manager/other scoped queries run, then department filtering behavior remains intact.
-
-### G2. Clock-in empty-state clarity
-**Story**: As a student, if no valid shift is clockable I receive clear guidance.
-
-**AC**
-- Given no current/near shift is available for clock-in, when clock page opens, then actionable empty-state message is displayed.
-
----
-
-## Epic H: Platform Reliability / Maintenance
-
-### H1. Remove orphan legacy API surface
-**Story**: As developers maintaining the app, we keep one active request workflow model and remove dead paths.
-
-**AC**
-- Given legacy `shift_trade` model/controller/routes were unused, when refactor merges, then dead files/routes are removed.
-- Given app startup and route loading, when server boots, then no references to removed legacy files remain.
-
-### H2. Deployment/runtime stability hardening
-**Story**: As the team, deploy and startup paths are resilient enough to avoid production outages.
-
-**AC**
-- Given migration and startup edge cases, when backend starts/deploys, then known fatal startup failures are avoided.
-- Given diagnostics are needed post-deploy, when deploy scripts run, then logs and restart behavior are available for troubleshooting.
-
----
-
-## Current Decision Notes (requested)
-
-### Trade Board page
-Decision direction: remove as standalone navigation and keep swap/cover actions embedded in schedule/dashboard flows.
-
-### Open shift expiry logic
-Intended logic: open shifts should auto-disappear after end time; managers should not need manual cleanup for expired pickup opportunities.
-
-### Manager calendar parity
-Direction requested: upgrade manager Student Workers availability view toward a true time-grid calendar (similar to Student Hours) and reduce current visual clutter.
+### D-03 Manager calendar parity direction
+- Student-workers availability should continue moving from pill clutter to true time-grid calendar readability (same visual grammar as Student Hours).

@@ -1,28 +1,36 @@
 <template>
   <v-container fluid class="pa-4">
     <!-- Header -->
-    <div class="d-flex align-center mb-6">
-      <v-icon size="28" class="mr-3" color="primary">mdi-checkbox-marked-outline</v-icon>
-      <div>
-        <h1 class="text-h4 font-weight-bold">Approvals</h1>
-        <p class="text-subtitle-1 text-medium-emphasis">
-          Review time off requests and shift swap requests
-        </p>
+    <div class="approvals-header mb-6">
+      <div class="d-flex align-center">
+        <v-icon size="28" class="mr-3" color="primary">mdi-checkbox-marked-outline</v-icon>
+        <div>
+          <h1 class="text-h4 font-weight-bold">Approvals</h1>
+          <p class="text-body-2 text-medium-emphasis mb-0">
+            Review pending requests from your students.
+          </p>
+        </div>
+        <v-spacer />
+        <v-btn
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-refresh"
+          :loading="loading || swapsLoading || claimsLoading || ackLoading"
+          @click="loadAll"
+        >
+          Refresh
+        </v-btn>
       </div>
-      <v-spacer />
-      <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="loadAll">
-        Refresh
-      </v-btn>
     </div>
 
     <!-- Tabs -->
-    <v-tabs v-model="activeTab" color="#8B1538" class="mb-4">
+    <v-tabs v-model="activeTab" color="#8B1538" class="mb-4 approvals-tabs">
       <v-tab value="time-off">
         Time Off Requests
         <v-badge
           v-if="pendingTimeOffCount > 0"
           :content="pendingTimeOffCount"
-          color="error"
+          color="primary"
           inline
           class="ml-2"
         />
@@ -32,7 +40,7 @@
         <v-badge
           v-if="pendingSwapCount > 0"
           :content="pendingSwapCount"
-          color="error"
+          color="primary"
           inline
           class="ml-2"
         />
@@ -42,7 +50,7 @@
         <v-badge
           v-if="unacknowledgedCount > 0"
           :content="unacknowledgedCount"
-          color="warning"
+          color="primary"
           inline
           class="ml-2"
         />
@@ -59,43 +67,39 @@
         </v-alert>
 
         <div v-if="timeOffRequests.length === 0 && !loading" class="empty-state">
-          <v-icon size="48" color="grey-lighten-1">mdi-calendar-check-outline</v-icon>
-          <p class="text-body-1 text-medium-emphasis mt-2">No pending time off requests found.</p>
+          <v-icon size="56" color="grey-lighten-1">mdi-calendar-check-outline</v-icon>
+          <p class="text-body-1 text-medium-emphasis mt-3 mb-0">You're all caught up.</p>
+          <p class="text-caption text-medium-emphasis">No pending time off requests.</p>
         </div>
 
         <v-card
           v-for="req in timeOffRequests"
           :key="req.id"
-          elevation="2"
-          class="mb-3"
+          variant="outlined"
+          class="approval-card mb-3"
         >
           <v-card-text>
-            <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-              <div>
-                <div class="text-subtitle-1 font-weight-bold">
-                  {{ req.user?.fName }} {{ req.user?.lName }}
-                  <span class="text-caption text-medium-emphasis ml-1">{{ req.user?.email }}</span>
+            <div class="d-flex align-start justify-space-between flex-wrap ga-3">
+              <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-center flex-wrap ga-2">
+                  <span class="text-subtitle-1 font-weight-bold">
+                    {{ req.user?.fName }} {{ req.user?.lName }}
+                  </span>
+                  <span class="text-caption text-medium-emphasis">{{ req.user?.email }}</span>
                 </div>
-                <div class="d-flex align-center gap-2 mt-1 flex-wrap">
-                  <v-chip size="x-small" color="primary" variant="tonal">
-                    <v-icon start size="12">mdi-calendar</v-icon>
-                    {{ formatDate(req.start_date) }} → {{ formatDate(req.end_date) }}
-                  </v-chip>
-                  <v-chip
-                    size="x-small"
-                    :color="statusColor(req.status)"
-                    variant="tonal"
-                  >
-                    {{ req.status }}
-                  </v-chip>
+                <div class="approval-meta mt-2">
+                  <span class="approval-meta-item">
+                    <v-icon size="14">mdi-calendar</v-icon>
+                    {{ formatDate(req.start_date) }} &rarr; {{ formatDate(req.end_date) }}
+                  </span>
                 </div>
-                <div v-if="req.notes" class="text-body-2 text-medium-emphasis mt-2">
+                <div v-if="req.notes" class="approval-note mt-2">
                   <v-icon size="14" class="mr-1">mdi-note-text-outline</v-icon>
                   {{ req.notes }}
                 </div>
               </div>
 
-              <div v-if="req.status === 'pending'" class="d-flex gap-2">
+              <div class="d-flex ga-2 flex-shrink-0">
                 <v-btn
                   color="success"
                   variant="tonal"
@@ -117,15 +121,6 @@
                   Deny
                 </v-btn>
               </div>
-
-              <v-chip
-                v-else
-                size="small"
-                :color="statusColor(req.status)"
-                variant="flat"
-              >
-                {{ req.status }}
-              </v-chip>
             </div>
           </v-card-text>
         </v-card>
@@ -136,50 +131,57 @@
         <v-progress-linear v-if="swapsLoading" indeterminate color="primary" class="mb-4" />
 
         <div v-if="!hasPendingSwapActions && !swapsLoading && !claimsLoading" class="empty-state">
-          <v-icon size="48" color="grey-lighten-1">mdi-checkbox-marked-circle-outline</v-icon>
-          <p class="text-body-1 text-medium-emphasis mt-2">No pending shift swap actions.</p>
+          <v-icon size="56" color="grey-lighten-1">mdi-checkbox-marked-circle-outline</v-icon>
+          <p class="text-body-1 text-medium-emphasis mt-3 mb-0">You're all caught up.</p>
+          <p class="text-caption text-medium-emphasis">No pending shift swap actions.</p>
         </div>
 
         <!-- ── Stage 1: Cover Requests awaiting manager approval ── -->
         <template v-if="coverRequests.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Cover Requests</div>
+          <div class="approval-section-header">
+            <v-icon size="18" color="primary" class="mr-2">mdi-account-switch-outline</v-icon>
+            <span>Cover Requests</span>
+            <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
+              {{ coverRequests.length }}
+            </v-chip>
+            <span class="approval-section-hint">
+              Approving posts the shift as open for pickup.
+            </span>
+          </div>
 
           <v-card
             v-for="swap in coverRequests"
             :key="swap.id"
-            elevation="2"
-            class="mb-3"
+            variant="outlined"
+            class="approval-card mb-3"
           >
             <v-card-text>
-              <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-                <div>
+              <div class="d-flex align-start justify-space-between flex-wrap ga-3">
+                <div class="flex-grow-1 min-w-0">
                   <div class="text-subtitle-1 font-weight-bold">
                     {{ swap.requestedBy }}
-                    <v-chip size="x-small" class="ml-2" variant="tonal" color="warning">
-                      Find Cover
-                    </v-chip>
                   </div>
-                  <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
-                    <v-icon size="14">mdi-calendar</v-icon>
-                    {{ swap.dateLabel }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-clock-outline</v-icon>
-                    {{ swap.timeRange }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-map-marker-outline</v-icon>
-                    {{ swap.location }}
+                  <div class="approval-meta mt-2">
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-calendar</v-icon>
+                      {{ swap.dateLabel }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-clock-outline</v-icon>
+                      {{ swap.timeRange }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-map-marker-outline</v-icon>
+                      {{ swap.location }}
+                    </span>
                   </div>
-                  <div v-if="swap.reason" class="text-body-2 text-medium-emphasis mt-1">
+                  <div v-if="swap.reason" class="approval-note mt-2">
                     <v-icon size="14" class="mr-1">mdi-message-outline</v-icon>
                     {{ swap.reason }}
                   </div>
-                  <div class="text-caption text-medium-emphasis mt-1">
-                    <v-icon size="12" class="mr-1">mdi-information-outline</v-icon>
-                    Approving will post this shift as open for other students to pick up.
-                  </div>
                 </div>
 
-                <div class="d-flex gap-2 align-center">
+                <div class="d-flex ga-2 flex-shrink-0">
                   <v-btn
                     color="success"
                     variant="tonal"
@@ -206,49 +208,57 @@
           </v-card>
         </template>
 
-        <v-divider v-if="coverRequests.length > 0 && pickupRequests.length > 0" class="my-4" />
-
         <!-- ── Stage 2: Pickup Requests awaiting manager approval ── -->
         <template v-if="pickupRequests.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Shift Pickup Requests</div>
+          <div class="approval-section-header">
+            <v-icon size="18" color="primary" class="mr-2">mdi-hand-extended-outline</v-icon>
+            <span>Pickup Requests</span>
+            <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
+              {{ pickupRequests.length }}
+            </v-chip>
+            <span class="approval-section-hint">
+              Students volunteering to take an open shift.
+            </span>
+          </div>
 
           <v-card
             v-for="swap in pickupRequests"
             :key="swap.id"
-            elevation="2"
-            class="mb-3"
+            variant="outlined"
+            class="approval-card mb-3"
           >
             <v-card-text>
-              <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-                <div>
+              <div class="d-flex align-start justify-space-between flex-wrap ga-3">
+                <div class="flex-grow-1 min-w-0">
                   <div class="text-subtitle-1 font-weight-bold">
                     {{ swap.requestedBy }}
-                    <span class="text-caption text-medium-emphasis ml-1">wants cover</span>
-                    <v-chip size="x-small" class="ml-2" variant="tonal" color="primary">
-                      Find Cover
-                    </v-chip>
+                    <span class="text-caption text-medium-emphasis ml-1">needs cover</span>
                   </div>
-                  <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
-                    <v-icon size="14">mdi-calendar</v-icon>
-                    {{ swap.dateLabel }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-clock-outline</v-icon>
-                    {{ swap.timeRange }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-map-marker-outline</v-icon>
-                    {{ swap.location }}
+                  <div class="approval-meta mt-2">
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-calendar</v-icon>
+                      {{ swap.dateLabel }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-clock-outline</v-icon>
+                      {{ swap.timeRange }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-map-marker-outline</v-icon>
+                      {{ swap.location }}
+                    </span>
                   </div>
-                  <div v-if="swap.reason" class="text-body-2 text-medium-emphasis mt-1">
+                  <div v-if="swap.claimedBy" class="approval-volunteer mt-2">
+                    <v-icon size="14" color="success" class="mr-1">mdi-account-check</v-icon>
+                    <strong>Volunteer:</strong>&nbsp;{{ swap.claimedBy }}
+                  </div>
+                  <div v-if="swap.reason" class="approval-note mt-2">
                     <v-icon size="14" class="mr-1">mdi-message-outline</v-icon>
                     {{ swap.reason }}
                   </div>
-                  <div v-if="swap.claimedBy" class="text-body-2 mt-1 font-weight-medium">
-                    <v-icon size="14" color="success" class="mr-1">mdi-account-check</v-icon>
-                    Volunteer: {{ swap.claimedBy }}
-                  </div>
                 </div>
 
-                <div class="d-flex gap-2 align-center">
+                <div class="d-flex ga-2 flex-shrink-0">
                   <v-btn
                     color="success"
                     variant="tonal"
@@ -275,47 +285,57 @@
           </v-card>
         </template>
 
-        <v-divider v-if="showTradeSectionDivider" class="my-4" />
-
-        <!-- ── Shift Trades ── -->
+        <!-- ── Shift Trades (Swaps) ── -->
         <template v-if="actionableTradeRequests.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Shift Trades</div>
+          <div class="approval-section-header">
+            <v-icon size="18" color="primary" class="mr-2">mdi-swap-horizontal</v-icon>
+            <span>Shift Trades</span>
+            <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
+              {{ actionableTradeRequests.length }}
+            </v-chip>
+            <span class="approval-section-hint">
+              Direct trades between two students.
+            </span>
+          </div>
 
           <v-card
             v-for="swap in actionableTradeRequests"
             :key="swap.id"
-            elevation="2"
-            class="mb-3"
+            variant="outlined"
+            class="approval-card mb-3"
           >
             <v-card-text>
-              <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-                <div>
+              <div class="d-flex align-start justify-space-between flex-wrap ga-3">
+                <div class="flex-grow-1 min-w-0">
                   <div class="text-subtitle-1 font-weight-bold">
                     {{ swap.requestedBy }}
-                    <v-chip size="x-small" class="ml-2" variant="tonal" color="primary">
-                      Trade
-                    </v-chip>
                   </div>
-                  <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
-                    <v-icon size="14">mdi-calendar</v-icon>
-                    {{ swap.dateLabel }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-clock-outline</v-icon>
-                    {{ swap.timeRange }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-map-marker-outline</v-icon>
-                    {{ swap.location }}
+                  <div class="approval-meta mt-2">
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-calendar</v-icon>
+                      {{ swap.dateLabel }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-clock-outline</v-icon>
+                      {{ swap.timeRange }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-map-marker-outline</v-icon>
+                      {{ swap.location }}
+                    </span>
                   </div>
-                  <div v-if="swap.reason" class="text-body-2 text-medium-emphasis mt-1">
+                  <div v-if="swap.claimedBy" class="approval-volunteer mt-2">
+                    <v-icon size="14" color="primary" class="mr-1">mdi-swap-horizontal</v-icon>
+                    <strong>Trading with:</strong>&nbsp;{{ swap.claimedBy }}
+                  </div>
+                  <div v-if="swap.reason" class="approval-note mt-2">
+                    <v-icon size="14" class="mr-1">mdi-message-outline</v-icon>
                     {{ swap.reason }}
-                  </div>
-                  <div v-if="swap.claimedBy" class="text-body-2 mt-1">
-                    <strong>Trading with:</strong> {{ swap.claimedBy }}
                   </div>
                 </div>
 
-                <div v-if="swap.status === 'pending'" class="d-flex gap-2 align-center">
-                  <v-chip size="x-small" color="orange" variant="tonal">
+                <div v-if="swap.status === 'pending'" class="d-flex flex-column align-end ga-2 flex-shrink-0">
+                  <v-chip size="x-small" color="warning" variant="tonal">
                     Awaiting other student
                   </v-chip>
                   <v-btn
@@ -330,7 +350,7 @@
                   </v-btn>
                 </div>
 
-                <div v-else-if="swap.status === 'manager_pending'" class="d-flex gap-2 align-center">
+                <div v-else-if="swap.status === 'manager_pending'" class="d-flex ga-2 flex-shrink-0">
                   <v-btn
                     color="success"
                     variant="tonal"
@@ -357,38 +377,51 @@
           </v-card>
         </template>
 
-        <v-divider v-if="showClaimsSectionDivider" class="my-5" />
-
         <!-- ── Truly unassigned open shift claims (old flow) ── -->
         <template v-if="openShiftClaims.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Open Shift Claims</div>
+          <div class="approval-section-header">
+            <v-icon size="18" color="primary" class="mr-2">mdi-briefcase-outline</v-icon>
+            <span>Open Shift Claims</span>
+            <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
+              {{ openShiftClaims.length }}
+            </v-chip>
+            <span class="approval-section-hint">
+              Students claiming unassigned shifts.
+            </span>
+          </div>
 
           <v-card
             v-for="claim in openShiftClaims"
             :key="`claim-${claim.id}`"
-            elevation="2"
-            class="mb-3"
+            variant="outlined"
+            class="approval-card mb-3"
           >
             <v-card-text>
-              <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-                <div>
-                  <div class="text-subtitle-1 font-weight-bold">
-                    {{ claim.requesterName }}
-                    <span class="text-caption text-medium-emphasis ml-1">{{ claim.requesterEmail }}</span>
+              <div class="d-flex align-start justify-space-between flex-wrap ga-3">
+                <div class="flex-grow-1 min-w-0">
+                  <div class="d-flex align-center flex-wrap ga-2">
+                    <span class="text-subtitle-1 font-weight-bold">
+                      {{ claim.requesterName }}
+                    </span>
+                    <span class="text-caption text-medium-emphasis">{{ claim.requesterEmail }}</span>
                   </div>
-                  <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
-                    <v-icon size="14">mdi-briefcase-outline</v-icon>
-                    {{ claim.positionName }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-calendar</v-icon>
-                    {{ claim.dateLabel }}
-                    &nbsp;·&nbsp;
-                    <v-icon size="14">mdi-clock-outline</v-icon>
-                    {{ claim.timeRange }}
+                  <div class="approval-meta mt-2">
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-briefcase-outline</v-icon>
+                      {{ claim.positionName }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-calendar</v-icon>
+                      {{ claim.dateLabel }}
+                    </span>
+                    <span class="approval-meta-item">
+                      <v-icon size="14">mdi-clock-outline</v-icon>
+                      {{ claim.timeRange }}
+                    </span>
                   </div>
                 </div>
 
-                <div v-if="claim.status === 'manager_pending' || claim.status === 'pending'" class="d-flex gap-2">
+                <div class="d-flex ga-2 flex-shrink-0">
                   <v-btn
                     color="success"
                     variant="tonal"
@@ -531,16 +564,6 @@ const hasPendingSwapActions = computed(() =>
   coverRequests.value.length > 0 ||
   pickupRequests.value.length > 0 ||
   actionableTradeRequests.value.length > 0 ||
-  openShiftClaims.value.length > 0
-)
-
-const showTradeSectionDivider = computed(() =>
-  (coverRequests.value.length > 0 || pickupRequests.value.length > 0) &&
-  actionableTradeRequests.value.length > 0
-)
-
-const showClaimsSectionDivider = computed(() =>
-  (coverRequests.value.length > 0 || pickupRequests.value.length > 0 || actionableTradeRequests.value.length > 0) &&
   openShiftClaims.value.length > 0
 )
 
@@ -692,20 +715,6 @@ const formatTime = (timeStr) => {
   return `${display}:${m} ${period}`
 }
 
-const statusColor = (status) => {
-  const normalized = String(status || '').toLowerCase()
-  const map = {
-    pending: 'warning',
-    manager_pending: 'warning',
-    approved: 'success',
-    rejected: 'error',
-    denied: 'error',
-    declined: 'error',
-    claimed: 'info'
-  }
-  return map[normalized] || 'grey'
-}
-
 const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
@@ -730,10 +739,101 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+.approvals-header {
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 16px 18px;
+}
+
+.approvals-tabs {
+  border-bottom: 1px solid #eaecf0;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 0;
+  padding: 52px 0;
+  border: 1px dashed #d0d5dd;
+  border-radius: 12px;
+  background: #fcfcfd;
+}
+
+.approval-card {
+  border-color: #eaecf0 !important;
+  border-radius: 12px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.approval-card:hover {
+  border-color: #d0d5dd !important;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08);
+}
+
+.approval-section-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #101828;
+}
+
+.approval-section-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #667085;
+  font-weight: 500;
+}
+
+.approval-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.approval-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475467;
+  background: #f9fafb;
+  border: 1px solid #eaecf0;
+  border-radius: 999px;
+  padding: 4px 9px;
+}
+
+.approval-note {
+  display: inline-flex;
+  align-items: center;
+  color: #475467;
+  font-size: 13px;
+}
+
+.approval-volunteer {
+  display: inline-flex;
+  align-items: center;
+  color: #1d2939;
+  font-size: 13px;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .approval-section-hint {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+
+  .approval-card :deep(.v-card-text) {
+    padding: 14px;
+  }
 }
 </style>

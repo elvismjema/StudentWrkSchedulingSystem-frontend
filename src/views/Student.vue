@@ -176,7 +176,6 @@ const navItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard', route: '/student/dashboard', name: 'student-dashboard' },
   { title: 'My Schedule', icon: 'mdi-calendar-clock', route: '/student/schedule', name: 'student-schedule' },
   { title: 'Clock In/Out', icon: 'mdi-clock-check-outline', route: '/student/clock', name: 'student-clock' },
-  { title: 'Swap Board', icon: 'mdi-swap-horizontal', route: '/student/trade-board', name: 'student-trade-board' },
   { title: 'Availability', icon: 'mdi-calendar-edit', route: '/student/availability', name: 'student-availability' },
 ];
 

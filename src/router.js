@@ -111,11 +111,10 @@ const router = createRouter({
           component: () => import("./views/StudentAvailability.vue"),
           meta: getStudentMobileRouteMeta("student-availability"),
         },
+        // Legacy student trade-board URL support after removing standalone page
         {
           path: "trade-board",
-          name: "student-trade-board",
-          component: () => import("./views/StudentTradeBoard.vue"),
-          meta: getStudentMobileRouteMeta("student-trade-board"),
+          redirect: { name: "student-schedule" },
         },
         {
           path: "tasks",

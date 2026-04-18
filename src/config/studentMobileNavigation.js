@@ -3,8 +3,12 @@
  *
  * Single source of truth for the student mobile IA.
  *
- * Primary bottom nav: 5 tabs
- *   Home · Schedule · Clock (center) · Swap · Hours
+ * Primary bottom nav: 4 tabs
+ *   Home · Schedule · Clock (center) · Hours
+ *
+ * Swap/cover actions live inside Schedule on the individual shift cards
+ * and on the Home dashboard as incoming-request cards, so a standalone
+ * Swap Board tab is not needed.
  *
  * Secondary pages are accessible via the profile/avatar menu in the
  * top bar — not promoted to a bottom tab.
@@ -40,22 +44,13 @@ const studentMobilePrimaryTabs = [
     order: 2,
   },
   {
-    key: 'trade',
-    label: 'Swap',
-    routeName: 'student-trade-board',
-    title: 'Swap Board',
-    icon: 'mdi-swap-horizontal-circle',
-    iconOutline: 'mdi-swap-horizontal-circle-outline',
-    order: 3,
-  },
-  {
     key: 'hours',
     label: 'Hours',
     routeName: 'student-availability',
     title: 'Hours',
     icon: 'mdi-calendar-edit',
     iconOutline: 'mdi-calendar-edit-outline',
-    order: 4,
+    order: 3,
   },
 ];
 

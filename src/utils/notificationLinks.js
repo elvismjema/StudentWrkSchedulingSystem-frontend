@@ -18,7 +18,7 @@ const getApprovalsRoute = (role) => {
   const normalized = normalizeRole(role);
   return normalized === "manager" || normalized === "admin"
     ? "/manager/approvals"
-    : "/student/trade-board";
+    : "/student/schedule";
 };
 
 const byTypeFallback = (type, role) => {
@@ -54,7 +54,7 @@ export const resolveNotificationLink = (notification, role) => {
       return byTypeFallback(notification?.type, role);
     }
     if (rawLink.startsWith("/manager/") && normalizeRole(role) === "student") {
-      if (rawLink.includes("/approvals")) return "/student/trade-board";
+      if (rawLink.includes("/approvals")) return "/student/schedule";
       return byTypeFallback(notification?.type, role);
     }
     return rawLink;

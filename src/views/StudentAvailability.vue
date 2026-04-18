@@ -809,6 +809,7 @@ const formatWeekRange = (start, end) => {
 const normalizeToHHMM = (t) => (t ? String(t).slice(0, 5) : "");
 const notify = (text, color = "success") => { snackbar.value = { show: true, text, color }; };
 const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
+const isNotFoundError = (error) => Number(error?.response?.status) === 404;
 
 const isClassScheduleRecord = (record) =>
   record?.sourceType === "class_schedule"
@@ -817,6 +818,37 @@ const isClassScheduleRecord = (record) =>
 
 const isClassScheduleBlock = (block) =>
   block?.sourceType === "class_schedule" || Boolean(block?.isSystemManaged);
+
+const overlaps = (startA, endA, startB, endB) => startA < endB && endA > startB;
+
+const hasManualBlockOverlap = (candidate, excludeTempId = null) =>
+  blocks.value
+    .filter(
+      (block) =>
+        !isClassScheduleBlock(block)
+        && block.tempId !== excludeTempId
+        && Number(block.dayOfWeek) === Number(candidate.dayOfWeek)
+    )
+    .some((block) => overlaps(candidate.startTime, candidate.endTime, block.startTime, block.endTime));
+
+const findFirstOverlapPair = (manualBlocks) => {
+  const ordered = [...manualBlocks].sort((a, b) => {
+    if (Number(a.dayOfWeek) !== Number(b.dayOfWeek)) {
+      return Number(a.dayOfWeek) - Number(b.dayOfWeek);
+    }
+    return String(a.startTime).localeCompare(String(b.startTime));
+  });
+
+  for (let i = 0; i < ordered.length; i += 1) {
+    for (let j = i + 1; j < ordered.length; j += 1) {
+      if (Number(ordered[i].dayOfWeek) !== Number(ordered[j].dayOfWeek)) break;
+      if (overlaps(ordered[i].startTime, ordered[i].endTime, ordered[j].startTime, ordered[j].endTime)) {
+        return { first: ordered[i], second: ordered[j] };
+      }
+    }
+  }
+  return null;
+};
 
 const blocksFingerprint = (bs) =>
   JSON.stringify(
@@ -1093,6 +1125,10 @@ const confirmCreate = () => {
     notify("This block overlaps locked class time. Choose a different time.", "error");
     return;
   }
+  if (hasManualBlockOverlap({ dayOfWeek, startTime, endTime })) {
+    notify("This block overlaps an existing availability block. Choose a non-conflicting time range.", "error");
+    return;
+  }
   blocks.value = [
     ...blocks.value,
     { tempId: `blk-${++tempIdCounter}`, dayOfWeek, startTime, endTime, availabilityType },
@@ -1129,6 +1165,10 @@ const confirmEdit = () => {
       notify("This update overlaps locked class time. Choose a different time.", "error");
       return;
     }
+    if (hasManualBlockOverlap({ dayOfWeek, startTime, endTime }, tempId)) {
+      notify("This update overlaps another availability block. Choose a non-conflicting time range.", "error");
+      return;
+    }
     updated[idx] = candidate;
     blocks.value = updated;
   }
@@ -1156,6 +1196,12 @@ const onEventDrop = (dropInfo) => {
   const newStart = dropInfo.event.startStr.split("T")[1].slice(0, 5);
   const newEnd = dropInfo.event.endStr.split("T")[1].slice(0, 5);
 
+  if (hasManualBlockOverlap({ dayOfWeek: newDow, startTime: newStart, endTime: newEnd }, tempId)) {
+    dropInfo.revert();
+    notify("This move overlaps another availability block. Choose a non-conflicting time range.", "error");
+    return;
+  }
+
   const updated = [...blocks.value];
   updated[idx] = { ...updated[idx], dayOfWeek: newDow, startTime: newStart, endTime: newEnd };
   blocks.value = updated;
@@ -1173,6 +1219,17 @@ const onEventResize = (resizeInfo) => {
   }
 
   const newEnd = resizeInfo.event.endStr.split("T")[1].slice(0, 5);
+  const current = blocks.value[idx];
+  if (
+    hasManualBlockOverlap(
+      { dayOfWeek: current.dayOfWeek, startTime: current.startTime, endTime: newEnd },
+      tempId
+    )
+  ) {
+    resizeInfo.revert();
+    notify("This resize overlaps another availability block. Choose a non-conflicting time range.", "error");
+    return;
+  }
   const updated = [...blocks.value];
   updated[idx] = { ...updated[idx], endTime: newEnd };
   blocks.value = updated;
@@ -1315,6 +1372,14 @@ const saveChanges = async () => {
   saving.value = true;
   try {
     const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
+    const overlapPair = findFirstOverlapPair(manualOnlyBlocks);
+    if (overlapPair) {
+      notify(
+        `Overlapping blocks detected on ${dowLabel(overlapPair.first.dayOfWeek)}. Please resolve overlaps before saving.`,
+        "error"
+      );
+      return;
+    }
     const hasConflict = manualOnlyBlocks.some((block) => hasClassConflict(block));
     if (hasConflict) {
       notify("One or more manual availability blocks overlap locked class time.", "error");
@@ -1326,7 +1391,11 @@ const saveChanges = async () => {
       (r) => (r.isRecurring || !r.specificDate) && !isClassScheduleRecord(r)
     );
     for (const rec of recurringManualRecords) {
-      await availabilityService.remove(rec.id);
+      try {
+        await availabilityService.remove(rec.id);
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+      }
     }
 
     // Re-create only manual blocks sequentially to avoid race conditions

@@ -45,10 +45,10 @@
 
       <!-- View toggle: List / Calendar -->
       <div class="m-view-toggle">
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'list' }" @click="mobileViewMode = 'list'">
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'list' }" @click="setMobileViewMode('list')">
           <v-icon icon="mdi-format-list-bulleted" size="14" class="mr-1" />List
         </button>
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' }" @click="mobileViewMode = 'calendar'">
+        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' }" @click="setMobileViewMode('calendar')">
           <v-icon icon="mdi-calendar-month" size="14" class="mr-1" />Calendar
         </button>
       </div>
@@ -979,18 +979,27 @@ const goToCurrentWeek = () => {
   mobileCalendarDay.value = new Date().getDay();
 };
 
+const setMobileViewMode = (mode) => {
+  mobileViewMode.value = mode;
+  if (mode === "calendar" && mobileDayIndex.value !== -1) {
+    mobileCalendarDay.value = Number(mobileDayIndex.value);
+  }
+};
+
 const selectMobileDay = (dow) => {
+  const normalizedDow = Number(dow);
   if (mobileViewMode.value === "list") {
-    mobileDayIndex.value = dow;
+    mobileDayIndex.value = normalizedDow;
+    mobileCalendarDay.value = normalizedDow;
     return;
   }
-  mobileCalendarDay.value = dow;
+  mobileCalendarDay.value = normalizedDow;
 };
 
 const isMobileDaySelected = (dow) => {
-  if (mobileViewMode.value === "list") return mobileDayIndex.value === dow;
-  if (mobileCalendarMode.value === "day") return mobileCalendarDay.value === dow;
-  return Number(dow) === Number(new Date().getDay()) && mobileWeekOffset.value === 0;
+  const normalizedDow = Number(dow);
+  if (mobileViewMode.value === "list") return Number(mobileDayIndex.value) === normalizedDow;
+  return Number(mobileCalendarDay.value) === normalizedDow;
 };
 
 // --- Calendar grid helpers ---

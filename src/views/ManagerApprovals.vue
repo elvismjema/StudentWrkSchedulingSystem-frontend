@@ -15,7 +15,7 @@
           variant="tonal"
           color="primary"
           prepend-icon="mdi-refresh"
-          :loading="loading || swapsLoading || claimsLoading || ackLoading"
+          :loading="loading || swapsLoading || ackLoading"
           @click="loadAll"
         >
           Refresh
@@ -35,8 +35,8 @@
           class="ml-2"
         />
       </v-tab>
-      <v-tab value="shift-swaps">
-        Shift Swaps
+        <v-tab value="shift-swaps">
+        Shift Requests
         <v-badge
           v-if="pendingSwapCount > 0"
           :content="pendingSwapCount"
@@ -130,7 +130,7 @@
       <v-tabs-window-item value="shift-swaps">
         <v-progress-linear v-if="swapsLoading" indeterminate color="primary" class="mb-4" />
 
-        <div v-if="!hasPendingSwapActions && !swapsLoading && !claimsLoading" class="empty-state">
+        <div v-if="!hasPendingSwapActions && !swapsLoading" class="empty-state">
           <v-icon size="56" color="grey-lighten-1">mdi-checkbox-marked-circle-outline</v-icon>
           <p class="text-body-1 text-medium-emphasis mt-3 mb-0">You're all caught up.</p>
           <p class="text-caption text-medium-emphasis">No pending shift swap actions.</p>
@@ -285,11 +285,11 @@
           </v-card>
         </template>
 
-        <!-- ── Shift Trades (Swaps) ── -->
+        <!-- ── Swap Requests ── -->
         <template v-if="actionableTradeRequests.length > 0">
           <div class="approval-section-header">
             <v-icon size="18" color="primary" class="mr-2">mdi-swap-horizontal</v-icon>
-            <span>Shift Trades</span>
+            <span>Swap Requests</span>
             <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
               {{ actionableTradeRequests.length }}
             </v-chip>
@@ -377,76 +377,6 @@
           </v-card>
         </template>
 
-        <!-- ── Truly unassigned open shift claims (old flow) ── -->
-        <template v-if="openShiftClaims.length > 0">
-          <div class="approval-section-header">
-            <v-icon size="18" color="primary" class="mr-2">mdi-briefcase-outline</v-icon>
-            <span>Open Shift Claims</span>
-            <v-chip size="x-small" variant="tonal" color="primary" class="ml-2">
-              {{ openShiftClaims.length }}
-            </v-chip>
-            <span class="approval-section-hint">
-              Students claiming unassigned shifts.
-            </span>
-          </div>
-
-          <v-card
-            v-for="claim in openShiftClaims"
-            :key="`claim-${claim.id}`"
-            variant="outlined"
-            class="approval-card mb-3"
-          >
-            <v-card-text>
-              <div class="d-flex align-start justify-space-between flex-wrap ga-3">
-                <div class="flex-grow-1 min-w-0">
-                  <div class="d-flex align-center flex-wrap ga-2">
-                    <span class="text-subtitle-1 font-weight-bold">
-                      {{ claim.requesterName }}
-                    </span>
-                    <span class="text-caption text-medium-emphasis">{{ claim.requesterEmail }}</span>
-                  </div>
-                  <div class="approval-meta mt-2">
-                    <span class="approval-meta-item">
-                      <v-icon size="14">mdi-briefcase-outline</v-icon>
-                      {{ claim.positionName }}
-                    </span>
-                    <span class="approval-meta-item">
-                      <v-icon size="14">mdi-calendar</v-icon>
-                      {{ claim.dateLabel }}
-                    </span>
-                    <span class="approval-meta-item">
-                      <v-icon size="14">mdi-clock-outline</v-icon>
-                      {{ claim.timeRange }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="d-flex ga-2 flex-shrink-0">
-                  <v-btn
-                    color="success"
-                    variant="tonal"
-                    size="small"
-                    prepend-icon="mdi-check"
-                    :loading="actioning === `claim-${claim.id}-approve`"
-                    @click="reviewOpenClaim(claim, 'approve')"
-                  >
-                    Approve
-                  </v-btn>
-                  <v-btn
-                    color="error"
-                    variant="tonal"
-                    size="small"
-                    prepend-icon="mdi-close"
-                    :loading="actioning === `claim-${claim.id}-reject`"
-                    @click="reviewOpenClaim(claim, 'reject')"
-                  >
-                    Deny
-                  </v-btn>
-                </div>
-              </div>
-            </v-card-text>
-          </v-card>
-        </template>
       </v-tabs-window-item>
 
       <!-- ─── Shift Acknowledgments Tab ──────────────────────────────── -->
@@ -518,14 +448,12 @@ const currentDeptId = deptContext.department_id || null
 const activeTab = ref('time-off')
 const loading = ref(false)
 const swapsLoading = ref(false)
-const claimsLoading = ref(false)
 const ackLoading = ref(false)
 const actioning = ref(null)
 const timeOffError = ref('')
 const ackError = ref('')
 const timeOffRequests = ref([])
 const swapRequests = ref([])
-const openShiftClaims = ref([])
 const acknowledgments = ref([])
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
@@ -536,8 +464,7 @@ const pendingTimeOffCount = computed(() =>
 const pendingSwapCount = computed(() =>
   coverRequests.value.length +
   pickupRequests.value.length +
-  tradeRequests.value.filter(s => ['pending', 'manager_pending'].includes(s.status)).length +
-  openShiftClaims.value.filter(c => ['pending', 'manager_pending'].includes(String(c.status || '').toLowerCase())).length
+  tradeRequests.value.filter(s => ['pending', 'manager_pending'].includes(s.status)).length
 )
 
 // Derived sub-lists from swapRequests
@@ -563,8 +490,7 @@ const actionableTradeRequests = computed(() =>
 const hasPendingSwapActions = computed(() =>
   coverRequests.value.length > 0 ||
   pickupRequests.value.length > 0 ||
-  actionableTradeRequests.value.length > 0 ||
-  openShiftClaims.value.length > 0
+  actionableTradeRequests.value.length > 0
 )
 
 const unacknowledgedCount = computed(() =>
@@ -596,7 +522,7 @@ const loadSwapRequests = async () => {
       .map((row) => ({
         id: row.id,
         type: row.type || 'find_cover',
-        requestType: row.type === 'swap' ? 'Swap' : 'Find Cover',
+        requestType: row.type === 'swap' ? 'Swap Request' : 'Cover Request',
         requestedBy: `${row.requester?.fName || ''} ${row.requester?.lName || ''}`.trim() || row.requester?.email || 'Unknown',
         claimedBy: row.respondent ? `${row.respondent?.fName || ''} ${row.respondent?.lName || ''}`.trim() : '',
         dateLabel: formatDate(row.requesterShift?.shift_date),
@@ -610,28 +536,6 @@ const loadSwapRequests = async () => {
     showSnackbar('Failed to load shift swaps', 'error')
   } finally {
     swapsLoading.value = false
-  }
-}
-
-const loadOpenShiftClaims = async () => {
-  claimsLoading.value = true
-  try {
-    const response = await apiClient.get('/manager/open-shift-claims')
-    const rows = response?.data?.data || []
-    openShiftClaims.value = rows.map((row) => ({
-      id: row.id,
-      requesterName: `${row.requester?.fName || ''} ${row.requester?.lName || ''}`.trim() || 'Unknown',
-      requesterEmail: row.requester?.email || '',
-      positionName: row.requesterShift?.position?.position_name || 'Shift',
-      dateLabel: formatDate(row.requesterShift?.shift_date),
-      timeRange: `${formatTime(row.requesterShift?.start_time)} – ${formatTime(row.requesterShift?.end_time)}`,
-      status: row.status || 'manager_pending',
-    }))
-  } catch (err) {
-    openShiftClaims.value = []
-    showSnackbar('Failed to load open shift claims', 'error')
-  } finally {
-    claimsLoading.value = false
   }
 }
 
@@ -684,20 +588,6 @@ const reviewSwap = async (swap, action) => {
   }
 }
 
-const reviewOpenClaim = async (claim, action) => {
-  actioning.value = `claim-${claim.id}-${action === 'approve' ? 'approve' : 'reject'}`
-  try {
-    await apiClient.put(`/manager/open-shift-claims/${claim.id}`, { action })
-    showSnackbar(`Open shift claim ${action === 'approve' ? 'approved' : 'rejected'}`, 'success')
-    await loadOpenShiftClaims()
-  } catch (err) {
-    showSnackbar('Failed to review open shift claim', 'error')
-    console.error(err)
-  } finally {
-    actioning.value = null
-  }
-}
-
 const formatDate = (dateStr) => {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -731,7 +621,6 @@ const formatDateTime = (dateStr) => {
 const loadAll = () => {
   loadTimeOffRequests()
   loadSwapRequests()
-  loadOpenShiftClaims()
   loadAcknowledgments()
 }
 

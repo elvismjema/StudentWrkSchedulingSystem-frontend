@@ -73,20 +73,20 @@
               variant="outlined"
               color="primary"
               prepend-icon="mdi-account-switch"
-              aria-label="Find cover for this shift"
+              aria-label="Request cover for this shift"
               @click.stop="$emit('find-cover', shift)"
             >
-              Find Cover
+              Request Cover
             </v-btn>
             <v-btn
               v-if="canTrade"
               size="small"
               variant="outlined"
               prepend-icon="mdi-swap-horizontal"
-              aria-label="Trade this shift"
+              aria-label="Swap this shift"
               @click.stop="$emit('trade', shift)"
             >
-              Trade
+              Swap
             </v-btn>
             <v-btn
               v-if="canClockIn"
@@ -167,7 +167,7 @@ const formattedTime = computed(() => {
 const statusLabel = computed(() => {
   if (props.isOpenShift) return 'Open';
   if (props.shift.status === 'pending_acknowledgement') return 'Unacknowledged';
-  if (props.shift.swap_requested) return 'Cover Requested';
+  if (props.shift.swap_requested) return 'Cover Request';
   return null;
 });
 

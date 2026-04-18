@@ -198,8 +198,8 @@
           <v-btn variant="text" @click="eventDialog.show = false">Close</v-btn>
           <template v-if="eventDialog.type === 'mine'">
             <v-btn variant="outlined" size="small" color="primary" @click="onAddToCalendar"><v-icon start size="16">mdi-calendar-plus</v-icon>Add to Calendar</v-btn>
-            <v-btn variant="outlined" size="small" @click="onFindCover">Find Cover</v-btn>
-            <v-btn variant="outlined" size="small" @click="onTrade">Trade</v-btn>
+            <v-btn variant="outlined" size="small" @click="onFindCover">Request Cover</v-btn>
+            <v-btn variant="outlined" size="small" @click="onTrade">Swap</v-btn>
           </template>
           <v-btn v-if="eventDialog.type === 'pending_ack'" color="warning" variant="flat" :loading="eventDialog.loading" @click="onAcknowledge">Accept</v-btn>
           <v-btn v-if="eventDialog.type === 'open'" color="primary" variant="flat" :loading="eventDialog.loading" @click="onClaim">Pick Up</v-btn>

@@ -6,7 +6,7 @@
       <div>
         <h1 class="text-h4 font-weight-bold">Approvals</h1>
         <p class="text-subtitle-1 text-medium-emphasis">
-          Review time off requests and shift swap requests
+          Review pending time off, cover, pickup, and swap requests
         </p>
       </div>
       <v-spacer />
@@ -28,7 +28,7 @@
         />
       </v-tab>
       <v-tab value="shift-swaps">
-        Shift Swaps
+        Shift Requests
         <v-badge
           v-if="pendingSwapCount > 0"
           :content="pendingSwapCount"
@@ -156,7 +156,7 @@
                   <div class="text-subtitle-1 font-weight-bold">
                     {{ swap.requestedBy }}
                     <v-chip size="x-small" class="ml-2" variant="tonal" color="warning">
-                      Find Cover
+                      Cover Request
                     </v-chip>
                   </div>
                   <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
@@ -210,7 +210,7 @@
 
         <!-- ── Stage 2: Pickup Requests awaiting manager approval ── -->
         <template v-if="pickupRequests.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Shift Pickup Requests</div>
+          <div class="text-subtitle-1 font-weight-bold mb-2">Pickup Requests</div>
 
           <v-card
             v-for="swap in pickupRequests"
@@ -225,7 +225,7 @@
                     {{ swap.requestedBy }}
                     <span class="text-caption text-medium-emphasis ml-1">wants cover</span>
                     <v-chip size="x-small" class="ml-2" variant="tonal" color="primary">
-                      Find Cover
+                      Cover Request
                     </v-chip>
                   </div>
                   <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
@@ -277,9 +277,9 @@
 
         <v-divider v-if="showTradeSectionDivider" class="my-4" />
 
-        <!-- ── Shift Trades ── -->
+        <!-- ── Swap Requests ── -->
         <template v-if="actionableTradeRequests.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Shift Trades</div>
+          <div class="text-subtitle-1 font-weight-bold mb-2">Swap Requests</div>
 
           <v-card
             v-for="swap in actionableTradeRequests"
@@ -293,7 +293,7 @@
                   <div class="text-subtitle-1 font-weight-bold">
                     {{ swap.requestedBy }}
                     <v-chip size="x-small" class="ml-2" variant="tonal" color="primary">
-                      Trade
+                      Swap Request
                     </v-chip>
                   </div>
                   <div class="d-flex align-center gap-2 mt-1 flex-wrap text-body-2">
@@ -359,9 +359,9 @@
 
         <v-divider v-if="showClaimsSectionDivider" class="my-5" />
 
-        <!-- ── Truly unassigned open shift claims (old flow) ── -->
+        <!-- ── Truly unassigned open shift pickup requests (legacy flow) ── -->
         <template v-if="openShiftClaims.length > 0">
-          <div class="text-subtitle-1 font-weight-bold mb-2">Open Shift Claims</div>
+          <div class="text-subtitle-1 font-weight-bold mb-2">Open Shift Pickup Requests</div>
 
           <v-card
             v-for="claim in openShiftClaims"
@@ -573,7 +573,7 @@ const loadSwapRequests = async () => {
       .map((row) => ({
         id: row.id,
         type: row.type || 'find_cover',
-        requestType: row.type === 'swap' ? 'Swap' : 'Find Cover',
+        requestType: row.type === 'swap' ? 'Swap Request' : 'Cover Request',
         requestedBy: `${row.requester?.fName || ''} ${row.requester?.lName || ''}`.trim() || row.requester?.email || 'Unknown',
         claimedBy: row.respondent ? `${row.respondent?.fName || ''} ${row.respondent?.lName || ''}`.trim() : '',
         dateLabel: formatDate(row.requesterShift?.shift_date),
@@ -584,7 +584,7 @@ const loadSwapRequests = async () => {
       }))
   } catch (err) {
     swapRequests.value = []
-    showSnackbar('Failed to load shift swaps', 'error')
+    showSnackbar('Failed to load shift requests', 'error')
   } finally {
     swapsLoading.value = false
   }
@@ -606,7 +606,7 @@ const loadOpenShiftClaims = async () => {
     }))
   } catch (err) {
     openShiftClaims.value = []
-    showSnackbar('Failed to load open shift claims', 'error')
+    showSnackbar('Failed to load open shift pickup requests', 'error')
   } finally {
     claimsLoading.value = false
   }
@@ -665,10 +665,10 @@ const reviewOpenClaim = async (claim, action) => {
   actioning.value = `claim-${claim.id}-${action === 'approve' ? 'approve' : 'reject'}`
   try {
     await apiClient.put(`/manager/open-shift-claims/${claim.id}`, { action })
-    showSnackbar(`Open shift claim ${action === 'approve' ? 'approved' : 'rejected'}`, 'success')
+    showSnackbar(`Open shift pickup request ${action === 'approve' ? 'approved' : 'rejected'}`, 'success')
     await loadOpenShiftClaims()
   } catch (err) {
-    showSnackbar('Failed to review open shift claim', 'error')
+    showSnackbar('Failed to review open shift pickup request', 'error')
     console.error(err)
   } finally {
     actioning.value = null

@@ -3,7 +3,7 @@
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center pa-4">
         <v-icon class="mr-2" color="primary">{{ mode === 'cover' ? 'mdi-account-switch' : 'mdi-swap-horizontal' }}</v-icon>
-        {{ mode === 'cover' ? 'Find Cover' : 'Trade Shift' }}
+        {{ mode === 'cover' ? 'Request Cover' : 'Swap Shift' }}
         <v-spacer />
         <v-btn icon size="small" variant="text" aria-label="Close" @click="close">
           <v-icon>mdi-close</v-icon>
@@ -13,7 +13,7 @@
       <v-divider />
 
       <v-card-text class="pa-4">
-        <!-- Shift being covered/traded -->
+        <!-- Shift being covered/swapped -->
         <div v-if="shift" class="mb-4 pa-3 rounded-lg" style="background: #fafafa; border: 1px solid #e0e0e0">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">YOUR SHIFT</div>
           <div class="text-body-1 font-weight-medium">
@@ -29,7 +29,7 @@
           </div>
         </div>
 
-        <!-- Find Cover: just post to pool -->
+        <!-- Cover Request: post to pool -->
         <div v-if="mode === 'cover'">
           <v-textarea
             v-model="notes"
@@ -42,7 +42,7 @@
           />
         </div>
 
-        <!-- Trade: select coworker -->
+        <!-- Swap: select coworker -->
         <div v-else>
           <v-autocomplete
             v-model="selectedCoworker"
@@ -50,22 +50,22 @@
             :loading="loadingCoworkers"
             item-title="name"
             item-value="id"
-            label="Trade with"
+            label="Swap with"
             placeholder="Search coworkers..."
             variant="outlined"
             density="comfortable"
             no-data-text="No eligible coworkers found"
-            aria-label="Select coworker to trade with"
+            aria-label="Select coworker to swap with"
           />
           <v-textarea
             v-model="notes"
             label="Message (optional)"
-            placeholder="Include a note with your trade request..."
+            placeholder="Include a note with your swap request..."
             rows="2"
             variant="outlined"
             density="comfortable"
             class="mt-3"
-            aria-label="Message for trade request"
+            aria-label="Message for swap request"
           />
         </div>
 
@@ -94,7 +94,7 @@
           :disabled="mode === 'trade' && !selectedCoworker"
           @click="submit"
         >
-          {{ mode === 'cover' ? 'Post for Cover' : 'Send Request' }}
+          {{ mode === 'cover' ? 'Post Cover Request' : 'Send Request' }}
         </v-btn>
       </v-card-actions>
     </v-card>

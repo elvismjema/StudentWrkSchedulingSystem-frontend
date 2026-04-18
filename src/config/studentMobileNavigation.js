@@ -4,7 +4,7 @@
  * Single source of truth for the student mobile IA.
  *
  * Primary bottom nav: 5 tabs
- *   Home · Schedule · Clock (center) · Trade · Hours
+ *   Home · Schedule · Clock (center) · Swap · Hours
  *
  * Secondary pages are accessible via the profile/avatar menu in the
  * top bar — not promoted to a bottom tab.
@@ -41,9 +41,9 @@ const studentMobilePrimaryTabs = [
   },
   {
     key: 'trade',
-    label: 'Trade',
+    label: 'Swap',
     routeName: 'student-trade-board',
-    title: 'Trade Board',
+    title: 'Swap Board',
     icon: 'mdi-swap-horizontal-circle',
     iconOutline: 'mdi-swap-horizontal-circle-outline',
     order: 3,

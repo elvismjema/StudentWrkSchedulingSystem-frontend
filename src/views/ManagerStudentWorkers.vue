@@ -82,46 +82,35 @@
                 <v-chip size="x-small" variant="tonal" color="success">
                   Available {{ countSlotsByType(worker, 'available') }}
                 </v-chip>
-                <v-chip size="x-small" variant="tonal" color="default">
+                <v-chip size="x-small" variant="tonal" color="error">
                   Unavailable {{ countSlotsByType(worker, 'unavailable') }}
                 </v-chip>
               </div>
             </div>
-            <div class="availability-legend">
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--available" />
-                Available
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--unavailable" />
-                Unavailable
-              </span>
-            </div>
-            <div class="availability-calendar availability-calendar--preview">
+
+            <!-- Compact 7-day bar preview — one colored strip per availability block -->
+            <div class="preview-week">
               <div
                 v-for="day in weekDays"
                 :key="day.key"
-                class="calendar-day"
+                class="preview-day"
               >
-                <div class="calendar-day-label">{{ day.label }}</div>
-                <div class="calendar-day-slots">
+                <div class="preview-day-label">{{ day.label.slice(0, 1) }}</div>
+                <div class="preview-day-bars">
                   <template v-if="getDaySlots(worker, day.key).length">
                     <div
-                      v-for="slot in getPreviewDaySlots(worker, day.key)"
-                      :key="`${day.key}-${slot.startMinutes}-${slot.endMinutes}-${slot.type}`"
-                      class="calendar-slot"
-                      :class="slot.type === 'unavailable' ? 'calendar-slot--unavailable' : 'calendar-slot--available'"
-                    >
-                      <span class="calendar-slot__time">{{ slot.label }}</span>
-                    </div>
-                    <div
-                      v-if="getHiddenSlotCount(worker, day.key) > 0"
-                      class="calendar-day-more"
-                    >
-                      +{{ getHiddenSlotCount(worker, day.key) }} more
-                    </div>
+                      v-for="slot in getDaySlots(worker, day.key)"
+                      :key="`prev-${day.key}-${slot.startMinutes}`"
+                      class="preview-bar"
+                      :class="{
+                        'preview-bar--available': slot.type === 'available',
+                        'preview-bar--unavailable': slot.type === 'unavailable',
+                        'preview-bar--class': slot.type === 'class',
+                      }"
+                      :title="`${slot.label} · ${slot.type}`"
+                    />
                   </template>
-                  <div v-else class="calendar-day-empty">—</div>
+                  <div v-else class="preview-bar-empty" />
                 </div>
               </div>
             </div>
@@ -170,7 +159,7 @@
                       <v-chip size="small" variant="tonal" color="success">
                         Available {{ countSlotsByType(workerModal.selectedWorker, 'available') }}
                       </v-chip>
-                      <v-chip size="small" variant="tonal" color="default">
+                      <v-chip size="small" variant="tonal" color="error">
                         Unavailable {{ countSlotsByType(workerModal.selectedWorker, 'unavailable') }}
                       </v-chip>
                     </div>
@@ -198,12 +187,13 @@
                             v-for="slot in getDaySlots(workerModal.selectedWorker, day.key)"
                             :key="`${day.key}-${slot.startMinutes}-${slot.endMinutes}-${slot.type}`"
                             class="calendar-slot"
-                            :class="slot.type === 'unavailable' ? 'calendar-slot--unavailable' : 'calendar-slot--available'"
+                            :class="{
+                              'calendar-slot--available': slot.type === 'available',
+                              'calendar-slot--unavailable': slot.type === 'unavailable',
+                              'calendar-slot--class': slot.type === 'class',
+                            }"
                           >
                             <span class="calendar-slot__time">{{ slot.label }}</span>
-                            <span class="calendar-slot__type">
-                              {{ slot.type === 'unavailable' ? 'Unavailable' : 'Available' }}
-                            </span>
                           </div>
                         </template>
                         <div v-else class="calendar-day-empty">No availability set</div>
@@ -859,6 +849,65 @@ watch(activeTab, (nextTab) => {
   flex-wrap: wrap;
 }
 
+/* ─── Compact 7-day preview bar (worker card) ─────────────────── */
+.preview-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.preview-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.preview-day-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #98a2b3;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.preview-day-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 20px;
+}
+
+.preview-bar {
+  height: 7px;
+  border-radius: 3px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.preview-bar--available {
+  background-color: #16a34a;
+}
+
+.preview-bar--unavailable {
+  background-color: #dc2626;
+}
+
+.preview-bar--class {
+  background-color: #0277bd;
+}
+
+.preview-bar-empty {
+  height: 20px;
+  border-radius: 4px;
+  background-color: #f3f4f6;
+  width: 100%;
+}
+
+/* ─── Modal legend / calendar ─────────────────────────────────── */
 .availability-legend {
   display: flex;
   gap: 12px;
@@ -887,13 +936,13 @@ watch(activeTab, (nextTab) => {
 }
 
 .legend-dot--available {
-  background: rgba(22, 163, 74, 0.3);
-  border-color: rgba(13, 148, 136, 0.5);
+  background: #16a34a;
+  border-color: #15803d;
 }
 
 .legend-dot--unavailable {
-  background: rgba(107, 114, 128, 0.2);
-  border-color: rgba(107, 114, 128, 0.5);
+  background: #dc2626;
+  border-color: #b91c1c;
 }
 
 .availability-calendar {
@@ -956,13 +1005,18 @@ watch(activeTab, (nextTab) => {
 }
 
 .calendar-slot--available {
-  background: rgba(22, 163, 74, 0.12);
-  border-left-color: #0ea5a0;
+  background: rgba(22, 163, 74, 0.1);
+  border-left-color: #16a34a;
 }
 
 .calendar-slot--unavailable {
-  background: rgba(107, 114, 128, 0.15);
-  border-left-color: #6b7280;
+  background: rgba(220, 38, 38, 0.1);
+  border-left-color: #dc2626;
+}
+
+.calendar-slot--class {
+  background: rgba(2, 119, 189, 0.1);
+  border-left-color: #0277bd;
 }
 
 .calendar-slot__time {
@@ -970,11 +1024,6 @@ watch(activeTab, (nextTab) => {
   font-weight: 600;
   color: #1f2937;
   line-height: 1.25;
-}
-
-.calendar-slot__type {
-  font-size: 10px;
-  color: #667085;
 }
 
 .calendar-day-more {

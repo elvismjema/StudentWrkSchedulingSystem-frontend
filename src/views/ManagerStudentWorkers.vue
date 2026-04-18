@@ -76,7 +76,27 @@
 
           <!-- Availability Summary -->
           <div class="availability-section">
-            <h4 class="availability-title">Weekly Availability</h4>
+            <div class="availability-summary-head">
+              <h4 class="availability-title">Weekly Availability</h4>
+              <div class="availability-totals">
+                <v-chip size="x-small" variant="tonal" color="success">
+                  Available {{ countSlotsByType(worker, 'available') }}
+                </v-chip>
+                <v-chip size="x-small" variant="tonal" color="default">
+                  Unavailable {{ countSlotsByType(worker, 'unavailable') }}
+                </v-chip>
+              </div>
+            </div>
+            <div class="availability-legend">
+              <span class="legend-item">
+                <span class="legend-dot legend-dot--available" />
+                Available
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot legend-dot--unavailable" />
+                Unavailable
+              </span>
+            </div>
             <div class="availability-calendar availability-calendar--preview">
               <div
                 v-for="day in weekDays"
@@ -144,7 +164,27 @@
                 
                 <!-- Availability in Modal -->
                 <div class="modal-availability">
-                  <h4 class="section-title">Weekly Availability</h4>
+                  <div class="availability-summary-head">
+                    <h4 class="section-title">Weekly Availability</h4>
+                    <div class="availability-totals">
+                      <v-chip size="small" variant="tonal" color="success">
+                        Available {{ countSlotsByType(workerModal.selectedWorker, 'available') }}
+                      </v-chip>
+                      <v-chip size="small" variant="tonal" color="default">
+                        Unavailable {{ countSlotsByType(workerModal.selectedWorker, 'unavailable') }}
+                      </v-chip>
+                    </div>
+                  </div>
+                  <div class="availability-legend availability-legend--modal">
+                    <span class="legend-item">
+                      <span class="legend-dot legend-dot--available" />
+                      Available
+                    </span>
+                    <span class="legend-item">
+                      <span class="legend-dot legend-dot--unavailable" />
+                      Unavailable
+                    </span>
+                  </div>
                   <div class="availability-calendar">
                     <div
                       v-for="day in weekDays"
@@ -371,6 +411,15 @@ const getPreviewDaySlots = (worker, dayKey) => {
 const getHiddenSlotCount = (worker, dayKey) => {
   const total = getDaySlots(worker, dayKey).length;
   return total > MAX_PREVIEW_SLOTS ? total - MAX_PREVIEW_SLOTS : 0;
+};
+
+const countSlotsByType = (worker, type) => {
+  if (!worker) return 0;
+  const total = weekDays.reduce((count, day) => {
+    const dayCount = getDaySlots(worker, day.key).filter((slot) => slot.type === type).length;
+    return count + dayCount;
+  }, 0);
+  return total;
 };
 
 const parseTimeToMinutes = (timeString) => {
@@ -790,16 +839,72 @@ watch(activeTab, (nextTab) => {
 }
 
 .availability-title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #667085;
+}
+
+.availability-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.availability-totals {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.availability-legend {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.availability-legend--modal {
+  margin-bottom: 12px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #667085;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.legend-dot--available {
+  background: rgba(22, 163, 74, 0.3);
+  border-color: rgba(13, 148, 136, 0.5);
+}
+
+.legend-dot--unavailable {
+  background: rgba(107, 114, 128, 0.2);
+  border-color: rgba(107, 114, 128, 0.5);
 }
 
 .availability-calendar {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
+}
+
+.availability-calendar--preview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .availability-calendar--preview .calendar-slot {
@@ -814,17 +919,19 @@ watch(activeTab, (nextTab) => {
   border: 1px solid #eaecf0;
   border-radius: 8px;
   background: #fcfcfd;
-  min-height: 100px;
+  min-height: 108px;
   overflow: hidden;
 }
 
 .calendar-day-label {
   padding: 7px 8px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #667085;
   background: #f9fafb;
   border-bottom: 1px solid #eaecf0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .calendar-day-slots {
@@ -849,12 +956,12 @@ watch(activeTab, (nextTab) => {
 }
 
 .calendar-slot--available {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(22, 163, 74, 0.12);
   border-left-color: #0ea5a0;
 }
 
 .calendar-slot--unavailable {
-  background: rgba(156, 163, 175, 0.15);
+  background: rgba(107, 114, 128, 0.15);
   border-left-color: #6b7280;
 }
 
@@ -1063,6 +1170,11 @@ watch(activeTab, (nextTab) => {
     gap: 8px;
   }
 
+  .availability-summary-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .modal-worker-info {
     flex-direction: column;
     text-align: center;
@@ -1077,7 +1189,8 @@ watch(activeTab, (nextTab) => {
 }
 
 @media (max-width: 480px) {
-  .availability-calendar {
+  .availability-calendar,
+  .availability-calendar--preview {
     grid-template-columns: 1fr;
   }
 }

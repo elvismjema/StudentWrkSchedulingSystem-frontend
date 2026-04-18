@@ -242,9 +242,9 @@
               item-value="value"
               label="Assign To *"
               variant="outlined"
-              :disabled="form.post_as_open || !form.department_id || loadingWorkers"
+              :disabled="form.post_as_open || !hasWorkerQueryInputs || loadingWorkers"
               clearable
-              :no-data-text="loadingWorkers ? 'Loading workers...' : 'No workers available'"
+              :no-data-text="workerNoDataText"
               :messages="form.post_as_open ? 'Disabled when Post as Open Shift is enabled.' : undefined"
               hide-details="auto"
             />
@@ -313,11 +313,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
-import UserRoleServices from "../services/userRoleServices.js";
 import Utils from "../config/utils.js";
 import { localDateStr } from "../utils/tz.js";
 
@@ -453,7 +452,16 @@ const isPastDate = computed(() => !!form.shift_date && form.shift_date < todayIs
 const hasRequiredFields = computed(
   () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
+const hasWorkerQueryInputs = computed(
+  () => !!form.department_id && !!form.shift_date && !!form.start_time && !!form.end_time,
+);
 const workersNeededValid = computed(() => Number(form.workers_needed) >= 1 && Number(form.workers_needed) <= 10);
+const workerNoDataText = computed(() => {
+  if (loadingWorkers.value) return "Loading workers...";
+  if (!hasWorkerQueryInputs.value) return "Select date and time first";
+  if (form.position_id) return "No available workers for this position and time";
+  return "No available workers for this shift time";
+});
 
 const isCreateDisabled = computed(() => {
   if (!hasRequiredFields.value || isPastDate.value) return true;
@@ -502,43 +510,60 @@ const loadPositions = async () => {
 };
 
 const loadWorkers = async () => {
-  const departmentId = deptContext.department_id;
+  const departmentId = form.department_id || deptContext.department_id;
   if (!departmentId) {
     departmentWorkers.value = [];
+    workerLoadError.value = "No department selected.";
+    return;
+  }
+
+  if (!hasWorkerQueryInputs.value) {
+    departmentWorkers.value = [];
+    form.assigned_user_id = null;
+    workerLoadError.value = "Select shift date and time to load available students.";
     return;
   }
 
   loadingWorkers.value = true;
   workerLoadError.value = "";
   try {
-    const response = await UserRoleServices.getAllUsersWithRoles(true);
-    const users = toItems(response);
-    const departmentMembers = users.filter((user) =>
-      (user.userDepartments || []).some(
-        (membership) => Number(membership.department_id) === Number(departmentId),
-      ),
-    );
+    const params = new URLSearchParams({
+      department_id: String(departmentId),
+      shift_date: String(form.shift_date),
+      start_time: String(form.start_time),
+      end_time: String(form.end_time),
+    });
+    if (form.position_id) {
+      params.append("position_id", String(form.position_id));
+    }
 
-    const studentMembers = departmentMembers.filter((user) =>
-      (user.userDepartments || []).some(
-        (membership) =>
-          Number(membership.department_id) === Number(departmentId) &&
-          String(membership?.role?.role_name || "").toLowerCase().includes("student"),
-      ),
-    );
-
-    const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers;
-    departmentWorkers.value = candidateUsers
+    const response = await apiClient.get(`/shifts/assignable-workers?${params.toString()}`);
+    const workers = toItems(response);
+    departmentWorkers.value = workers
       .filter((user) => Number(user.id) !== Number(currentUser.userId || currentUser.id))
       .map((user) => ({
         id: user.id,
-        userId: user.id,
+        userId: user.userId || user.id,
         fName: user.fName,
         lName: user.lName,
         email: user.email,
       }));
+
+    if (
+      form.assigned_user_id &&
+      !departmentWorkers.value.some((worker) => String(worker.userId || worker.id) === String(form.assigned_user_id))
+    ) {
+      form.assigned_user_id = null;
+    }
+
+    if (departmentWorkers.value.length === 0) {
+      workerLoadError.value = form.position_id
+        ? "No available students match this position and time."
+        : "No available students for this shift time.";
+    }
   } catch (error) {
     departmentWorkers.value = [];
+    form.assigned_user_id = null;
     workerLoadError.value = error?.response?.data?.message || "Service is unavailable. Please try again later.";
   } finally {
     loadingWorkers.value = false;
@@ -548,9 +573,17 @@ const loadWorkers = async () => {
 watch(
   () => form.department_id,
   async () => {
-    await Promise.all([loadPositions(), loadWorkers()]);
+    await loadPositions();
+    await loadWorkers();
   },
   { immediate: true },
+);
+
+watch(
+  () => [form.position_id, form.shift_date, form.start_time, form.end_time],
+  () => {
+    loadWorkers();
+  },
 );
 
 watch(
@@ -657,10 +690,6 @@ const submitShift = async () => {
   }
 };
 
-onMounted(() => {
-  loadPositions();
-  loadWorkers();
-});
 </script>
 
 <style scoped>

@@ -44,7 +44,7 @@ export default {
     return apiClient.post(`/student/open-shifts/${shiftId}/claim`);
   },
 
-  // ─── Shift Swap / Find Cover ─────────────────────────────────────
+  // ─── Cover Request / Swap Request ───────────────────────────────
   findCover(shiftId, data = {}) {
     return apiClient.post(`/student/shifts/${shiftId}/find-cover`, data);
   },

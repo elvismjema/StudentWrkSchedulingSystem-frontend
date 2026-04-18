@@ -35,7 +35,7 @@
           class="ml-2"
         />
       </v-tab>
-        <v-tab value="shift-swaps">
+      <v-tab value="shift-swaps">
         Shift Requests
         <v-badge
           v-if="pendingSwapCount > 0"
@@ -126,7 +126,7 @@
         </v-card>
       </v-tabs-window-item>
 
-      <!-- ─── Shift Swaps Tab ──────────────────────────────────────── -->
+      <!-- ─── Shift Requests Tab ───────────────────────────────────── -->
       <v-tabs-window-item value="shift-swaps">
         <v-progress-linear v-if="swapsLoading" indeterminate color="primary" class="mb-4" />
 
@@ -294,7 +294,7 @@
               {{ actionableTradeRequests.length }}
             </v-chip>
             <span class="approval-section-hint">
-              Direct trades between two students.
+              Direct swap requests between two students.
             </span>
           </div>
 
@@ -376,7 +376,6 @@
             </v-card-text>
           </v-card>
         </template>
-
       </v-tabs-window-item>
 
       <!-- ─── Shift Acknowledgments Tab ──────────────────────────────── -->
@@ -533,7 +532,7 @@ const loadSwapRequests = async () => {
       }))
   } catch (err) {
     swapRequests.value = []
-    showSnackbar('Failed to load shift swaps', 'error')
+    showSnackbar('Failed to load shift requests', 'error')
   } finally {
     swapsLoading.value = false
   }

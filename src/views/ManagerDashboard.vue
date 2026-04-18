@@ -280,7 +280,7 @@ const loadDashboardData = async () => {
     swapRequests.value = raw.map((item) => ({
       id: item.id,
       status: item.status === 'manager_pending' ? 'pending' : item.status,
-      requestType: item.type === 'find_cover' ? 'Find Cover' : 'Swap',
+      requestType: item.type === 'find_cover' ? 'Cover Request' : 'Swap Request',
       requestedBy: item.requester
         ? `${item.requester.fName} ${item.requester.lName}`
         : 'Unknown Worker',

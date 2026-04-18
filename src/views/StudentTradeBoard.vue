@@ -48,8 +48,8 @@
         </div>
         <div v-else class="t-empty">
           <v-icon icon="mdi-swap-horizontal" size="44" color="#ccc" />
-          <div class="t-empty-title">No open trades</div>
-          <div class="t-empty-sub">Trade requests from coworkers will appear here</div>
+          <div class="t-empty-title">No open requests</div>
+          <div class="t-empty-sub">Cover and swap requests from coworkers will appear here</div>
         </div>
       </div>
 
@@ -61,7 +61,7 @@
             <div class="t-card-accent t-card-accent--mine"></div>
             <div class="t-card-body">
               <div class="t-card-top-row">
-                <div class="t-card-name">{{ req.department_name || req.shift?.department_name || 'Trade Request' }}</div>
+                <div class="t-card-name">{{ req.department_name || req.shift?.department_name || 'Swap Request' }}</div>
                 <span class="t-status-chip" :class="'t-status--' + (req.status || 'pending').toLowerCase()">{{ req.status || 'Pending' }}</span>
               </div>
               <div class="t-card-detail">{{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }} · {{ formatTimeRange(req.shift || req) }}</div>
@@ -79,7 +79,7 @@
         <div v-else class="t-empty">
           <v-icon icon="mdi-clipboard-text-outline" size="44" color="#ccc" />
           <div class="t-empty-title">No requests posted</div>
-          <div class="t-empty-sub">Tap + to post a trade request for one of your shifts</div>
+          <div class="t-empty-sub">Tap + to post a cover or swap request for one of your shifts</div>
         </div>
       </div>
 
@@ -94,7 +94,7 @@
                 <div class="t-avatar t-avatar--blue">{{ getInitials(req.requester_name || req.user?.fName) }}</div>
                 <div class="t-card-meta">
                   <div class="t-card-name">{{ req.requester_name || formatUserName(req.user) || 'Student' }}</div>
-                  <div class="t-card-sub">wants to trade</div>
+                  <div class="t-card-sub">requested a swap</div>
                 </div>
                 <span class="t-status-chip" :class="'t-status--' + (req.status || 'pending').toLowerCase()">{{ req.status || 'Pending' }}</span>
               </div>
@@ -113,7 +113,7 @@
         </div>
         <div v-else class="t-empty">
           <v-icon icon="mdi-arrow-down-bold-circle-outline" size="44" color="#ccc" />
-          <div class="t-empty-title">No incoming trades</div>
+          <div class="t-empty-title">No incoming swap requests</div>
           <div class="t-empty-sub">Swap requests from coworkers will show up here</div>
         </div>
       </div>
@@ -128,14 +128,14 @@
     <v-dialog v-model="showPostDialog" max-width="100vw" transition="dialog-bottom-transition">
       <v-card class="t-bottom-sheet">
         <div class="t-sheet-handle"></div>
-        <div class="t-sheet-title">Post Trade Request</div>
+        <div class="t-sheet-title">Post Request</div>
         <v-alert v-if="!myShifts.length && !loadingMyShifts" type="info" variant="tonal" density="compact" class="mb-3">
-          You need assigned shifts to post a trade.
+          You need assigned shifts to post a request.
         </v-alert>
-        <v-select v-model="postForm.shiftId" :items="myShifts" item-title="label" item-value="id" label="Select shift to trade" variant="outlined" density="comfortable" :loading="loadingMyShifts" :disabled="!myShifts.length" class="mb-3" />
+        <v-select v-model="postForm.shiftId" :items="myShifts" item-title="label" item-value="id" label="Select shift" variant="outlined" density="comfortable" :loading="loadingMyShifts" :disabled="!myShifts.length" class="mb-3" />
         <v-radio-group v-model="postForm.type" inline density="compact" class="mb-3">
-          <v-radio label="Post to pool" value="pool" />
-          <v-radio label="Specific coworker" value="specific" />
+          <v-radio label="Cover request to pool" value="pool" />
+          <v-radio label="Swap with specific coworker" value="specific" />
         </v-radio-group>
         <v-text-field v-if="postForm.type === 'specific'" v-model="postForm.respondentUserId" label="Coworker User ID" variant="outlined" density="comfortable" class="mb-3" />
         <v-text-field v-if="postForm.type === 'specific'" v-model="postForm.respondentShiftId" label="Coworker's Shift ID" variant="outlined" density="comfortable" class="mb-3" />
@@ -160,13 +160,13 @@
   <div class="trade-board-page pa-6">
     <div class="d-flex align-center justify-space-between mb-6" style="gap:12px">
       <div>
-        <h1 class="text-h4 font-weight-bold">Shift Trade Board</h1>
+        <h1 class="text-h4 font-weight-bold">Shift Swap Board</h1>
         <p class="text-body-1 text-medium-emphasis mt-1">
-          Browse open requests, manage your trades, and respond to incoming swap requests
+          Browse open requests, manage your requests, and respond to incoming swap requests
         </p>
       </div>
       <v-btn color="#8B1538" variant="flat" prepend-icon="mdi-plus" @click="showPostDialog = true">
-        Post Trade Request
+        Post Request
       </v-btn>
     </div>
 
@@ -215,8 +215,8 @@
       </template>
       <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
         <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-swap-horizontal</v-icon>
-        <div class="text-body-1 text-medium-emphasis">No open trade requests</div>
-        <div class="text-caption text-medium-emphasis">When other students post trade requests, they'll appear here</div>
+        <div class="text-body-1 text-medium-emphasis">No open requests</div>
+        <div class="text-caption text-medium-emphasis">When other students post cover or swap requests, they'll appear here</div>
       </v-card>
     </div>
 
@@ -231,7 +231,7 @@
             <v-card elevation="0" rounded="lg" border class="fill-height">
               <v-card-text class="pa-4">
                 <div class="d-flex align-center justify-space-between mb-2">
-                  <div class="text-body-1 font-weight-bold">{{ req.department_name || req.shift?.department_name || 'Trade Request' }}</div>
+                  <div class="text-body-1 font-weight-bold">{{ req.department_name || req.shift?.department_name || 'Swap Request' }}</div>
                   <v-chip size="small" :color="statusColor(req.status)" variant="tonal">{{ req.status || 'Pending' }}</v-chip>
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1"><v-icon size="14" class="mr-1">mdi-calendar</v-icon>{{ formatDate(req.shift_date || req.shift?.shift_date || req.shift?.start_time) }}</div>
@@ -246,8 +246,8 @@
       </template>
       <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
         <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-clipboard-text-outline</v-icon>
-        <div class="text-body-1 text-medium-emphasis">You haven't posted any trade requests</div>
-        <div class="text-caption text-medium-emphasis">Use the "Post Trade Request" button to request coverage for a shift</div>
+        <div class="text-body-1 text-medium-emphasis">You haven't posted any requests</div>
+        <div class="text-caption text-medium-emphasis">Use the "Post Request" button to request cover or a swap for a shift</div>
       </v-card>
     </div>
 
@@ -265,7 +265,7 @@
                   <v-avatar size="32" color="#196CA2" class="mr-2"><span class="text-caption text-white">{{ getInitials(req.requester_name || req.user?.fName) }}</span></v-avatar>
                   <div>
                     <div class="text-body-1 font-weight-bold">{{ req.requester_name || formatUserName(req.user) || 'Student' }}</div>
-                    <div class="text-caption text-medium-emphasis">wants to trade with you</div>
+                    <div class="text-caption text-medium-emphasis">wants to swap with you</div>
                   </div>
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-1"><v-icon size="14" class="mr-1">mdi-briefcase-outline</v-icon>{{ req.shift_details || req.shift?.department_name || 'Shift details' }}</div>
@@ -284,20 +284,20 @@
       </template>
       <v-card v-else elevation="0" rounded="lg" border class="pa-8 text-center">
         <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-arrow-down-bold-circle-outline</v-icon>
-        <div class="text-body-1 text-medium-emphasis">No incoming trade requests</div>
-        <div class="text-caption text-medium-emphasis">When someone wants to trade a shift with you, it'll show up here</div>
+        <div class="text-body-1 text-medium-emphasis">No incoming swap requests</div>
+        <div class="text-caption text-medium-emphasis">When someone wants to swap a shift with you, it will show up here</div>
       </v-card>
     </div>
 
     <!-- Post Dialog (desktop) -->
     <v-dialog v-model="showPostDialog" max-width="560">
       <v-card rounded="lg">
-        <v-card-title class="pa-4 d-flex align-center"><v-icon class="mr-2">mdi-swap-horizontal</v-icon>Post Trade Request</v-card-title>
+        <v-card-title class="pa-4 d-flex align-center"><v-icon class="mr-2">mdi-swap-horizontal</v-icon>Post Request</v-card-title>
         <v-card-text class="pa-4 pt-0">
-          <v-alert v-if="!myShifts.length && !loadingMyShifts" type="info" variant="tonal" class="mb-4">You need to be assigned shifts before you can post trade requests.</v-alert>
-          <v-select v-model="postForm.shiftId" :items="myShifts" item-title="label" item-value="id" label="Select your shift to trade" variant="outlined" density="comfortable" :loading="loadingMyShifts" :disabled="!myShifts.length" class="mb-4" />
+          <v-alert v-if="!myShifts.length && !loadingMyShifts" type="info" variant="tonal" class="mb-4">You need to be assigned shifts before you can post requests.</v-alert>
+          <v-select v-model="postForm.shiftId" :items="myShifts" item-title="label" item-value="id" label="Select your shift" variant="outlined" density="comfortable" :loading="loadingMyShifts" :disabled="!myShifts.length" class="mb-4" />
           <v-radio-group v-model="postForm.type" inline class="mb-4">
-            <v-radio label="Post to pool (anyone can pick up)" value="pool" />
+            <v-radio label="Cover request to pool (anyone can pick up)" value="pool" />
             <v-radio label="Request swap with specific coworker" value="specific" />
           </v-radio-group>
           <v-text-field v-if="postForm.type === 'specific'" v-model="postForm.respondentUserId" label="Coworker User ID" variant="outlined" density="comfortable" class="mb-4" />
@@ -442,7 +442,7 @@ async function loadAllSwapRequests() {
       ? (poolRes.value?.data?.data || poolRes.value?.data || [])
       : [];
   } catch {
-    showSnack('Failed to load trade requests', 'error');
+    showSnack('Failed to load swap requests', 'error');
   } finally {
     loadingOpen.value = false;
     loadingMine.value = false;
@@ -544,7 +544,7 @@ async function submitTradeRequest() {
         notes: postForm.notes,
       });
     }
-    showSnack('Trade request posted!');
+    showSnack('Request posted!');
     showPostDialog.value = false;
     postForm.shiftId = null;
     postForm.notes = '';

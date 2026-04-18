@@ -101,7 +101,7 @@
               </div>
               <button class="shift-hero-cta" @click="openSwapDialog(nextShift)">
                 <v-icon size="15" class="mr-1">mdi-account-switch</v-icon>
-                Find Cover
+                Request Cover
               </button>
             </div>
           </div>
@@ -249,7 +249,7 @@
                 </div>
                 <div class="d-flex ga-2">
                   <v-btn color="success" variant="flat" size="small" :loading="acknowledgingId === ack.id" :disabled="acknowledgingId !== null" prepend-icon="mdi-check-circle" @click="acknowledgeShift(ack)">Acknowledge</v-btn>
-                  <v-btn color="primary" variant="outlined" size="small" :loading="acknowledgingId === ack.id + '-cover'" :disabled="acknowledgingId !== null" prepend-icon="mdi-account-switch" @click="acknowledgeAndFindCover(ack)">Find Cover</v-btn>
+                  <v-btn color="primary" variant="outlined" size="small" :loading="acknowledgingId === ack.id + '-cover'" :disabled="acknowledgingId !== null" prepend-icon="mdi-account-switch" @click="acknowledgeAndFindCover(ack)">Request Cover</v-btn>
                 </div>
               </div>
             </v-card>
@@ -296,7 +296,7 @@
             <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1"><v-icon size="16" class="mr-1">mdi-calendar</v-icon>{{ formatShiftDate(nextShift) }}</div>
             <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1"><v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>{{ formatTimeRange(nextShift) }}</div>
             <div v-if="nextShiftPosition" class="d-flex align-center text-body-2 text-medium-emphasis mb-3"><v-icon size="16" class="mr-1">mdi-badge-account-outline</v-icon>{{ nextShiftPosition }}</div>
-            <v-btn variant="outlined" color="primary" @click="openSwapDialog(nextShift)"><v-icon start>mdi-account-switch</v-icon>Find Cover</v-btn>
+            <v-btn variant="outlined" color="primary" @click="openSwapDialog(nextShift)"><v-icon start>mdi-account-switch</v-icon>Request Cover</v-btn>
           </div>
         </v-card>
         <v-card v-else class="mb-6 pa-8 text-center" elevation="0" rounded="lg" border>
@@ -513,8 +513,8 @@ function mapRequest(r) {
     label:       r.type === "time_off"
                    ? `Time off: ${r.startDate ?? r.start_date} – ${r.endDate ?? r.end_date}`
                    : r.type === "find_cover"
-                     ? `Cover request – ${r.shiftDate ?? r.shift_date ?? ""}`
-                     : r.label || "Swap request",
+                     ? `Cover Request - ${r.shiftDate ?? r.shift_date ?? ""}`
+                     : r.label || "Swap Request",
     icon:        r.type === "time_off" ? "mdi-calendar-remove" : "mdi-swap-horizontal",
     iconColor:   r.type === "time_off" ? "orange" : "blue",
     status,
@@ -819,7 +819,7 @@ async function acknowledgeAndFindCover(ack) {
     await studentService.acknowledgeShift(ack.id);
     pendingAcknowledgements.value = pendingAcknowledgements.value.filter((a) => a.id !== ack.id);
 
-    // Step 2: Open the Find Cover dialog for this shift
+    // Step 2: Open the cover request dialog for this shift
     const shift = ack.shift || {};
     swapShift.value = {
       ...shift,
@@ -827,7 +827,7 @@ async function acknowledgeAndFindCover(ack) {
       department_name: shift.department?.department_name || shift.department_name,
     };
     swapDialogOpen.value = true;
-    showSnack("Shift acknowledged. Now post for cover.");
+    showSnack("Shift acknowledged. Now submit a cover request.");
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to acknowledge shift.", "error");
   } finally {

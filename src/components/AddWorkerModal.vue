@@ -4,7 +4,7 @@
       <v-card>
         <v-card-title class="modal-header">
           <div class="header-content">
-            <v-icon class="header-icon" color="#8B1538">mdi-account-plus</v-icon>
+            <v-icon class="header-icon" color="primary">mdi-account-plus</v-icon>
             <div>
               <h2>{{ isEditMode ? 'Edit Worker' : 'Add Worker' }}</h2>
               <p class="header-subtitle">
@@ -28,7 +28,7 @@
 
           <!-- Loading State -->
           <div v-if="checkingEmail" class="loading-state">
-            <v-progress-circular indeterminate color="#8B1538" size="24" />
+            <v-progress-circular indeterminate color="primary" size="24" />
             <span>Checking email availability...</span>
           </div>
 
@@ -124,7 +124,7 @@
                       v-if="!loadingPositions"
                       size="small"
                       variant="text"
-                      color="#8B1538"
+                      color="primary"
                       @click="openCreatePosition"
                     >
                       <v-icon start>mdi-plus</v-icon>
@@ -141,7 +141,7 @@
           <v-spacer />
           <v-btn variant="text" @click="closeModal">Cancel</v-btn>
           <v-btn
-            color="#8B1538"
+            color="primary"
             :loading="submitting"
             :disabled="!canSubmit"
             @click="submitForm"
@@ -447,12 +447,12 @@ resetForm();
   margin: 0 0 4px;
   font-size: 24px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .header-subtitle {
   margin: 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -465,7 +465,7 @@ resetForm();
   align-items: center;
   gap: 12px;
   padding: 20px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 

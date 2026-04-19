@@ -47,9 +47,9 @@
       </v-tab>
     </v-tabs>
 
-    <v-tabs-window v-model="activeTab">
+    <v-window v-model="activeTab">
       <!-- ─── Time Off Requests Tab ─────────────────────────────────── -->
-      <v-tabs-window-item value="time-off">
+      <v-window-item value="time-off">
         <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
 
         <v-alert v-if="timeOffError" type="error" variant="tonal" class="mb-4">
@@ -114,10 +114,10 @@
             </div>
           </v-card-text>
         </v-card>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- ─── Shift Requests Tab ───────────────────────────────────── -->
-      <v-tabs-window-item value="shift-swaps">
+      <v-window-item value="shift-swaps">
         <v-progress-linear v-if="swapsLoading" indeterminate color="primary" class="mb-4" />
 
         <div v-if="!hasPendingSwapActions && !swapsLoading" class="empty-state">
@@ -366,9 +366,9 @@
             </v-card-text>
           </v-card>
         </template>
-      </v-tabs-window-item>
+      </v-window-item>
 
-    </v-tabs-window>
+    </v-window>
   </v-container>
 
   <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">

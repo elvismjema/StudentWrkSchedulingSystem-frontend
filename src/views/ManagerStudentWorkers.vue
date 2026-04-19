@@ -120,7 +120,7 @@
     </div>
 
     <!-- Worker Detail Modal -->
-    <v-dialog v-model="workerModal.open" max-width="800px" scrollable>
+    <v-dialog v-model="workerModal.open" max-width="1200px" width="92vw" scrollable>
       <v-card v-if="workerModal.selectedWorker">
         <v-card-title class="modal-header">
           <div class="modal-worker-info">
@@ -967,8 +967,8 @@ watch(activeTab, (nextTab) => {
 }
 
 .modal-availability__grid {
-  min-height: 420px;
-  max-height: 60vh;
+  min-height: 560px;
+  max-height: 75vh;
   overflow: auto;
   border: 1px solid var(--border-1);
   border-radius: 10px;

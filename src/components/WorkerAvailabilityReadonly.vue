@@ -208,7 +208,7 @@ const formatTimeLabel = (hhmm) => {
 .worker-avail__body {
   display: grid;
   grid-template-columns: 56px 1fr;
-  min-height: 420px;
+  min-height: 560px;
 }
 
 .worker-avail__hours {
@@ -219,7 +219,7 @@ const formatTimeLabel = (hhmm) => {
 
 .worker-avail__hour-label {
   flex: 1;
-  min-height: 38px;
+  min-height: 48px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-3);
@@ -250,7 +250,7 @@ const formatTimeLabel = (hhmm) => {
 
 .worker-avail__cell {
   flex: 1;
-  min-height: 38px;
+  min-height: 48px;
   border-bottom: 1px solid var(--border-1);
 }
 

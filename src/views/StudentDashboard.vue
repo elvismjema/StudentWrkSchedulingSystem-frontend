@@ -666,6 +666,29 @@ async function loadDashboard() {
     nextShift.value = data.nextShift || null;
     todayShifts.value = data.todayShifts || [];
     weekShifts.value = data.weekShifts || [];
+
+    // Derive upcoming accepted shifts for the dashboard 'Up Next' stack.
+    // Prefer an explicit upcomingShifts payload if the backend provides one;
+    // otherwise combine nextShift + weekShifts, dedupe, and drop anything
+    // already started more than an hour ago. nextShift is ALWAYS upcoming[0]
+    // so it renders as the hero.
+    const upcomingPool = Array.isArray(data.upcomingShifts) && data.upcomingShifts.length
+      ? data.upcomingShifts
+      : [
+          ...(data.nextShift ? [data.nextShift] : []),
+          ...(Array.isArray(data.weekShifts) ? data.weekShifts : []),
+        ];
+    const seen = new Set();
+    const cutoff = new Date(Date.now() - 3600000);
+    upcomingShifts.value = upcomingPool
+      .filter((s) => {
+        const key = String(s.id || s.shift_id || `${s.shift_date}-${s.start_time}-${s.department_id || ''}`);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        const d = new Date(shiftStartDT(s));
+        return !isNaN(d) && d >= cutoff;
+      })
+      .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
     openShiftsCount.value = openShiftData.count;
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
     weeklyHours.value = data.estimatedWeeklyHours ?? 0;

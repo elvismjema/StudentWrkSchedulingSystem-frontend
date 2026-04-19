@@ -60,7 +60,7 @@ const showRedirectMessage = computed(() => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--surface-2);
 }
 
 .login-card {
@@ -68,7 +68,7 @@ const showRedirectMessage = computed(() => {
   max-width: 420px;
   background: #fff;
   border-radius: 12px;
-  border-top: 3px solid #8B1538;
+  border-top: 3px solid var(--brand-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
   padding: 48px 40px 36px;
   text-align: center;
@@ -79,7 +79,7 @@ const showRedirectMessage = computed(() => {
   width: 56px;
   height: 56px;
   border-radius: 12px;
-  background: #8B1538;
+  background: var(--brand-primary);
   display: grid;
   place-items: center;
   margin: 0 auto 24px;
@@ -94,13 +94,13 @@ const showRedirectMessage = computed(() => {
 .login-heading {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #8B1538;
+  color: var(--brand-primary);
   margin-bottom: 4px;
 }
 
 .login-subheading {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-2);
   margin-bottom: 32px;
 }
 
@@ -112,7 +112,7 @@ const showRedirectMessage = computed(() => {
 
 .login-footer {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-3);
   letter-spacing: 0.02em;
 }
 </style>

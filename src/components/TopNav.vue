@@ -95,7 +95,7 @@
               class="sign-out-item"
             >
               <template v-slot:prepend>
-                <v-icon icon="mdi-logout" size="20" color="#d32f2f"></v-icon>
+                <v-icon icon="mdi-logout" size="20" color="error"></v-icon>
               </template>
               <v-list-item-title class="sign-out-text">Sign out</v-list-item-title>
             </v-list-item>
@@ -158,7 +158,7 @@ const handleNotificationClick = (notification) => {
 
 <style scoped>
 .top-nav {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-1);
   padding: 0 12px;
 }
 
@@ -177,11 +177,11 @@ const handleNotificationClick = (notification) => {
 }
 
 .tasks-btn {
-  color: #4b5563;
+  color: var(--text-2);
 }
 
 .nav-user-avatar {
-  background-color: #8B1538; /* OC Maroon */
+  background-color: var(--brand-primary);
 }
 
 .nav-user-initial {
@@ -195,7 +195,7 @@ const handleNotificationClick = (notification) => {
 .tasks-btn:hover,
 .notification-btn:hover,
 .user-menu-btn:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 /* Profile Menu Styles */
@@ -212,7 +212,7 @@ const handleNotificationClick = (notification) => {
 }
 
 .header-avatar {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
 }
 
 .header-initial {
@@ -228,13 +228,13 @@ const handleNotificationClick = (notification) => {
 .header-name {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
 .header-email {
   font-size: 13px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   margin-top: 2px;
 }
@@ -251,7 +251,7 @@ const handleNotificationClick = (notification) => {
 }
 
 .menu-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 .sign-out-item {
@@ -261,11 +261,11 @@ const handleNotificationClick = (notification) => {
 }
 
 .sign-out-item:hover {
-  background-color: #ffebee;
+  background-color: var(--state-alert-lt);
 }
 
 .sign-out-text {
-  color: #d32f2f;
+  color: var(--state-alert);
   font-weight: 500;
 }
 </style>

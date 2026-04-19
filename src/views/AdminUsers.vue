@@ -1096,11 +1096,11 @@ watch(
 .admin-users-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .admin-page-header {
-  border-bottom: 1px solid #e3e5e8;
+  border-bottom: 1px solid var(--border-1);
   padding-bottom: 1.25rem;
 }
 

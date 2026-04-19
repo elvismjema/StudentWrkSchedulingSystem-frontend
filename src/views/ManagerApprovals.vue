@@ -24,7 +24,7 @@
     </div>
 
     <!-- Tabs -->
-    <v-tabs v-model="activeTab" color="#8B1538" class="mb-4 approvals-tabs">
+    <v-tabs v-model="activeTab" color="primary" class="mb-4 approvals-tabs">
       <v-tab value="time-off">
         Time Off Requests
         <v-badge
@@ -629,14 +629,14 @@ onMounted(loadAll)
 
 <style scoped>
 .approvals-header {
-  border: 1px solid #eaecf0;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
-  background: #ffffff;
+  background: #fff;
   padding: 16px 18px;
 }
 
 .approvals-tabs {
-  border-bottom: 1px solid #eaecf0;
+  border-bottom: 1px solid var(--border-1);
 }
 
 .empty-state {
@@ -644,19 +644,19 @@ onMounted(loadAll)
   flex-direction: column;
   align-items: center;
   padding: 52px 0;
-  border: 1px dashed #d0d5dd;
+  border: 1px dashed var(--border-1);
   border-radius: 12px;
-  background: #fcfcfd;
+  background: var(--surface-1);
 }
 
 .approval-card {
-  border-color: #eaecf0 !important;
+  border-color: var(--border-1) !important;
   border-radius: 12px;
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .approval-card:hover {
-  border-color: #d0d5dd !important;
+  border-color: var(--border-1) !important;
   box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08);
 }
 
@@ -668,13 +668,13 @@ onMounted(loadAll)
   margin: 12px 0 10px;
   font-size: 15px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .approval-section-hint {
   margin-left: auto;
   font-size: 12px;
-  color: #667085;
+  color: var(--text-2);
   font-weight: 500;
 }
 
@@ -689,9 +689,9 @@ onMounted(loadAll)
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #475467;
-  background: #f9fafb;
-  border: 1px solid #eaecf0;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-1);
   border-radius: 999px;
   padding: 4px 9px;
 }
@@ -699,14 +699,14 @@ onMounted(loadAll)
 .approval-note {
   display: inline-flex;
   align-items: center;
-  color: #475467;
+  color: var(--text-2);
   font-size: 13px;
 }
 
 .approval-volunteer {
   display: inline-flex;
   align-items: center;
-  color: #1d2939;
+  color: var(--text-1);
   font-size: 13px;
 }
 

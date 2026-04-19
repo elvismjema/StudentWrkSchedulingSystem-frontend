@@ -155,12 +155,12 @@ onMounted(loadDashboard);
   font-size: 46px;
   font-weight: 700;
   line-height: 1.15;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .page-subtitle {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 17px;
 }
 
@@ -169,14 +169,14 @@ onMounted(loadDashboard);
 }
 
 .kpi-card {
-  border: 1px solid #e4e7ec;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   cursor: pointer;
   transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .kpi-card:hover {
-  border-color: #d0d5dd;
+  border-color: var(--border-1);
   box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
   transform: translateY(-1px);
 }
@@ -185,7 +185,7 @@ onMounted(loadDashboard);
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 18px;
 }
 
@@ -193,7 +193,7 @@ onMounted(loadDashboard);
   margin-top: 10px;
   font-size: 52px;
   line-height: 1;
-  color: #101828;
+  color: var(--text-1);
   font-weight: 700;
 }
 

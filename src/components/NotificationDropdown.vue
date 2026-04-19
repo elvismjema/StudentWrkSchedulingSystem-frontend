@@ -285,14 +285,14 @@ onUnmounted(() => {
 .header-title h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   margin: 0;
 }
 
 .unread-count {
   font-size: 13px;
-  color: #666;
-  background: #f5f5f5;
+  color: var(--text-2);
+  background: var(--surface-2);
   padding: 4px 8px;
   border-radius: 12px;
 }
@@ -312,16 +312,16 @@ onUnmounted(() => {
 }
 
 .notification-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--surface-1);
 }
 
 .notification-item.unread {
-  background-color: #f0f7ff;
+  background-color: var(--state-info-lt);
 }
 
 .notification-icon {
   margin-right: 12px;
-  color: #666;
+  color: var(--text-2);
 }
 
 .notification-content {
@@ -338,14 +338,14 @@ onUnmounted(() => {
 .notification-title {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.3;
   margin-bottom: 2px;
 }
 
 .notification-time {
   font-size: 12px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
 }
 
@@ -356,7 +356,7 @@ onUnmounted(() => {
 .unread-dot {
   width: 8px;
   height: 8px;
-  background-color: #1976d2;
+  background-color: var(--state-info);
   border-radius: 50%;
 }
 

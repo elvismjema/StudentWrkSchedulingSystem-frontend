@@ -76,7 +76,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="startTimeParts.hour === hour ? '#1976d2' : undefined"
+                        :color="startTimeParts.hour === hour ? 'info' : undefined"
                         @click="updateTimePart('start', 'hour', hour)"
                       >
                         {{ hour }}
@@ -91,7 +91,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="startTimeParts.minute === minute ? '#1976d2' : undefined"
+                        :color="startTimeParts.minute === minute ? 'info' : undefined"
                         @click="updateTimePart('start', 'minute', minute)"
                       >
                         {{ minute }}
@@ -106,7 +106,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="startTimeParts.period === period ? '#1976d2' : undefined"
+                        :color="startTimeParts.period === period ? 'info' : undefined"
                         @click="updateTimePart('start', 'period', period)"
                       >
                         {{ period }}
@@ -155,7 +155,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="endTimeParts.hour === hour ? '#1976d2' : undefined"
+                        :color="endTimeParts.hour === hour ? 'info' : undefined"
                         @click="updateTimePart('end', 'hour', hour)"
                       >
                         {{ hour }}
@@ -170,7 +170,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="endTimeParts.minute === minute ? '#1976d2' : undefined"
+                        :color="endTimeParts.minute === minute ? 'info' : undefined"
                         @click="updateTimePart('end', 'minute', minute)"
                       >
                         {{ minute }}
@@ -185,7 +185,7 @@
                         variant="flat"
                         block
                         class="mb-1"
-                        :color="endTimeParts.period === period ? '#1976d2' : undefined"
+                        :color="endTimeParts.period === period ? 'info' : undefined"
                         @click="updateTimePart('end', 'period', period)"
                       >
                         {{ period }}
@@ -208,7 +208,7 @@
                 <div class="toggle-title">Recurring Shift</div>
                 <div class="toggle-subtitle">Repeat this shift on the same day each week</div>
               </div>
-              <v-switch v-model="form.recurring" color="#8B1538" hide-details inset />
+              <v-switch v-model="form.recurring" color="primary" hide-details inset />
             </div>
           </v-col>
 
@@ -218,7 +218,7 @@
                 <div class="toggle-title">Post as Open Shift</div>
                 <div class="toggle-subtitle">Allow workers to claim this shift</div>
               </div>
-              <v-switch v-model="form.post_as_open" color="#8B1538" hide-details inset />
+              <v-switch v-model="form.post_as_open" color="primary" hide-details inset />
             </div>
           </v-col>
 
@@ -273,7 +273,7 @@
                 </div>
                 
                 <div v-for="(task, index) in form.tasks" :key="task.id" class="task-item">
-                  <v-icon class="task-icon" color="#667085">mdi-checkbox-blank-circle-outline</v-icon>
+                  <v-icon class="task-icon" color="text-2">mdi-checkbox-blank-circle-outline</v-icon>
                   <v-text-field
                     v-model="task.text"
                     placeholder="Enter checkpoint task..."
@@ -298,7 +298,7 @@
         <div class="action-row">
           <v-btn variant="outlined" @click="goBack">Cancel</v-btn>
           <v-btn
-            color="#8B1538"
+            color="primary"
             prepend-icon="mdi-content-save-outline"
             :loading="submitting"
             :disabled="isCreateDisabled"
@@ -710,34 +710,34 @@ const submitShift = async () => {
   font-size: 40px;
   line-height: 1.05;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .page-subtitle {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
 .form-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
 }
 
 .card-title {
   margin: 0;
   font-size: 30px;
-  color: #101828;
+  color: var(--text-1);
   font-weight: 700;
 }
 
 .card-subtitle {
   margin: 8px 0 18px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .toggle-row {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   padding: 12px 16px;
   display: flex;
@@ -749,12 +749,12 @@ const submitShift = async () => {
 .toggle-title {
   font-size: 17px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .toggle-subtitle {
   margin-top: 2px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -765,7 +765,7 @@ const submitShift = async () => {
 }
 
 .tasks-section {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   padding: 16px;
   margin-top: 8px;
@@ -775,12 +775,12 @@ const submitShift = async () => {
   margin: 0 0 4px;
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .section-subtitle {
   margin: 0 0 16px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -799,15 +799,15 @@ const submitShift = async () => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .empty-tasks {
   padding: 16px;
   text-align: center;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
-  background: #f9fafb;
+  background: var(--surface-2);
   border-radius: 8px;
   margin-bottom: 12px;
 }
@@ -829,12 +829,12 @@ const submitShift = async () => {
 
 .assign-error {
   margin-top: 6px;
-  color: #b42318;
+  color: var(--state-alert);
   font-size: 13px;
 }
 
 .time-picker-card {
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--border-1);
 }
 
 .time-picker-grid {
@@ -853,14 +853,14 @@ const submitShift = async () => {
   top: 0;
   background: #fff;
   font-size: 12px;
-  color: #667085;
+  color: var(--text-2);
   padding-bottom: 6px;
 }
 
 .time-picker-col-hour {
   overflow-y: auto;
   padding-right: 8px;
-  border-right: 1px solid #e4e7ec;
+  border-right: 1px solid var(--border-1);
 }
 
 .time-picker-col-fixed {

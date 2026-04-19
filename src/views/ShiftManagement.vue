@@ -833,8 +833,9 @@ const calendarEvents = computed(() => {
   return filteredShifts.value
     .filter((shift) => !!shift.shift_date)
     .map((shift) => {
-      const start = `${shift.shift_date}T${normalizeTimeInput(shift.start_time) || '00:00'}:00`
-      const end = `${shift.shift_date}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
+      const shiftDate = normalizeDateInput(shift.shift_date)
+      const start = `${shiftDate}T${normalizeTimeInput(shift.start_time) || '00:00'}:00`
+      const end = `${shiftDate}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
       const title = shift.position?.position_name || 'Shift'
       const state = classifyShiftState(shift)
       const worker = shift.assignedUser

@@ -87,28 +87,32 @@
         <div v-else :class="['d-flex', 'flex-column', 'align-center', mobile ? 'gap-3' : 'gap-3']">
           <div v-if="!onBreak" :class="['d-flex', mobile ? 'flex-column gap-3' : 'gap-2']" :style="mobile ? 'width:100%;max-width:320px' : ''">
             <!-- #5: Start Break with confirmation -->
+            <!-- Start Break = secondary action (outlined maroon) -->
             <v-btn
-              color="warning"
-              variant="flat"
-              rounded="pill"
+              color="primary"
+              variant="outlined"
+              rounded="lg"
               :size="mobile ? 'large' : 'default'"
               :block="mobile"
-              :min-height="mobile ? 52 : undefined"
+              :min-height="mobile ? 48 : undefined"
               :loading="breakLoading"
+              class="clock-action-btn"
               aria-label="Start break"
               @click="startBreakDialog = true"
             >
               <v-icon start>mdi-coffee-outline</v-icon>
               Start Break
             </v-btn>
+            <!-- Clock Out = primary destructive-ish action (solid maroon) -->
             <v-btn
-              color="error"
+              color="primary"
               variant="flat"
-              rounded="pill"
+              rounded="lg"
               :size="mobile ? 'large' : 'default'"
               :block="mobile"
-              :min-height="mobile ? 52 : undefined"
+              :min-height="mobile ? 48 : undefined"
               :loading="clockingOut"
+              class="clock-action-btn"
               aria-label="Clock out"
               @click="confirmClockOut"
             >
@@ -122,10 +126,11 @@
             v-else
             color="primary"
             variant="flat"
-            rounded="pill"
+            rounded="lg"
             :size="mobile ? 'x-large' : 'default'"
             :min-height="mobile ? 56 : undefined"
             :loading="breakLoading"
+            class="clock-action-btn"
             aria-label="End break"
             @click="endBreakDialog = true"
           >
@@ -266,7 +271,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockOutDialog = false">Cancel</v-btn>
-          <v-btn color="error" variant="flat" :loading="clockingOut" @click="doClockOut">Clock Out</v-btn>
+          <v-btn color="primary" variant="flat" :loading="clockingOut" @click="doClockOut">Clock Out</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -281,7 +286,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="startBreakDialog = false">Cancel</v-btn>
-          <v-btn color="warning" variant="flat" :loading="breakLoading" @click="doStartBreak">Start Break</v-btn>
+          <v-btn color="primary" variant="flat" :loading="breakLoading" @click="doStartBreak">Start Break</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -762,6 +767,27 @@ onMounted(fetchAll);
   letter-spacing: 1px;
 }
 
+/* Start Break / Clock Out / End Break — cohesive maroon system.
+   The outlined variant gets a soft tinted background so it reads as a
+   real affordance rather than a hollow border. The flat primary variant
+   gets a slightly heavier shadow for presence without being loud. */
+.clock-action-btn {
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  box-shadow: 0 1px 2px rgba(72, 17, 28, 0.08);
+  transition: box-shadow 0.15s, transform 0.05s;
+}
+.clock-action-btn:active {
+  transform: translateY(1px);
+}
+.clock-action-btn:hover {
+  box-shadow: 0 3px 8px rgba(72, 17, 28, 0.14);
+}
+.clock-action-btn.v-btn--variant-outlined {
+  background: #FCF6F7; /* very soft maroon wash so the border reads crisply */
+}
+
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 .text-error { color: #EE5044; }
@@ -772,7 +798,7 @@ onMounted(fetchAll);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .ts-row-mobile--today {
-  background: rgba(63, 122, 77, 0.06);
+  background: rgba(129, 20, 41, 0.06); /* soft maroon tint for today (was green) */
 }
 .ts-row-mobile--total {
   padding: 12px 16px;

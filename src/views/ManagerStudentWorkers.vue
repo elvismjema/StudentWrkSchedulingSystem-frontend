@@ -164,41 +164,12 @@
                       </v-chip>
                     </div>
                   </div>
-                  <div class="availability-legend availability-legend--modal">
-                    <span class="legend-item">
-                      <span class="legend-dot legend-dot--available" />
-                      Available
-                    </span>
-                    <span class="legend-item">
-                      <span class="legend-dot legend-dot--unavailable" />
-                      Unavailable
-                    </span>
-                  </div>
-                  <div class="availability-calendar">
-                    <div
-                      v-for="day in weekDays"
-                      :key="day.key"
-                      class="calendar-day"
-                    >
-                      <div class="calendar-day-label">{{ day.label }}</div>
-                      <div class="calendar-day-slots">
-                        <template v-if="getDaySlots(workerModal.selectedWorker, day.key).length">
-                          <div
-                            v-for="slot in getDaySlots(workerModal.selectedWorker, day.key)"
-                            :key="`${day.key}-${slot.startMinutes}-${slot.endMinutes}-${slot.type}`"
-                            class="calendar-slot"
-                            :class="{
-                              'calendar-slot--available': slot.type === 'available',
-                              'calendar-slot--unavailable': slot.type === 'unavailable',
-                              'calendar-slot--class': slot.type === 'class',
-                            }"
-                          >
-                            <span class="calendar-slot__time">{{ slot.label }}</span>
-                          </div>
-                        </template>
-                        <div v-else class="calendar-day-empty">No availability set</div>
-                      </div>
-                    </div>
+                  <div class="modal-availability__grid">
+                    <AvailabilityGrid
+                      mode="readonly"
+                      :availability="workerAvailability"
+                      :events="workerShifts"
+                    />
                   </div>
                 </div>
               </div>
@@ -326,6 +297,7 @@ import apiClient from '../services/services.js';
 import studentScheduleService from '../services/studentScheduleService.js';
 import Utils from '../config/utils.js';
 import AddWorkerModal from '../components/AddWorkerModal.vue';
+import AvailabilityGrid from '../components/AvailabilityGrid.vue';
 
 const router = useRouter();
 
@@ -334,7 +306,7 @@ const loading = ref(false);
 const error = ref('');
 const searchQuery = ref('');
 const workers = ref([]);
-const workerAvailability = ref({}); // availability data keyed by worker ID
+const workerAvailabilityById = ref({}); // availability data keyed by worker ID
 const classSchedule = ref([]);
 const loadingSchedule = ref(false);
 const scheduleError = ref('');
@@ -367,8 +339,6 @@ const weekDays = [
   { key: 'sunday', label: 'Sun' },
 ];
 
-const MAX_PREVIEW_SLOTS = 3;
-
 // Computed properties
 const filteredWorkers = computed(() => {
   if (!searchQuery.value) return workers.value;
@@ -381,6 +351,34 @@ const filteredWorkers = computed(() => {
   });
 });
 
+// Flattened availability slots for the currently-open worker, shaped for
+// AvailabilityGrid's recurring availability contract.
+const workerAvailability = computed(() => {
+  const worker = workerModal.selectedWorker;
+  if (!worker) return [];
+  const byDay = workerAvailabilityById.value[worker.userId || worker.id] || {};
+  const slots = [];
+  for (const dayKey of Object.keys(byDay)) {
+    for (const slot of byDay[dayKey] || []) {
+      if (!slot || typeof slot.dayOfWeek !== 'number') continue;
+      if (!slot.startTime || !slot.endTime) continue;
+      slots.push({
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        recurring: true,
+        unavailable: slot.type === 'unavailable',
+      });
+    }
+  }
+  return slots;
+});
+
+// Placeholder for this worker's upcoming shifts. The Student Workers
+// endpoint does not return assigned shifts today; when it does, map each
+// shift to { id, title, start, end, positionColor, state } here.
+const workerShifts = computed(() => []);
+
 // Methods
 const getWorkerInitials = (worker) => {
   const first = (worker.fName || '').charAt(0).toUpperCase();
@@ -390,17 +388,8 @@ const getWorkerInitials = (worker) => {
 
 const getDaySlots = (worker, dayKey) => {
   if (!worker) return [];
-  const availability = workerAvailability.value[worker.userId || worker.id] || {};
+  const availability = workerAvailabilityById.value[worker.userId || worker.id] || {};
   return availability[dayKey] || [];
-};
-
-const getPreviewDaySlots = (worker, dayKey) => {
-  return getDaySlots(worker, dayKey).slice(0, MAX_PREVIEW_SLOTS);
-};
-
-const getHiddenSlotCount = (worker, dayKey) => {
-  const total = getDaySlots(worker, dayKey).length;
-  return total > MAX_PREVIEW_SLOTS ? total - MAX_PREVIEW_SLOTS : 0;
 };
 
 const countSlotsByType = (worker, type) => {
@@ -624,6 +613,9 @@ const loadWorkersAvailability = async () => {
           type: type === 'unavailable' || type === 'time_off' ? 'unavailable' : 'available',
           startMinutes: parseTimeToMinutes(availability.startTime),
           endMinutes: parseTimeToMinutes(availability.endTime),
+          dayOfWeek: dayNumber,
+          startTime: String(availability.startTime || '').slice(0, 5),
+          endTime: String(availability.endTime || '').slice(0, 5),
         });
       });
 
@@ -631,11 +623,11 @@ const loadWorkersAvailability = async () => {
         availabilityMap[dayKey].sort((a, b) => a.startMinutes - b.startMinutes);
       });
       
-      workerAvailability.value[worker.userId || worker.id] = availabilityMap;
+      workerAvailabilityById.value[worker.userId || worker.id] = availabilityMap;
     } catch (err) {
       console.warn(`No availability data for worker ${worker.userId || worker.id}:`, err);
       // Set empty availability for this worker
-      workerAvailability.value[worker.userId || worker.id] = {};
+      workerAvailabilityById.value[worker.userId || worker.id] = {};
     }
   });
 
@@ -907,132 +899,6 @@ watch(activeTab, (nextTab) => {
   width: 100%;
 }
 
-/* ─── Modal legend / calendar ─────────────────────────────────── */
-.availability-legend {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.availability-legend--modal {
-  margin-bottom: 12px;
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #667085;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-  border: 1px solid transparent;
-}
-
-.legend-dot--available {
-  background: #16a34a;
-  border-color: #15803d;
-}
-
-.legend-dot--unavailable {
-  background: #dc2626;
-  border-color: #b91c1c;
-}
-
-.availability-calendar {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.availability-calendar--preview {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.availability-calendar--preview .calendar-slot {
-  padding: 4px 6px;
-}
-
-.availability-calendar--preview .calendar-slot__time {
-  font-size: 10px;
-}
-
-.calendar-day {
-  border: 1px solid #eaecf0;
-  border-radius: 8px;
-  background: #fcfcfd;
-  min-height: 108px;
-  overflow: hidden;
-}
-
-.calendar-day-label {
-  padding: 7px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #667085;
-  background: #f9fafb;
-  border-bottom: 1px solid #eaecf0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.calendar-day-slots {
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.calendar-day-empty {
-  font-size: 11px;
-  color: #98a2b3;
-}
-
-.calendar-slot {
-  border-radius: 6px;
-  padding: 6px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-left: 3px solid transparent;
-}
-
-.calendar-slot--available {
-  background: rgba(22, 163, 74, 0.1);
-  border-left-color: #16a34a;
-}
-
-.calendar-slot--unavailable {
-  background: rgba(220, 38, 38, 0.1);
-  border-left-color: #dc2626;
-}
-
-.calendar-slot--class {
-  background: rgba(2, 119, 189, 0.1);
-  border-left-color: #0277bd;
-}
-
-.calendar-slot__time {
-  font-size: 11px;
-  font-weight: 600;
-  color: #1f2937;
-  line-height: 1.25;
-}
-
-.calendar-day-more {
-  font-size: 10px;
-  color: #8b1538;
-  font-weight: 600;
-  padding: 0 2px;
-}
-
 /* Modal Styles */
 .modal-header {
   padding: 24px 24px 0;
@@ -1098,6 +964,15 @@ watch(activeTab, (nextTab) => {
 .modal-availability {
   border-top: 1px solid #e3e5e8;
   padding-top: 20px;
+}
+
+.modal-availability__grid {
+  min-height: 420px;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid #e3e5e8;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .section-title {
@@ -1214,11 +1089,6 @@ watch(activeTab, (nextTab) => {
     gap: 16px;
   }
 
-  .availability-calendar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
   .availability-summary-head {
     align-items: flex-start;
     flex-direction: column;
@@ -1237,10 +1107,4 @@ watch(activeTab, (nextTab) => {
   }
 }
 
-@media (max-width: 480px) {
-  .availability-calendar,
-  .availability-calendar--preview {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

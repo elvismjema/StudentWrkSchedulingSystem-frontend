@@ -10,7 +10,7 @@
       </v-btn>
     </div>
 
-    <v-progress-linear v-if="loading" indeterminate color="#8B1538" class="mb-4" />
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
 
     <!-- Empty State -->
     <div v-if="!loading && requests.length === 0" class="empty-state">
@@ -166,24 +166,24 @@ onMounted(fetchPending);
 .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: #1f2328;
+  color: var(--text-1);
   margin: 0;
 }
 
 .page-subtitle {
   margin: 6px 0 0;
   font-size: 14px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .empty-state {
   text-align: center;
   padding: 64px 20px;
-  color: #9ca3af;
+  color: var(--text-3);
 }
 
 .empty-state h3 {
-  color: #667085;
+  color: var(--text-2);
   font-weight: 600;
 }
 
@@ -194,7 +194,7 @@ onMounted(fetchPending);
 }
 
 .request-card {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   padding: 20px;
   background: #fff;
@@ -215,8 +215,8 @@ onMounted(fetchPending);
 }
 
 .user-avatar {
-  background: #f0e6ea;
-  color: #930033;
+  background: var(--brand-primary-lt);
+  color: var(--brand-primary-dk);
   font-weight: 700;
   font-size: 14px;
 }
@@ -228,13 +228,13 @@ onMounted(fetchPending);
 .request-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--text-1);
   margin: 0;
 }
 
 .request-email {
   font-size: 13px;
-  color: #667085;
+  color: var(--text-2);
   margin: 2px 0 6px;
 }
 
@@ -247,7 +247,7 @@ onMounted(fetchPending);
 
 .request-date {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-3);
 }
 
 .request-actions {

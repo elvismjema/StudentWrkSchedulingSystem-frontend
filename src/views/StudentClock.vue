@@ -148,7 +148,50 @@
         </v-card-title>
 
         <v-card-text class="pa-0">
-          <v-table density="comfortable">
+          <!-- Mobile: two-line card rows (avoids 5-column wrap on ~320px screens) -->
+          <template v-if="mobile">
+            <div
+              v-for="day in timesheetRows"
+              :key="day.date"
+              class="ts-row-mobile"
+              :class="{ 'ts-row-mobile--today': day.isToday }"
+            >
+              <!-- Primary line: day label + hours -->
+              <div class="ts-row-mobile__primary">
+                <span class="ts-row-mobile__day" :class="{ 'font-weight-bold': day.isToday }">{{ day.label }}</span>
+                <span class="ts-row-mobile__hours font-weight-medium">{{ day.hours ? day.hours + 'h' : '—' }}</span>
+              </div>
+              <!-- Secondary line: scheduled → actual · break -->
+              <div class="ts-row-mobile__secondary">
+                <span>{{ day.scheduled || '—' }}</span>
+                <template v-if="day.actual">
+                  <span class="ts-row-mobile__sep">→</span>
+                  <span :class="day.actualClass">{{ day.actual }}</span>
+                </template>
+                <template v-if="day.breakDuration">
+                  <span class="ts-row-mobile__sep">·</span>
+                  <span>{{ day.breakDuration }} break</span>
+                </template>
+              </div>
+            </div>
+            <!-- Footer: totals -->
+            <div class="ts-row-mobile ts-row-mobile--total">
+              <div class="ts-row-mobile__primary">
+                <span class="font-weight-bold">Weekly Total</span>
+                <span class="font-weight-bold">{{ weeklyTotal }}h</span>
+              </div>
+              <div class="ts-row-mobile__primary">
+                <span class="text-body-2" style="color: var(--text-3)">Est. Earnings</span>
+                <span
+                  class="text-body-2 font-weight-bold"
+                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? 'var(--state-active)' : 'var(--text-3)' }"
+                >${{ weeklyEarnings }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Desktop: standard 5-column table -->
+          <v-table v-else density="comfortable">
             <thead>
               <tr>
                 <th>Day</th>
@@ -179,8 +222,10 @@
               </tr>
               <tr>
                 <td colspan="4" class="text-body-2 text-medium-emphasis">Est. Earnings</td>
-                <!-- #4: Real hourly rate -->
-                <td class="text-right text-body-2 font-weight-bold" style="color: #2E7D32">${{ weeklyEarnings }}</td>
+                <td
+                  class="text-right text-body-2 font-weight-bold"
+                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? 'var(--state-active)' : 'var(--text-3)' }"
+                >${{ weeklyEarnings }}</td>
               </tr>
             </tfoot>
           </v-table>
@@ -715,4 +760,44 @@ onMounted(fetchAll);
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 .text-error { color: #EE5044; }
+
+/* ── Mobile timesheet rows ──────────────────────────────── */
+.ts-row-mobile {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.ts-row-mobile--today {
+  background: rgba(63, 122, 77, 0.06);
+}
+.ts-row-mobile--total {
+  padding: 12px 16px;
+  border-top: 2px solid rgba(0, 0, 0, 0.10);
+  background: var(--surface-2);
+}
+.ts-row-mobile__primary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ts-row-mobile__day {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.ts-row-mobile__hours {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.ts-row-mobile__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ts-row-mobile__sep {
+  color: var(--text-3);
+  opacity: 0.6;
+}
 </style>

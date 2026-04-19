@@ -38,7 +38,7 @@
       <!-- ── Ack notice ───────────────────────────────── -->
       <div v-if="hasPendingAcks && !showOpenShifts" class="ack-notice">
         <v-icon size="14" color="#EA580C">mdi-alert-circle-outline</v-icon>
-        {{ pendingAcks.length }} shift{{ pendingAcks.length > 1 ? 's' : '' }} need acknowledgement
+        {{ pendingAcks.length }} shift{{ pendingAcks.length === 1 ? '' : 's' }} {{ pendingAcks.length === 1 ? 'needs' : 'need' }} acknowledgement
       </div>
 
       <!-- ── Error ────────────────────────────────────── -->

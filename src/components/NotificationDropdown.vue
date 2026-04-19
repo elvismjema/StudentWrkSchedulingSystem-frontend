@@ -15,8 +15,9 @@
         class="notification-btn"
       >
         <v-badge
-          :content="unreadCount"
-          :color="unreadCount > 0 ? 'error' : 'transparent'"
+          :model-value="unreadCount > 0"
+          :content="unreadCount > 99 ? '99+' : unreadCount"
+          color="error"
           floating
           offset-x="8"
           offset-y="8"

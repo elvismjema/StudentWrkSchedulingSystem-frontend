@@ -17,7 +17,7 @@
         <div class="ack-banner">
           <div class="ack-banner-head">
             <v-icon size="16" color="#EA580C">mdi-bell-ring-outline</v-icon>
-            <span>{{ pendingAcknowledgements.length }} shift{{ pendingAcknowledgements.length > 1 ? 's' : '' }} need your response</span>
+            <span>{{ pendingAcknowledgements.length }} shift{{ pendingAcknowledgements.length === 1 ? '' : 's' }} {{ pendingAcknowledgements.length === 1 ? 'needs' : 'need' }} your response</span>
           </div>
           <div v-for="ack in pendingAcknowledgements" :key="ack.id" class="ack-item">
             <div class="ack-item-info">
@@ -217,7 +217,7 @@
       >
         <template #title>
           <span class="text-subtitle-1 font-weight-bold">
-            {{ pendingAcknowledgements.length }} new shift{{ pendingAcknowledgements.length > 1 ? 's' : '' }} assigned to you
+            {{ pendingAcknowledgements.length }} new shift{{ pendingAcknowledgements.length === 1 ? '' : 's' }} assigned to you
           </span>
         </template>
         <template #text>

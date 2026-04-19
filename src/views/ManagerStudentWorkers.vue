@@ -165,12 +165,7 @@
                     </div>
                   </div>
                   <div class="modal-availability__grid">
-                    <AvailabilityGrid
-                      ref="workerAvailabilityGridRef"
-                      mode="readonly"
-                      :availability="workerAvailability"
-                      :events="workerShifts"
-                    />
+                    <WorkerAvailabilityReadonly :availability="workerAvailability" />
                   </div>
                 </div>
               </div>
@@ -292,13 +287,13 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../services/services.js';
 import studentScheduleService from '../services/studentScheduleService.js';
 import Utils from '../config/utils.js';
 import AddWorkerModal from '../components/AddWorkerModal.vue';
-import AvailabilityGrid from '../components/AvailabilityGrid.vue';
+import WorkerAvailabilityReadonly from '../components/WorkerAvailabilityReadonly.vue';
 
 const router = useRouter();
 
@@ -314,11 +309,6 @@ const scheduleError = ref('');
 const activeTab = ref('details');
 const deletingWorker = ref(false);
 const deleteWorkerDialog = ref(false);
-
-// Template ref for the availability grid inside the worker details modal.
-// Needed so we can force FullCalendar to re-measure after the v-dialog
-// entrance animation finishes — otherwise the grid renders at 0-height.
-const workerAvailabilityGridRef = ref(null);
 
 // Department context
 const deptContext = Utils.getStore('currentDepartmentContext') || {};
@@ -689,26 +679,6 @@ watch(activeTab, (nextTab) => {
   }
 });
 
-// Force the availability grid inside the worker modal to re-measure once the
-// v-dialog enter transition paints the final height. FullCalendar latches
-// onto whatever height it sees on mount; without this the body collapses to
-// 0px because the dialog is still animating.
-watch(
-  () => workerModal.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    nextTick(() => workerAvailabilityGridRef.value?.updateSize?.());
-    setTimeout(() => workerAvailabilityGridRef.value?.updateSize?.(), 250);
-  }
-);
-
-// Same story when switching back to the details tab — FullCalendar was
-// inside a hidden v-window-item and measured 0 while dormant.
-watch(activeTab, (nextTab) => {
-  if (nextTab !== 'details') return;
-  nextTick(() => workerAvailabilityGridRef.value?.updateSize?.());
-  setTimeout(() => workerAvailabilityGridRef.value?.updateSize?.(), 250);
-});
 </script>
 
 <style scoped>

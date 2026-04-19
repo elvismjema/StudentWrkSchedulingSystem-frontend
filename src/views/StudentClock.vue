@@ -184,7 +184,7 @@
                 <span class="text-body-2" style="color: var(--text-3)">Est. Earnings</span>
                 <span
                   class="text-body-2 font-weight-bold"
-                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? 'var(--state-active)' : 'var(--text-3)' }"
+                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? '#811429' : 'var(--text-3)' }"
                 >${{ weeklyEarnings }}</span>
               </div>
             </div>
@@ -224,7 +224,7 @@
                 <td colspan="4" class="text-body-2 text-medium-emphasis">Est. Earnings</td>
                 <td
                   class="text-right text-body-2 font-weight-bold"
-                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? 'var(--state-active)' : 'var(--text-3)' }"
+                  :style="{ color: parseFloat(weeklyEarnings) > 0 ? '#811429' : 'var(--text-3)' }"
                 >${{ weeklyEarnings }}</td>
               </tr>
             </tfoot>

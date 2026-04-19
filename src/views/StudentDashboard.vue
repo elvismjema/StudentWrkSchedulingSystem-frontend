@@ -117,17 +117,17 @@
           <div class="section-eyebrow">THIS WEEK</div>
           <div class="stats-strip">
             <div class="stat-cell">
-              <div class="stat-value" style="color: #80162B">{{ weeklyHours }}h</div>
+              <div class="stat-value" style="color: #811429">{{ weeklyHours }}h</div>
               <div class="stat-label">Hours</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-cell">
-              <div class="stat-value" style="color: #196CA2">{{ weeklyShifts }}</div>
+              <div class="stat-value" style="color: #48111C">{{ weeklyShifts }}</div>
               <div class="stat-label">Shifts</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-cell">
-              <div class="stat-value" style="color: #2E7D32">${{ estimatedEarnings }}</div>
+              <div class="stat-value" style="color: #811429">${{ estimatedEarnings }}</div>
               <div class="stat-label">Est. Pay</div>
             </div>
           </div>
@@ -329,7 +329,7 @@
                   <v-divider />
                   <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#196CA2">{{ weeklyShifts }}</div><div class="text-caption text-medium-emphasis">Shifts</div></div>
                   <v-divider />
-                  <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#2e7d32">${{ estimatedEarnings }}</div><div class="text-caption text-medium-emphasis">Earnings</div></div>
+                  <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#811429">${{ estimatedEarnings }}</div><div class="text-caption text-medium-emphasis">Earnings</div></div>
                 </div>
               </v-card-text>
             </v-card>

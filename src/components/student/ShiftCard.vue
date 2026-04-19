@@ -92,7 +92,7 @@
               v-if="canClockIn"
               size="small"
               variant="flat"
-              color="success"
+              color="primary"
               prepend-icon="mdi-login"
               aria-label="Clock in for this shift"
               @click.stop="$emit('clock-in', shift)"

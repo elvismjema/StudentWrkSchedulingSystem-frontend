@@ -983,39 +983,59 @@ const dayCellClassNames = (arg) => {
 }
 
 // --- Calendar options ------------------------------------------------------
-const calendarOptions = computed(() => ({
-  plugins: [timeGridPlugin, interactionPlugin, listPlugin],
-  initialView: currentView.value,
-  initialDate: currentDate.value,
-  headerToolbar: false,
-  allDaySlot: false,
-  firstDay: 0,
-  events: calendarEvents.value,
-  slotMinTime: effectiveCalendarHours.value.slotMinTime,
-  slotMaxTime: effectiveCalendarHours.value.slotMaxTime,
-  slotDuration: '00:30:00',
-  slotLabelInterval: '01:00:00',
-  snapDuration: '00:15:00',
-  nowIndicator: true,
-  editable: true,
-  eventStartEditable: true,
-  eventDurationEditable: true,
-  selectable: true,
-  selectMirror: true,
-  eventOverlap: true,
-  height: 'auto',
-  eventClick: onCalendarEventClick,
-  select: onCalendarSelect,
-  eventDrop: onCalendarEventChange,
-  eventResize: onCalendarEventChange,
-  datesSet: onCalendarDatesSet,
-  eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-  // "Mon 20" — weekday AND date.
-  dayHeaderFormat: { weekday: 'short', day: 'numeric' },
-  dayHeaderClassNames,
-  dayCellClassNames,
-  eventContent: renderEventContent,
-}))
+const calendarOptions = computed(() => {
+  // Compute contentHeight so each 30-min slot is exactly 48px tall
+  // (= 96px per hour). This guarantees event block heights are always
+  // proportional to their real duration regardless of the visible time range.
+  // CSS slot-height overrides don't reliably win against FullCalendar's
+  // internal layout engine, so driving height through contentHeight +
+  // expandRows is the only approach that works consistently.
+  const parseMins = (t) => {
+    const parts = String(t || '').split(':').map(Number)
+    return (parts[0] || 0) * 60 + (parts[1] || 0)
+  }
+  const totalMins = Math.max(60,
+    parseMins(effectiveCalendarHours.value.slotMaxTime) -
+    parseMins(effectiveCalendarHours.value.slotMinTime)
+  )
+  // slotDuration is 30 min → numSlots = totalMins / 30
+  const contentHeight = Math.round((totalMins / 30) * 48)
+
+  return {
+    plugins: [timeGridPlugin, interactionPlugin, listPlugin],
+    initialView: currentView.value,
+    initialDate: currentDate.value,
+    headerToolbar: false,
+    allDaySlot: false,
+    firstDay: 0,
+    events: calendarEvents.value,
+    slotMinTime: effectiveCalendarHours.value.slotMinTime,
+    slotMaxTime: effectiveCalendarHours.value.slotMaxTime,
+    slotDuration: '00:30:00',
+    slotLabelInterval: '01:00:00',
+    snapDuration: '00:15:00',
+    nowIndicator: true,
+    editable: true,
+    eventStartEditable: true,
+    eventDurationEditable: true,
+    selectable: true,
+    selectMirror: true,
+    eventOverlap: true,
+    expandRows: true,
+    contentHeight,
+    eventClick: onCalendarEventClick,
+    select: onCalendarSelect,
+    eventDrop: onCalendarEventChange,
+    eventResize: onCalendarEventChange,
+    datesSet: onCalendarDatesSet,
+    eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
+    // "Mon 20" — weekday AND date.
+    dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+    dayHeaderClassNames,
+    dayCellClassNames,
+    eventContent: renderEventContent,
+  }
+})
 
 watch(currentView, (view) => {
   const api = getCalendarApi()
@@ -1795,22 +1815,13 @@ onMounted(async () => {
 }
 
 /* ---- Calendar wrap ----------------------------------------------------- */
+/* No fixed height — contentHeight in calendarOptions controls the inner
+   time-grid height. The outer wrapper just provides the card styling. */
 .schedule-calendar-wrap {
   background: var(--surface-0);
   border: 1px solid var(--border-1);
   border-radius: var(--radius-md);
   padding: var(--space-2);
-  height: 760px;
-  overflow-y: auto;
-}
-
-/* Enforce a minimum slot height so 30-min blocks are never compressed.
-   With slotDuration=30min this means 1 hour = 80px — standard calendar
-   density. Without this, expandRows/height:100% would divide the total
-   container height by the number of slots, making every shift appear
-   shorter than it actually is. */
-.schedule-calendar-wrap :deep(.fc .fc-timegrid-slot) {
-  height: 40px;
 }
 
 .schedule-loading-wrap {

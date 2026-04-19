@@ -110,6 +110,29 @@
             <div class="empty-card-text">No upcoming shifts</div>
             <div class="empty-card-sub">Check the Schedule tab for open shifts</div>
           </div>
+
+          <!-- Additional accepted shifts (not just tomorrow) -->
+          <div v-if="laterShifts.length" class="later-shifts-list">
+            <div
+              v-for="shift in laterShifts"
+              :key="shift.id || shift.shift_id"
+              class="later-shift-row"
+              @click="openSwapDialog(shift)"
+            >
+              <div class="later-shift-date" aria-hidden="true">
+                <div class="later-shift-date__month">{{ formatLaterMonth(shift) }}</div>
+                <div class="later-shift-date__day">{{ formatLaterDay(shift) }}</div>
+              </div>
+              <div class="later-shift-info">
+                <div class="later-shift-dept">{{ shift.department?.department_name || shift.department_name || 'Shift' }}</div>
+                <div class="later-shift-time">{{ formatLaterWeekday(shift) }} &middot; {{ formatTimeRange(shift) }}</div>
+                <div v-if="shift.position?.position_name || shift.position_name" class="later-shift-position">
+                  <v-icon size="11" class="mr-1">mdi-badge-account-outline</v-icon>{{ shift.position?.position_name || shift.position_name }}
+                </div>
+              </div>
+              <v-icon size="16" color="#D1D5DB">mdi-chevron-right</v-icon>
+            </div>
+          </div>
         </div>
 
         <!-- ── This Week Stats (priority 3) ──────────────── -->
@@ -408,6 +431,7 @@ const clockingIn = ref(false);
 
 // Dashboard data
 const nextShift = ref(null);
+const upcomingShifts = ref([]); // all accepted future shifts (sorted, nextShift is [0])
 const todayShifts = ref([]);
 const weekShifts = ref([]);
 const openShiftsCount = ref(0);
@@ -461,6 +485,15 @@ const nextShiftLabel = computed(() => {
   return "Up Next";
 });
 
+// Additional upcoming accepted shifts shown below the hero card on the
+// dashboard. Cap at 4 secondary rows so the home view stays scannable;
+// the full list still lives in the Schedule tab.
+const laterShifts = computed(() => {
+  const list = upcomingShifts.value || [];
+  if (list.length <= 1) return [];
+  return list.slice(1, 5);
+});
+
 const nextShiftPosition = computed(() => {
   if (!nextShift.value) return '';
   return nextShift.value.position_name
@@ -499,6 +532,29 @@ const nextShiftWeekday = computed(() => {
   return d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" });
 });
 
+
+// Mini date-part helpers for the secondary upcoming shift rows. Same tz-safe
+// extraction as nextShiftDateObj so dates don’t drift by one across
+// DST / UTC boundaries.
+function laterShiftDateObj(shift) {
+  if (!shift) return null;
+  const raw = shift.shift_date || shiftDateStr(shift);
+  if (!raw) return null;
+  const d = raw instanceof Date ? raw : new Date(String(raw).includes('T') ? raw : raw + 'T00:00:00');
+  return isNaN(d) ? null : d;
+}
+function formatLaterMonth(shift) {
+  const d = laterShiftDateObj(shift);
+  return d ? d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '';
+}
+function formatLaterDay(shift) {
+  const d = laterShiftDateObj(shift);
+  return d ? d.getDate() : '';
+}
+function formatLaterWeekday(shift) {
+  const d = laterShiftDateObj(shift);
+  return d ? d.toLocaleDateString('en-US', { weekday: 'short' }) : '';
+}
 
 function formatShiftDate(shift) {
   if (!shift) return '';
@@ -711,6 +767,7 @@ async function loadFromIndividualEndpoints() {
       })
       .sort((a, b) => new Date(shiftStartDT(a)) - new Date(shiftStartDT(b)));
     nextShift.value = upcoming[0] || null;
+    upcomingShifts.value = upcoming;
 
     weeklyShifts.value = weekShifts.value.length;
     weeklyHours.value = weekShifts.value.reduce((sum, s) => {
@@ -1274,6 +1331,78 @@ onMounted(loadDashboard);
   font-size: 12px;
   color: #6B7280;
   margin-top: 2px;
+}
+
+/* ── Additional upcoming accepted shifts (below hero) ── */
+.later-shifts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.later-shift-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #EBEBEB;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s;
+}
+.later-shift-row:active {
+  background: #FAFAFA;
+}
+.later-shift-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  background: #F4E6EA; /* brand-primary-lt */
+  border-radius: 10px;
+  line-height: 1;
+}
+.later-shift-date__month {
+  font-size: 9px;
+  font-weight: 700;
+  color: #811429;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.later-shift-date__day {
+  font-size: 18px;
+  font-weight: 700;
+  color: #48111C;
+  margin-top: 2px;
+}
+.later-shift-info {
+  flex: 1;
+  min-width: 0;
+}
+.later-shift-dept {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.later-shift-time {
+  font-size: 12px;
+  color: #52525B;
+  margin-top: 2px;
+}
+.later-shift-position {
+  font-size: 11px;
+  color: #6B7280;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ── Pending Requests ── */

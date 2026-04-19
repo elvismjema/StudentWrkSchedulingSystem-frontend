@@ -1,53 +1,102 @@
 <template>
-  <div class="schedule-container">
-    <div class="greeting-banner">
-      <h2 class="greeting-title">Manager Schedule</h2>
-      <p class="greeting-date">{{ currentGreetingDate }}</p>
-    </div>
+  <PageFrame>
+    <template #header>
+      <PageHeader title="Schedule" :subtitle="headerSubtitle">
+        <template #actions>
+          <v-btn
+            color="primary"
+            variant="elevated"
+            prepend-icon="mdi-plus"
+            @click="openCreateDialog()"
+          >
+            Create Shift
+          </v-btn>
 
-    <!-- Calendar Header -->
-    <div class="calendar-header">
-      <div>
-        <p class="selected-shift-note" v-if="selectedShift">
-          Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
-        </p>
-      </div>
-      <div class="header-controls">
-        <v-btn variant="outlined" class="nav-btn" @click="previousWeek">
-          <v-icon>mdi-chevron-left</v-icon>
-        </v-btn>
-        <v-btn variant="outlined" class="today-btn" @click="goToToday">Today</v-btn>
-        <v-btn variant="outlined" class="nav-btn" @click="nextWeek">
-          <v-icon>mdi-chevron-right</v-icon>
-        </v-btn>
-        <v-btn color="primary" variant="elevated" @click="openCreateDialog()" prepend-icon="mdi-plus">
-          Create Shift
-        </v-btn>
-      </div>
-    </div>
+          <v-btn-toggle
+            v-model="currentView"
+            mandatory
+            density="comfortable"
+            variant="outlined"
+            color="primary"
+            class="schedule-view-toggle"
+          >
+            <v-btn value="timeGridDay" size="small">Day</v-btn>
+            <v-btn value="timeGridWeek" size="small">Week</v-btn>
+            <v-btn
+              value="listMonth"
+              size="small"
+              :title="'Month — list view'"
+            >
+              Month
+            </v-btn>
+          </v-btn-toggle>
 
-    <!-- Position Color Legend -->
-    <div v-if="positions.length > 0" class="position-legend">
-      <span class="legend-label">Key:</span>
-      <div class="legend-items">
-        <div v-for="pos in positions" :key="pos.position_id" class="legend-item">
-          <span class="legend-swatch" :style="{ backgroundColor: pos.color || '#8B1538' }"></span>
-          <span class="legend-text">{{ pos.position_name }}</span>
+          <div class="schedule-nav-group">
+            <v-btn icon variant="outlined" density="comfortable" @click="previousPeriod" aria-label="Previous">
+              <v-icon>mdi-chevron-left</v-icon>
+            </v-btn>
+            <v-btn variant="outlined" density="comfortable" class="schedule-today-btn" @click="goToToday">
+              Today
+            </v-btn>
+            <v-btn icon variant="outlined" density="comfortable" @click="nextPeriod" aria-label="Next">
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </div>
+        </template>
+      </PageHeader>
+    </template>
+
+    <template #filters>
+      <div class="schedule-filters">
+        <v-select
+          v-model="filterPositionIds"
+          :items="positions"
+          item-title="position_name"
+          item-value="position_id"
+          label="Positions"
+          variant="outlined"
+          density="compact"
+          multiple
+          chips
+          closable-chips
+          hide-details
+          class="schedule-filter-positions"
+        />
+
+        <v-btn-toggle
+          v-model="filterStatus"
+          mandatory
+          density="comfortable"
+          variant="outlined"
+          color="primary"
+        >
+          <v-btn value="all" size="small">All</v-btn>
+          <v-btn value="open" size="small">Open</v-btn>
+          <v-btn value="filled" size="small">Filled</v-btn>
+          <v-btn value="needs-coverage" size="small">Needs coverage</v-btn>
+        </v-btn-toggle>
+
+        <v-switch
+          v-model="filterOnlyMyApprovals"
+          label="Only my approvals"
+          hide-details
+          density="compact"
+          color="primary"
+          class="schedule-filter-switch"
+        />
+
+        <div v-if="selectedShift" class="schedule-selected-note type-meta">
+          Selected: {{ selectedShift.position?.position_name }} ·
+          {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
         </div>
-        <div class="legend-item">
-          <span class="legend-swatch legend-swatch-unfilled"></span>
-          <span class="legend-text">Unfilled</span>
-        </div>
       </div>
+    </template>
+
+    <div v-if="!shiftsLoading" class="schedule-calendar-wrap">
+      <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
     </div>
 
-    <div class="calendar-scroll-container" v-if="!shiftsLoading">
-      <div class="calendar-container fullcalendar-wrap">
-        <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
-      </div>
-    </div>
-
-    <div v-else class="loading-wrap">
+    <div v-else class="schedule-loading-wrap">
       <v-progress-circular indeterminate color="primary" />
     </div>
 
@@ -75,7 +124,6 @@
         <v-card-text class="pa-5">
           <v-form ref="createFormRef" v-model="createFormValid">
             <v-row dense>
-              <!-- Position -->
               <v-col cols="12">
                 <v-select
                   v-model="newShift.position_id"
@@ -90,7 +138,6 @@
                 />
               </v-col>
 
-              <!-- Date -->
               <v-col cols="12" md="4">
                 <v-text-field
                   v-model="newShift.shift_date"
@@ -102,7 +149,6 @@
                 />
               </v-col>
 
-              <!-- Start Time -->
               <v-col cols="12" md="4">
                 <v-menu v-model="startTimeMenu" :close-on-content-click="false" location="bottom" offset="8">
                   <template #activator="{ props }">
@@ -118,22 +164,49 @@
                       :rules="[v => !!v || 'Start time is required']"
                     />
                   </template>
-                  <v-card class="time-picker-card start-time-picker-card" min-width="320">
+                  <v-card class="time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
-                          <v-btn v-for="hour in hourOptions" :key="`sh-${hour}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.hour === hour ? '#1976d2' : undefined" @click="updateTimePart('start', 'hour', hour)">{{ hour }}</v-btn>
+                          <v-btn
+                            v-for="hour in hourOptions"
+                            :key="`sh-${hour}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="startTimeParts.hour === hour ? 'primary' : undefined"
+                            @click="updateTimePart('start', 'hour', hour)"
+                          >{{ hour }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
                           <div class="minute-scroll-list" ref="startMinuteListRef">
-                            <v-btn v-for="minute in minuteOptions" :key="`sm-${minute}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('start', 'minute', minute)">{{ minute }}</v-btn>
+                            <v-btn
+                              v-for="minute in minuteOptions"
+                              :key="`sm-${minute}`"
+                              size="small"
+                              variant="flat"
+                              block
+                              class="mb-1"
+                              :color="startTimeParts.minute === minute ? 'primary' : undefined"
+                              @click="updateTimePart('start', 'minute', minute)"
+                            >{{ minute }}</v-btn>
                           </div>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
-                          <v-btn v-for="period in periodOptions" :key="`sp-${period}`" size="small" variant="flat" block class="mb-1" :color="startTimeParts.period === period ? '#1976d2' : undefined" @click="updateTimePart('start', 'period', period)">{{ period }}</v-btn>
+                          <v-btn
+                            v-for="period in periodOptions"
+                            :key="`sp-${period}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="startTimeParts.period === period ? 'primary' : undefined"
+                            @click="updateTimePart('start', 'period', period)"
+                          >{{ period }}</v-btn>
                         </div>
                       </div>
                       <div class="time-picker-actions">
@@ -145,7 +218,6 @@
                 </v-menu>
               </v-col>
 
-              <!-- End Time -->
               <v-col cols="12" md="4">
                 <v-menu v-model="endTimeMenu" :close-on-content-click="false" location="bottom" offset="8" :disabled="!newShift.start_time">
                   <template #activator="{ props }">
@@ -162,22 +234,49 @@
                       :rules="[v => !!v || 'End time is required']"
                     />
                   </template>
-                  <v-card class="time-picker-card end-time-picker-card" min-width="320">
+                  <v-card class="time-picker-card" min-width="320">
                     <v-card-text class="pa-3">
                       <div class="time-picker-grid">
                         <div class="time-picker-col time-picker-col-hour">
                           <div class="time-picker-col-title">Hour</div>
-                          <v-btn v-for="hour in hourOptions" :key="`eh-${hour}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.hour === hour ? '#1976d2' : undefined" @click="updateTimePart('end', 'hour', hour)">{{ hour }}</v-btn>
+                          <v-btn
+                            v-for="hour in hourOptions"
+                            :key="`eh-${hour}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="endTimeParts.hour === hour ? 'primary' : undefined"
+                            @click="updateTimePart('end', 'hour', hour)"
+                          >{{ hour }}</v-btn>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Minute</div>
                           <div class="minute-scroll-list" ref="endMinuteListRef">
-                            <v-btn v-for="minute in minuteOptions" :key="`em-${minute}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.minute === minute ? '#1976d2' : undefined" @click="updateTimePart('end', 'minute', minute)">{{ minute }}</v-btn>
+                            <v-btn
+                              v-for="minute in minuteOptions"
+                              :key="`em-${minute}`"
+                              size="small"
+                              variant="flat"
+                              block
+                              class="mb-1"
+                              :color="endTimeParts.minute === minute ? 'primary' : undefined"
+                              @click="updateTimePart('end', 'minute', minute)"
+                            >{{ minute }}</v-btn>
                           </div>
                         </div>
                         <div class="time-picker-col time-picker-col-fixed">
                           <div class="time-picker-col-title">Period</div>
-                          <v-btn v-for="period in periodOptions" :key="`ep-${period}`" size="small" variant="flat" block class="mb-1" :color="endTimeParts.period === period ? '#1976d2' : undefined" @click="updateTimePart('end', 'period', period)">{{ period }}</v-btn>
+                          <v-btn
+                            v-for="period in periodOptions"
+                            :key="`ep-${period}`"
+                            size="small"
+                            variant="flat"
+                            block
+                            class="mb-1"
+                            :color="endTimeParts.period === period ? 'primary' : undefined"
+                            @click="updateTimePart('end', 'period', period)"
+                          >{{ period }}</v-btn>
                         </div>
                       </div>
                       <div class="time-picker-actions">
@@ -189,7 +288,6 @@
                 </v-menu>
               </v-col>
 
-              <!-- Recurring Shift toggle -->
               <v-col cols="12">
                 <v-card variant="outlined" class="pa-3">
                   <div class="d-flex justify-space-between align-center">
@@ -202,7 +300,6 @@
                 </v-card>
               </v-col>
 
-              <!-- Post as Open Shift toggle -->
               <v-col cols="12">
                 <v-card variant="outlined" class="pa-3">
                   <div class="d-flex justify-space-between align-center">
@@ -234,7 +331,6 @@
                 </v-card>
               </v-col>
 
-              <!-- Assign To: required unless open shift -->
               <v-col cols="12">
                 <v-select
                   v-model="newShift.assigned_user_id"
@@ -251,7 +347,6 @@
                 />
               </v-col>
 
-              <!-- Tasks -->
               <v-col cols="12">
                 <div class="tasks-section">
                   <div class="tasks-header">
@@ -490,15 +585,18 @@
       <v-icon start>mdi-alert-circle</v-icon>
       {{ errorMessage }}
     </v-snackbar>
-  </div>
+  </PageFrame>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import FullCalendar from '@fullcalendar/vue3'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import listPlugin from '@fullcalendar/list'
+import PageFrame from '../components/PageFrame.vue'
+import PageHeader from '../components/PageHeader.vue'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
@@ -507,7 +605,6 @@ import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 import { TZ, localDateStr } from '../utils/tz.js'
 
-const router = useRouter()
 const route = useRoute()
 
 // Department context (auto-determined from stored context)
@@ -516,19 +613,28 @@ const currentDeptId = deptContext.department_id || null
 const currentDeptName = deptContext.department_name || ''
 
 const currentDate = ref(new Date())
+const currentView = ref('timeGridWeek')
 const fullCalendarRef = ref(null)
 const startMinuteListRef = ref(null)
 const endMinuteListRef = ref(null)
 const shifts = ref([])
-const departments = ref([])
 const positions = ref([])
 const departmentWorkers = ref([])
 const filters = ref({
   position_id: null,
-  shift_date: null
+  shift_date: null,
 })
-const calendarHours = ref({ slotMinTime: '05:00:00', slotMaxTime: '24:00:00' })
+// Auto-fit hours: defaults fall back to 06:00–23:00 when department hours
+// can't be resolved. Set in loadDepartmentCalendarHours().
+const calendarHours = ref({ slotMinTime: '06:00:00', slotMaxTime: '23:00:00' })
+const calendarHoursSource = ref('fallback') // 'department' | 'fallback'
 const departmentHoursByDay = ref({})
+
+// Filter bar state
+const filterPositionIds = ref([])
+const filterStatus = ref('all') // all | open | filled | needs-coverage
+const filterOnlyMyApprovals = ref(false)
+const currentUserId = ref(null)
 
 const showCreateDialog = ref(false)
 const showAssignDialog = ref(false)
@@ -557,7 +663,7 @@ const newShift = ref({
   workers_needed: 1,
   recurring: false,
   tasks: [],
-  is_published: true
+  is_published: true,
 })
 
 const selectedShift = ref(null)
@@ -579,19 +685,14 @@ const shiftsLoading = ref(false)
 const creating = ref(false)
 const editing = ref(false)
 const deleting = ref(false)
-
-// Drag-to-create state
-const dragCreate = ref(null)
-const isDragCreating = ref(false)
-// Drag-to-reschedule state
-const draggingShift = ref(null)
-const dragOverCell = ref(null)
 const rescheduling = ref(false)
 
 const showSuccess = ref(false)
 const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+const headerSubtitle = computed(() => currentDeptName || 'No department selected')
 
 const isEditSaveDisabled = computed(() => {
   return (
@@ -605,179 +706,200 @@ const isEditSaveDisabled = computed(() => {
   )
 })
 
-// Data table
-const headers = [
-  { title: 'Date', key: 'shift_date', sortable: true },
-  { title: 'Time', key: 'time', sortable: false },
-  { title: 'Position', key: 'position', sortable: false },
-  { title: 'Assigned To', key: 'assigned_user', sortable: false },
-  { title: 'Status', key: 'status', sortable: false },
-  { title: 'Actions', key: 'actions', sortable: false, width: 120 }
-]
+// --- Shift state classification -------------------------------------------
+const classifyShiftState = (shift) => {
+  const tradeStatus = String(shift?.trade_status || '').toLowerCase()
+  const hasAssignee = !!shift?.assigned_user_id
+  if (tradeStatus === 'open' && !hasAssignee) return 'open'
+  if (!hasAssignee) return 'needs-coverage'
+  return 'filled'
+}
 
-// Computed
-const weekDays = computed(() => {
-  const today = new Date()
-  const todayIso = localDateStr(today)
-  const startOfWeek = new Date(currentDate.value)
-  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(startOfWeek)
-    d.setDate(startOfWeek.getDate() + i)
-    const isoDate = localDateStr(d)
-    return {
-      isoDate,
-      name: d.toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' }),
-      date: d.getDate(),
-      isToday: isoDate === todayIso
+// --- Filtered shifts -------------------------------------------------------
+const filteredShifts = computed(() => {
+  return shifts.value.filter((shift) => {
+    // Position filter (multi-select; empty = all)
+    if (filterPositionIds.value.length > 0) {
+      const pid = Number(shift.position_id)
+      if (!filterPositionIds.value.map(Number).includes(pid)) return false
     }
+
+    // Status filter
+    if (filterStatus.value !== 'all') {
+      if (classifyShiftState(shift) !== filterStatus.value) return false
+    }
+
+    // Only-my-approvals: shifts awaiting manager approval assigned to me.
+    // Uses approved_by / approved_at flags when present on the shift record.
+    if (filterOnlyMyApprovals.value) {
+      const uid = currentUserId.value
+      const approver = Number(shift.approved_by || shift.approver_id || 0)
+      if (!uid || approver !== Number(uid)) return false
+    }
+
+    return true
   })
 })
 
-const timeSlots = computed(() => Array.from({ length: 19 }, (_, i) => i + 5))
-
-const currentGreetingDate = computed(() => {
-  if (!weekDays.value.length) return ''
-  const first = new Date(weekDays.value[0].isoDate)
-  const last = new Date(weekDays.value[6].isoDate)
-  return `${first.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric', year: 'numeric' })}`
-})
-
-const filteredShifts = computed(() => {
-  return shifts.value
-})
-
-const hexToRgba = (hex, alpha) => {
-  const cleaned = (hex || '#8B1538').replace('#', '')
-  const r = parseInt(cleaned.slice(0, 2), 16)
-  const g = parseInt(cleaned.slice(2, 4), 16)
-  const b = parseInt(cleaned.slice(4, 6), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
+// --- FullCalendar events ---------------------------------------------------
 const calendarEvents = computed(() => {
-  return shifts.value
+  return filteredShifts.value
     .filter((shift) => !!shift.shift_date)
     .map((shift) => {
       const start = `${shift.shift_date}T${normalizeTimeInput(shift.start_time) || '00:00'}:00`
       const end = `${shift.shift_date}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
       const title = shift.position?.position_name || 'Shift'
-      const department = shift.department?.department_name || 'Department'
-      const isUnfilled = !shift.assigned_user_id
-      const posColor = shift.position?.color || '#8B1538'
-      const bgColor = isUnfilled ? hexToRgba(posColor, 0.45) : posColor
-      const borderClr = selectedShift.value?.shift_id === shift.shift_id ? '#00c853' : posColor
+      const state = classifyShiftState(shift)
+      const positionColor = shift.position?.color || 'var(--brand-primary)'
+      const worker = shift.assignedUser
+      const assigneeName = worker
+        ? `${worker.fName || ''} ${worker.lName || ''}`.trim() || null
+        : null
+      const assigneePhoto = worker?.avatar_url || worker?.photo_url || null
       return {
         id: String(shift.shift_id),
         title,
         start,
         end,
-        backgroundColor: bgColor,
-        borderColor: borderClr,
-        textColor: isUnfilled ? '#333333' : '#ffffff',
         classNames: [
-          ...(selectedShift.value?.shift_id === shift.shift_id ? ['fc-shift-selected'] : []),
-          ...(isUnfilled ? ['fc-shift-unfilled'] : []),
-        ],
+          'schedule-event',
+          `schedule-event--${state}`,
+          selectedShift.value?.shift_id === shift.shift_id ? 'schedule-event--selected' : null,
+        ].filter(Boolean),
         extendedProps: {
           shift,
-          department,
-          isUnfilled,
-          posColor,
+          state,
+          positionColor,
+          assigneeName,
+          assigneePhoto,
         },
       }
     })
 })
 
-const onCalendarSelect = (selectInfo) => {
-  const start = selectInfo.start
-  const end = selectInfo.end
-  const isoDate = localDateStr(start)
-  const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
-  const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
-  openCreateDialog(isoDate, startTime, endTime)
-  getCalendarApi()?.unselect()
+// --- Event content renderer -----------------------------------------------
+const renderEventContent = (arg) => {
+  const { positionColor, state, assigneeName, assigneePhoto } = arg.event.extendedProps || {}
+
+  const body = document.createElement('div')
+  body.className = 'schedule-event__body'
+
+  const rail = document.createElement('span')
+  rail.className = 'schedule-event__rail'
+  rail.style.background = positionColor || 'var(--brand-primary)'
+  body.appendChild(rail)
+
+  const inner = document.createElement('div')
+  inner.className = 'schedule-event__inner'
+  body.appendChild(inner)
+
+  const title = document.createElement('div')
+  title.className = 'schedule-event__title'
+  title.textContent = arg.event.title || ''
+  inner.appendChild(title)
+
+  const time = document.createElement('div')
+  time.className = 'schedule-event__time'
+  time.textContent = arg.timeText || ''
+  inner.appendChild(time)
+
+  if (assigneeName) {
+    const assignee = document.createElement('div')
+    assignee.className = 'schedule-event__assignee'
+
+    const avatar = document.createElement('span')
+    avatar.className = 'schedule-event__avatar'
+    if (assigneePhoto) {
+      const img = document.createElement('img')
+      img.src = assigneePhoto
+      img.alt = assigneeName
+      avatar.appendChild(img)
+    } else {
+      avatar.textContent = assigneeName.trim().charAt(0).toUpperCase()
+    }
+    assignee.appendChild(avatar)
+
+    const name = document.createElement('span')
+    name.className = 'schedule-event__assignee-name'
+    name.textContent = assigneeName
+    assignee.appendChild(name)
+
+    inner.appendChild(assignee)
+  }
+
+  if (state === 'open') {
+    const badge = document.createElement('span')
+    badge.className = 'schedule-event__badge schedule-event__badge--open'
+    badge.textContent = 'Open'
+    body.appendChild(badge)
+  } else if (state === 'needs-coverage') {
+    const badge = document.createElement('span')
+    badge.className = 'schedule-event__badge schedule-event__badge--alert'
+    badge.textContent = 'Needs coverage'
+    body.appendChild(badge)
+  }
+
+  return { domNodes: [body] }
 }
 
+// --- Day cell hooks --------------------------------------------------------
+// Today column tint: flag today via a class so scoped CSS can apply
+// var(--brand-primary-lt). We also use this to render the empty-day
+// + Create shift affordance on hover.
+const dayHeaderClassNames = (arg) => {
+  const classes = ['schedule-day-header']
+  if (arg.isToday) classes.push('schedule-day-header--today')
+  return classes
+}
+
+const dayCellClassNames = (arg) => {
+  const classes = []
+  if (arg.isToday) classes.push('schedule-day-cell--today')
+  return classes
+}
+
+// --- Calendar options ------------------------------------------------------
 const calendarOptions = computed(() => ({
-  plugins: [timeGridPlugin, interactionPlugin],
-  initialView: 'timeGridWeek',
+  plugins: [timeGridPlugin, interactionPlugin, listPlugin],
+  initialView: currentView.value,
   initialDate: currentDate.value,
   headerToolbar: false,
   allDaySlot: false,
+  firstDay: 0,
   events: calendarEvents.value,
   slotMinTime: calendarHours.value.slotMinTime,
   slotMaxTime: calendarHours.value.slotMaxTime,
-  slotDuration: '00:15:00',
+  slotDuration: '00:30:00',
   slotLabelInterval: '01:00:00',
   snapDuration: '00:15:00',
   nowIndicator: true,
-  editable: false,
+  editable: true,
+  eventStartEditable: true,
+  eventDurationEditable: true,
   selectable: true,
   selectMirror: true,
   eventOverlap: true,
+  expandRows: true,
+  height: '100%',
   eventClick: onCalendarEventClick,
   select: onCalendarSelect,
+  eventDrop: onCalendarEventChange,
+  eventResize: onCalendarEventChange,
   datesSet: onCalendarDatesSet,
   eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-  dayHeaderFormat: { weekday: 'short' },
-  height: 760,
-  contentHeight: 700,
-  expandRows: true,
-  eventContent: (arg) => {
-    const shift = arg.event.extendedProps?.shift
-    const isUnfilled = arg.event.extendedProps?.isUnfilled
-    const positionName = shift?.position?.position_name || arg.event.title || 'Shift'
-    const worker = shift?.assignedUser
-    const workerName = worker
-      ? `${worker.fName || ''} ${worker.lName || ''}`.trim() || 'Worker'
-      : null
-
-    const container = document.createElement('div')
-    container.className = 'fc-event-custom'
-
-    const timeEl = document.createElement('div')
-    timeEl.className = 'fc-event-custom-time'
-    timeEl.textContent = arg.timeText
-    container.appendChild(timeEl)
-
-    const posEl = document.createElement('div')
-    posEl.className = 'fc-event-custom-position'
-    posEl.textContent = positionName
-    container.appendChild(posEl)
-
-    if (isUnfilled) {
-      const unfilledEl = document.createElement('div')
-      unfilledEl.className = 'fc-event-custom-unfilled'
-      unfilledEl.textContent = '⚠ UNFILLED'
-      container.appendChild(unfilledEl)
-    } else if (workerName) {
-      const workerEl = document.createElement('div')
-      workerEl.className = 'fc-event-custom-worker'
-      workerEl.textContent = workerName
-      container.appendChild(workerEl)
-    }
-
-    return { domNodes: [container] }
-  },
+  // "Mon 20" — weekday AND date.
+  dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+  dayHeaderClassNames,
+  dayCellClassNames,
+  eventContent: renderEventContent,
 }))
 
-const formatTime = (hour) => {
-  const normalizedHour = hour === 24 ? 0 : hour
-  const period = normalizedHour >= 12 ? 'PM' : 'AM'
-  const displayHour = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour
-  return `${displayHour}:00 ${period}`
-}
+watch(currentView, (view) => {
+  const api = getCalendarApi()
+  if (api && view) api.changeView(view)
+})
 
-const parseHour = (timeValue) => {
-  if (!timeValue || typeof timeValue !== 'string') return null
-  const [rawHour, rawMinute] = timeValue.split(':')
-  const hour = Number(rawHour)
-  const minute = Number(rawMinute || 0)
-  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
-  return hour + minute / 60
-}
-
+// --- Helpers ---------------------------------------------------------------
 const toMinutes = (timeValue) => {
   if (!timeValue) return null
   const [hour, minute] = String(timeValue).split(':').map(Number)
@@ -792,21 +914,15 @@ const parseTimeToParts = (timeValue) => {
   const minute = String(rawMinute || '00').padStart(2, '0')
   const period = hour24 >= 12 ? 'PM' : 'AM'
   const hour12 = hour24 % 12 || 12
-  return {
-    hour: String(hour12).padStart(2, '0'),
-    minute,
-    period,
-  }
+  return { hour: String(hour12).padStart(2, '0'), minute, period }
 }
 
 const partsToTime = (parts) => {
   const hour12 = Number(parts.hour)
   const minute = Number(parts.minute)
   if (Number.isNaN(hour12) || Number.isNaN(minute)) return ''
-
   let hour24 = hour12 % 12
   if (parts.period === 'PM') hour24 += 12
-
   return `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
@@ -823,9 +939,7 @@ const formatTimeDisplay = (timeValue) => {
 const normalizeDateInput = (dateValue) => {
   if (!dateValue) return ''
   const value = String(dateValue)
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
   return parsed.toISOString().slice(0, 10)
@@ -850,7 +964,7 @@ const normalizeUserId = (value) => {
 
 const pickCalendarBoundsFromHours = (hoursRows = []) => {
   const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time)
-  if (!valid.length) return { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+  if (!valid.length) return null
   const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort()
   const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort()
   return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] }
@@ -872,7 +986,6 @@ const getDepartmentHoursForDate = (dateValue) => {
 const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }) => {
   const dayHours = getDepartmentHoursForDate(shift_date)
   if (!dayHours || !dayHours.open_time || !dayHours.close_time) {
-    // Relaxed mode: allow shift operations when department hours are not configured.
     return { valid: true, message: '' }
   }
 
@@ -884,7 +997,7 @@ const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }
   if ([shiftStart, shiftEnd, openMins, closeMins].some((mins) => mins == null)) {
     return {
       valid: false,
-      message: 'Unable to validate shift hours. Please confirm start/end times and department hours.'
+      message: 'Unable to validate shift hours. Please confirm start/end times and department hours.',
     }
   }
 
@@ -892,7 +1005,7 @@ const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }
     const format = (timeValue) => formatTimeDisplay(String(timeValue).slice(0, 5))
     return {
       valid: false,
-      message: `Shift must be within department hours (${format(dayHours.open_time)} - ${format(dayHours.close_time)}).`
+      message: `Shift must be within department hours (${format(dayHours.open_time)} - ${format(dayHours.close_time)}).`,
     }
   }
 
@@ -938,7 +1051,6 @@ const scrollMinuteListToSelected = (listRef, selectedMinute) => {
     const container = listRef?.value
     if (!container) return
     const index = parseInt(selectedMinute, 10) || 0
-    // Each button is approximately 28px tall (small + mb-1)
     const itemHeight = 28
     const scrollTop = Math.max(0, index * itemHeight - container.clientHeight / 2 + itemHeight / 2)
     container.scrollTop = scrollTop
@@ -953,16 +1065,6 @@ watch(endTimeMenu, (val) => {
   if (val) scrollMinuteListToSelected(endMinuteListRef, endTimeParts.minute)
 })
 
-const getShiftDurationHours = (shift) => {
-  const start = parseHour(shift.start_time)
-  const end = parseHour(shift.end_time)
-  if (start == null || end == null) return 1
-
-  let duration = end - start
-  if (duration <= 0) duration += 24
-  return Math.max(1, duration)
-}
-
 const formatShiftTime = (startTime, endTime) => {
   const normalize = (timeValue) => {
     if (!timeValue) return ''
@@ -971,25 +1073,7 @@ const formatShiftTime = (startTime, endTime) => {
     date.setHours(Number(h || 0), Number(m || 0), 0, 0)
     return date.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' })
   }
-
   return `${normalize(startTime)} - ${normalize(endTime)}`
-}
-
-const getShiftsForCell = (isoDate, hour) => {
-  return shifts.value.filter((shift) => {
-    if (shift.shift_date !== isoDate) return false
-    const start = parseHour(shift.start_time)
-    if (start == null) return false
-    return Math.floor(start) === hour
-  })
-}
-
-const getShiftBlockStyle = (shift, idx) => {
-  const duration = getShiftDurationHours(shift)
-  return {
-    top: `${idx * 6}px`,
-    height: `calc(var(--calendar-hour-height) * ${duration} - 8px)`
-  }
 }
 
 const loadShiftTasks = async (shiftId) => {
@@ -1051,11 +1135,10 @@ const updateCalendarSize = async () => {
   getCalendarApi()?.updateSize()
 }
 
+// --- Calendar event handlers ----------------------------------------------
 const onCalendarEventClick = async (clickInfo) => {
   const shift = clickInfo?.event?.extendedProps?.shift
-  if (shift) {
-    await selectShift(shift)
-  }
+  if (shift) await selectShift(shift)
 }
 
 const onCalendarDatesSet = (arg) => {
@@ -1064,7 +1147,60 @@ const onCalendarDatesSet = (arg) => {
   }
 }
 
-// --- Create dialog helpers ---
+const onCalendarSelect = (selectInfo) => {
+  const start = selectInfo.start
+  const end = selectInfo.end
+  const isoDate = localDateStr(start)
+  const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+  const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+  openCreateDialog(isoDate, startTime, endTime)
+  getCalendarApi()?.unselect()
+}
+
+// Drag-to-move and drag-to-resize handler
+const onCalendarEventChange = async (info) => {
+  const shift = info?.event?.extendedProps?.shift
+  if (!shift) { info.revert?.(); return }
+  const start = info.event.start
+  const end = info.event.end
+  if (!start || !end) { info.revert?.(); return }
+
+  const isoDate = localDateStr(start)
+  const newStartTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+  const newEndTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+
+  const validation = validateShiftWithinDepartmentHours({
+    shift_date: isoDate,
+    start_time: newStartTime,
+    end_time: newEndTime,
+  })
+  if (!validation.valid) {
+    errorMessage.value = validation.message
+    showError.value = true
+    info.revert?.()
+    return
+  }
+
+  try {
+    rescheduling.value = true
+    await shiftService.updateShift(shift.shift_id, {
+      shift_date: isoDate,
+      start_time: newStartTime,
+      end_time: newEndTime,
+    })
+    successMessage.value = 'Shift rescheduled. The assigned worker has been notified.'
+    showSuccess.value = true
+    await loadShifts()
+  } catch (err) {
+    errorMessage.value = err?.response?.data?.message || 'Failed to reschedule shift'
+    showError.value = true
+    info.revert?.()
+  } finally {
+    rescheduling.value = false
+  }
+}
+
+// --- Create dialog helpers ------------------------------------------------
 const openCreateDialog = (isoDate = '', startTime = '', endTime = '') => {
   newShift.value = {
     department_id: currentDeptId,
@@ -1086,15 +1222,12 @@ const openCreateDialog = (isoDate = '', startTime = '', endTime = '') => {
 
 const closeCreateDialog = () => {
   showCreateDialog.value = false
-  isDragCreating.value = false
-  dragCreate.value = null
 }
 
 const onOpenShiftToggle = () => {
   if (newShift.value.post_as_open) {
     newShift.value.assigned_user_id = null
   }
-  // Clear stale validation messages after rule change
   nextTick(() => createFormRef.value?.resetValidation())
 }
 
@@ -1106,151 +1239,18 @@ const removeNewTask = (index) => {
   newShift.value.tasks.splice(index, 1)
 }
 
-// --- Drag-to-create ---
-const startDragCreate = (isoDate, hour, event) => {
-  if (event.target.closest && event.target.closest('.shift-block')) return
-  isDragCreating.value = true
-  const startMinute = Math.floor((event.offsetY || 0) / 15) * 15
-  dragCreate.value = { isoDate, startHour: hour, startMinute, currentHour: hour }
-}
-
-const continueDragCreate = (isoDate, hour) => {
-  if (!isDragCreating.value || !dragCreate.value) return
-  if (dragCreate.value.isoDate !== isoDate) return
-  dragCreate.value = { ...dragCreate.value, currentHour: hour }
-}
-
-const endDragCreate = () => {
-  if (!isDragCreating.value || !dragCreate.value) {
-    isDragCreating.value = false
-    dragCreate.value = null
-    return
-  }
-  const { isoDate, startHour, startMinute, currentHour } = dragCreate.value
-  const fromHour = Math.min(startHour, currentHour)
-  const toHour = Math.max(startHour, currentHour) + 1
-  isDragCreating.value = false
-  dragCreate.value = null
-  const startTime = `${String(fromHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`
-  const endHour = Math.min(toHour, 23)
-  const endTime = `${String(endHour).padStart(2, '0')}:00`
-  openCreateDialog(isoDate, startTime, endTime)
-}
-
-const isDragHighlight = (isoDate, hour) => {
-  if (!dragCreate.value || dragCreate.value.isoDate !== isoDate) return false
-  const minH = Math.min(dragCreate.value.startHour, dragCreate.value.currentHour)
-  const maxH = Math.max(dragCreate.value.startHour, dragCreate.value.currentHour)
-  return hour >= minH && hour <= maxH
-}
-
-const _fmtMins = (totalMins) => {
-  const clamped = Math.min(Math.max(totalMins, 0), 23 * 60)
-  const h = Math.floor(clamped / 60)
-  const m = clamped % 60
-  const period = h < 12 ? 'AM' : 'PM'
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
-  return `${h12}:${String(m).padStart(2, '0')} ${period}`
-}
-
-const getDragPreviewStyle = () => {
-  if (!dragCreate.value) return {}
-  const { startHour, startMinute, currentHour } = dragCreate.value
-  const fromHour = Math.min(startHour, currentHour)
-  const toHour = Math.max(startHour, currentHour) + 1
-  const FIRST_HOUR = 5 // timeSlots starts at hour 5
-  const top = (fromHour - FIRST_HOUR) * 60 + (fromHour === startHour ? startMinute : 0)
-  const height = Math.max(15, (toHour - FIRST_HOUR) * 60 - top)
-  return { top: `${top}px`, height: `${height}px` }
-}
-
-const getDragPreviewLabel = () => {
-  if (!dragCreate.value) return ''
-  const { startHour, startMinute, currentHour } = dragCreate.value
-  const fromHour = Math.min(startHour, currentHour)
-  const toHour = Math.max(startHour, currentHour) + 1
-  const startMins = fromHour * 60 + (fromHour === startHour ? startMinute : 0)
-  const endMins = Math.min(toHour, 23) * 60
-  return `${_fmtMins(startMins)} – ${_fmtMins(endMins)}`
-}
-
-// --- Drag-to-reschedule ---
-const onShiftDragStart = (shift, event) => {
-  draggingShift.value = shift
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', String(shift.shift_id))
-}
-
-const onShiftDragEnd = () => {
-  draggingShift.value = null
-  dragOverCell.value = null
-}
-
-const onShiftDragOver = (isoDate, hour) => {
-  if (!draggingShift.value) return
-  dragOverCell.value = { isoDate, hour }
-}
-
-const onShiftDrop = async (isoDate, hour) => {
-  const shift = draggingShift.value
-  draggingShift.value = null
-  dragOverCell.value = null
-  if (!shift) return
-  const oldStartMin = toMinutes(shift.start_time)
-  const oldEndMin = toMinutes(shift.end_time)
-  const duration = (oldEndMin != null && oldStartMin != null && oldEndMin > oldStartMin) ? (oldEndMin - oldStartMin) : 60
-  const newStartMin = hour * 60
-  const newEndMin = newStartMin + duration
-  const newStartTime = `${String(Math.floor(newStartMin / 60)).padStart(2, '0')}:${String(newStartMin % 60).padStart(2, '0')}`
-  const newEndTime = `${String(Math.min(Math.floor(newEndMin / 60), 23)).padStart(2, '0')}:${String(newEndMin % 60).padStart(2, '0')}`
-  if (shift.shift_date === isoDate && normalizeTimeInput(shift.start_time) === newStartTime) return
-
-  const validation = validateShiftWithinDepartmentHours({
-    shift_date: isoDate,
-    start_time: newStartTime,
-    end_time: newEndTime,
-  })
-  if (!validation.valid) {
-    errorMessage.value = validation.message
-    showError.value = true
-    return
-  }
-
-  try {
-    rescheduling.value = true
-    await shiftService.updateShift(shift.shift_id, {
-      shift_date: isoDate,
-      start_time: newStartTime,
-      end_time: newEndTime,
-    })
-    successMessage.value = 'Shift rescheduled. The assigned worker has been notified.'
-    showSuccess.value = true
-    await loadShifts()
-  } catch (err) {
-    errorMessage.value = err?.response?.data?.message || 'Failed to reschedule shift'
-    showError.value = true
-  } finally {
-    rescheduling.value = false
-  }
-}
-
-const previousWeek = () => {
+// --- Nav controls ----------------------------------------------------------
+const previousPeriod = () => {
   const api = getCalendarApi()
-  if (api) {
-    api.prev()
-    return
-  }
+  if (api) { api.prev(); return }
   const nextDate = new Date(currentDate.value)
   nextDate.setDate(nextDate.getDate() - 7)
   currentDate.value = nextDate
 }
 
-const nextWeek = () => {
+const nextPeriod = () => {
   const api = getCalendarApi()
-  if (api) {
-    api.next()
-    return
-  }
+  if (api) { api.next(); return }
   const nextDate = new Date(currentDate.value)
   nextDate.setDate(nextDate.getDate() + 7)
   currentDate.value = nextDate
@@ -1258,25 +1258,15 @@ const nextWeek = () => {
 
 const goToToday = () => {
   const api = getCalendarApi()
-  if (api) {
-    api.today()
-    return
-  }
+  if (api) { api.today(); return }
   currentDate.value = new Date()
 }
 
-const openAddToSchedule = () => {
-  if (!selectedShift.value) {
-    errorMessage.value = 'Select a shift first, then click Add to Schedule.'
-    showError.value = true
-    return
-  }
-  showAssignDialog.value = true
-}
-
+// --- Data loading ----------------------------------------------------------
 const loadDepartmentCalendarHours = async () => {
   if (!currentDeptId) {
-    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    calendarHours.value = { slotMinTime: '06:00:00', slotMaxTime: '23:00:00' }
+    calendarHoursSource.value = 'fallback'
     departmentHoursByDay.value = {}
     return
   }
@@ -1284,14 +1274,22 @@ const loadDepartmentCalendarHours = async () => {
   try {
     const response = await departmentServices.getDepartmentHours(currentDeptId)
     const rows = response?.data?.data || []
-    calendarHours.value = pickCalendarBoundsFromHours(rows)
+    const bounds = pickCalendarBoundsFromHours(rows)
+    if (bounds) {
+      calendarHours.value = bounds
+      calendarHoursSource.value = 'department'
+    } else {
+      calendarHours.value = { slotMinTime: '06:00:00', slotMaxTime: '23:00:00' }
+      calendarHoursSource.value = 'fallback'
+    }
     departmentHoursByDay.value = rows.reduce((acc, row) => {
       const day = Number(row?.day_of_week)
       if (!Number.isNaN(day)) acc[day] = row
       return acc
     }, {})
   } catch {
-    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    calendarHours.value = { slotMinTime: '06:00:00', slotMaxTime: '23:00:00' }
+    calendarHoursSource.value = 'fallback'
     departmentHoursByDay.value = {}
   }
 }
@@ -1346,8 +1344,7 @@ const loadDepartmentWorkers = async () => {
 
 const loadDepartments = async () => {
   try {
-    const response = await apiClient.get('/departments')
-    departments.value = response?.data?.data || []
+    await apiClient.get('/departments')
   } catch (error) {
     console.error('Error loading departments:', error)
   }
@@ -1399,8 +1396,7 @@ const createShift = async () => {
     const createdShift = response.data
     const warningMessage = createdShift?.warning_message || ''
 
-    // Create tasks if any were added
-    const validTasks = newShift.value.tasks.filter(t => String(t.task_name || '').trim())
+    const validTasks = newShift.value.tasks.filter((t) => String(t.task_name || '').trim())
     if (validTasks.length > 0) {
       const shiftId = createdShift?.shift_id || createdShift?.data?.shift_id
       if (shiftId) {
@@ -1412,8 +1408,8 @@ const createShift = async () => {
               sortOrder: i + 1,
               isRequired: true,
               status: 'pending',
-            })
-          )
+            }),
+          ),
         )
       }
     }
@@ -1502,7 +1498,6 @@ const saveShiftEdits = async () => {
 
 const deleteSelectedShift = async () => {
   if (!editShift.value.shift_id) return
-
   try {
     deleting.value = true
     await shiftService.deleteShift(editShift.value.shift_id)
@@ -1557,11 +1552,15 @@ onMounted(async () => {
     Utils.removeItem('managerScheduleToast')
   }
 
+  const currentUser = Utils.getStore('currentUser') || Utils.getStore('user') || {}
+  currentUserId.value = currentUser?.id || currentUser?.user_id || null
+
   await Promise.all([
     loadDepartmentCalendarHours(),
     loadShifts(),
     loadPositions(),
-    loadDepartmentWorkers()
+    loadDepartmentWorkers(),
+    loadDepartments(),
   ])
 
   await updateCalendarSize()
@@ -1573,50 +1572,262 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.schedule-container,
-.schedule-container * {
-  box-sizing: border-box;
+/* ---- Page-level wiring ------------------------------------------------- */
+.schedule-view-toggle {
+  margin-left: var(--space-1);
 }
 
-.schedule-container {
-  padding: 20px;
-  background-color: #fafafa;
+.schedule-nav-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+}
+
+.schedule-today-btn {
+  min-width: 80px;
+}
+
+/* ---- Filter bar -------------------------------------------------------- */
+.schedule-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.schedule-filter-positions {
+  min-width: 240px;
+  max-width: 360px;
+}
+
+.schedule-filter-switch {
+  margin-left: auto;
+}
+
+.schedule-selected-note {
+  color: var(--text-2);
+  flex-basis: 100%;
+}
+
+/* ---- Calendar wrap ----------------------------------------------------- */
+.schedule-calendar-wrap {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-height: 720px;
+  height: 760px;
+}
+
+.schedule-loading-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  flex: 1;
+}
+
+/* ---- FullCalendar theme overrides -------------------------------------- */
+.schedule-calendar-wrap :deep(.fc) {
+  --fc-border-color: var(--border-1);
+  --fc-page-bg-color: var(--surface-0);
+  --fc-neutral-bg-color: var(--surface-1);
+  --fc-now-indicator-color: var(--brand-primary);
+  /* Today-column tint: subtle, surface-level; spec calls for brand-primary-lt. */
+  --fc-today-bg-color: var(--brand-primary-lt);
+  font-family: var(--font-sans);
+  height: 100%;
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
+  font-size: var(--type-meta-size);
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 8px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.schedule-calendar-wrap :deep(.fc .schedule-day-header--today .fc-col-header-cell-cushion) {
+  color: var(--brand-primary);
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-slot-label-cushion),
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-axis-cushion) {
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--text-3);
+}
+
+/* Selection mirror uses brand primary — token-based. */
+.schedule-calendar-wrap :deep(.fc .fc-highlight) {
+  background-color: var(--brand-primary-lt);
+}
+
+/* ---- Event presentation ----------------------------------------------- */
+.schedule-calendar-wrap :deep(.fc-event.schedule-event) {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+}
+
+.schedule-calendar-wrap :deep(.fc-event.schedule-event--selected) {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -1px;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event .fc-event-main) {
+  padding: 0;
+  color: var(--text-1);
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__body) {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 4px 28px 4px 0;
+  height: 100%;
+  min-height: 28px;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__rail) {
+  flex: 0 0 4px;
+  width: 4px;
   min-height: 100%;
+  background: var(--brand-primary);
+  border-top-left-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__inner) {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  padding: 2px 0;
 }
 
-.calendar-header {
+.schedule-calendar-wrap :deep(.schedule-event__title) {
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__time) {
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+  color: var(--text-2);
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__assignee) {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  gap: 12px;
-}
-
-.month-year {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
-}
-
-.selected-shift-note {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.header-controls {
-  display: flex;
-  gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 6px;
+  font-size: var(--type-meta-size);
+  color: var(--text-2);
+  overflow: hidden;
 }
 
+.schedule-calendar-wrap :deep(.schedule-event__avatar) {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__avatar img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__assignee-name) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- State badges (top-right) ----------------------------------------- */
+.schedule-calendar-wrap :deep(.schedule-event__badge) {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__badge--open) {
+  color: var(--text-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__badge--alert) {
+  color: var(--surface-0);
+  background: var(--state-alert);
+  border: 1px solid var(--state-alert);
+}
+
+/* ---- Empty-day "+ Create shift" affordance ---------------------------- */
+/* Renders on hover over any empty day-cell; delegates to the calendar
+   select flow by letting FullCalendar's built-in dateClick fire naturally. */
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-col) {
+  position: relative;
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-col-frame)::after {
+  content: "+ Create shift";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--type-meta-size);
+  font-weight: 500;
+  color: var(--text-3);
+  background: var(--surface-0);
+  border: 1px dashed var(--border-1);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-col:hover .fc-timegrid-col-frame)::after {
+  opacity: 0.85;
+}
+
+/* Hide affordance if the column actually has events (non-empty day). */
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-col:has(.fc-event) .fc-timegrid-col-frame)::after {
+  content: none;
+}
+
+/* ---- Dialog support styles (tasks, time picker) ----------------------- */
 .time-picker-card {
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--border-1);
 }
 
 .time-picker-grid {
@@ -1633,16 +1844,16 @@ onMounted(async () => {
 .time-picker-col-title {
   position: sticky;
   top: 0;
-  background: #fff;
-  font-size: 12px;
-  color: #667085;
+  background: var(--surface-0);
+  font-size: var(--type-meta-size);
+  color: var(--text-2);
   padding-bottom: 6px;
 }
 
 .time-picker-col-hour {
   overflow-y: auto;
   padding-right: 8px;
-  border-right: 1px solid #e4e7ec;
+  border-right: 1px solid var(--border-1);
 }
 
 .time-picker-col-fixed {
@@ -1661,185 +1872,9 @@ onMounted(async () => {
   margin-top: 8px;
 }
 
-.nav-btn {
-  border-color: #e0e0e0;
-  color: #666;
-}
-
-.today-btn {
-  background-color: #8B1538;
-  color: white;
-}
-
-.greeting-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.greeting-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #333;
-  margin: 0;
-}
-
-.greeting-date {
-  font-size: 18px;
-  font-weight: 500;
-  color: #64748b;
-  margin: 0;
-  text-align: right;
-}
-
-.calendar-scroll-container {
-  flex: 1;
-  min-height: 740px;
-}
-
-.calendar-container {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: visible;
-}
-
-.fullcalendar-wrap {
-  padding: 8px 10px 12px;
-  min-height: 760px;
-}
-
-.fullcalendar-wrap :deep(.fc) {
-  --fc-border-color: #e5e7eb;
-  --fc-page-bg-color: #ffffff;
-  --fc-neutral-bg-color: #fafafa;
-  --fc-today-bg-color: #f8e6ea;
-  height: 740px;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-event) {
-  border-radius: 6px;
-  padding: 2px 4px;
-  font-size: 12px;
-  border-width: 2px;
-  border-style: solid;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-event.fc-shift-unfilled) {
-  border-style: dashed;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-event.fc-shift-selected) {
-  border-color: #00c853;
-  box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
-}
-
-.fullcalendar-wrap :deep(.fc-event-custom) {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 1px 2px;
-  height: 100%;
-  overflow: hidden;
-}
-
-.fullcalendar-wrap :deep(.fc-event-custom-time) {
-  font-size: 10px;
-  opacity: 0.85;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.fullcalendar-wrap :deep(.fc-event-custom-position) {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.fullcalendar-wrap :deep(.fc-event-custom-worker) {
-  font-size: 11px;
-  opacity: 0.9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.fullcalendar-wrap :deep(.fc-event-custom-unfilled) {
-  font-size: 11px;
-  font-weight: 700;
-  color: #b45309;
-  white-space: nowrap;
-}
-
-.fullcalendar-wrap :deep(.fc .fc-highlight) {
-  background-color: rgba(139, 21, 56, 0.15);
-}
-
-.fullcalendar-wrap :deep(.fc .fc-event.fc-mirror) {
-  background-color: rgba(139, 21, 56, 0.7);
-  border-color: #8B1538;
-  opacity: 0.85;
-}
-
-/* Legend */
-.position-legend {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-  padding: 8px 14px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-}
-
-.legend-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-  white-space: nowrap;
-}
-
-.legend-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.legend-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.legend-swatch-unfilled {
-  background-color: rgba(139, 21, 56, 0.35);
-  border: 2px dashed #8B1538;
-}
-
-.legend-text {
-  font-size: 12px;
-  color: #374151;
-  white-space: nowrap;
-}
-
 .tasks-section {
-  border: 1px solid #e3e5e8;
-  border-radius: 12px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
   padding: 12px;
 }
 
@@ -1855,11 +1890,11 @@ onMounted(async () => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .empty-tasks {
-  color: #667085;
+  color: var(--text-3);
   font-size: 14px;
 }
 
@@ -1870,32 +1905,14 @@ onMounted(async () => {
   margin-top: 8px;
 }
 
-.loading-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex: 1;
-}
-
 @media (max-width: 900px) {
-  .calendar-header {
+  .schedule-filters {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .header-controls {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 768px) {
-  .greeting-banner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .greeting-date {
-    text-align: left;
+  .schedule-filter-switch {
+    margin-left: 0;
   }
 }
 </style>

@@ -92,6 +92,27 @@
       </div>
     </template>
 
+    <div v-if="positionsWithColor.length > 0" class="schedule-legend">
+      <span class="schedule-legend__label">Key:</span>
+      <div class="schedule-legend__items">
+        <div
+          v-for="pos in positionsWithColor"
+          :key="pos.position_id"
+          class="schedule-legend__item"
+        >
+          <span
+            class="schedule-legend__swatch"
+            :style="{ backgroundColor: getPositionColor(pos) }"
+          ></span>
+          <span class="schedule-legend__text">{{ pos.position_name }}</span>
+        </div>
+        <div class="schedule-legend__item">
+          <span class="schedule-legend__swatch schedule-legend__swatch--unfilled"></span>
+          <span class="schedule-legend__text">Unfilled</span>
+        </div>
+      </div>
+    </div>
+
     <div v-if="!shiftsLoading" class="schedule-calendar-wrap">
       <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
     </div>
@@ -741,12 +762,57 @@ const filteredShifts = computed(() => {
   })
 })
 
+// --- Position color resolver ----------------------------------------------
+// Each position carries an optional hex color (set via the Position settings
+// UI). When missing, we hash the position_id into a fallback palette so each
+// position still gets a stable, distinct color across sessions.
+const FALLBACK_POSITION_COLORS = [
+  '#811429', // maroon (brand)
+  '#2E7D32', // green
+  '#1565C0', // blue
+  '#6A1B9A', // purple
+  '#EF6C00', // orange
+  '#00838F', // teal
+  '#AD1457', // pink
+  '#4E342E', // brown
+]
+
+const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
+
+const getPositionColor = (position) => {
+  const raw = position?.color
+  if (typeof raw === 'string' && HEX_COLOR_RE.test(raw.trim())) {
+    return raw.trim()
+  }
+  const id = position?.position_id ?? position?.id
+  const n = Number(id)
+  if (!Number.isFinite(n)) return FALLBACK_POSITION_COLORS[0]
+  const idx = ((n % FALLBACK_POSITION_COLORS.length) + FALLBACK_POSITION_COLORS.length)
+    % FALLBACK_POSITION_COLORS.length
+  return FALLBACK_POSITION_COLORS[idx]
+}
+
+// Positions relevant to the current shift list, deduped + sorted, for the
+// Key legend above the calendar.
+const positionsWithColor = computed(() => {
+  const byId = new Map()
+  for (const shift of shifts.value) {
+    const p = shift?.position
+    if (!p) continue
+    const id = p.position_id ?? p.id
+    if (id == null || byId.has(String(id))) continue
+    byId.set(String(id), p)
+  }
+  return Array.from(byId.values()).sort((a, b) =>
+    String(a.position_name || '').localeCompare(String(b.position_name || ''))
+  )
+})
+
 // --- FullCalendar events ---------------------------------------------------
-// Events are colored entirely via CSS modifier classes
-// (.schedule-event--filled / --open / --needs-coverage). No per-position
-// color is applied — we follow the student dashboard's 3-color rule:
-// filled = neutral white card + maroon left rail, unfilled = amber tint +
-// amber left rail. See the CSS block below for the state-driven styling.
+// Filled shifts render as SOLID per-position color cards with white text —
+// this restores the old hand-rolled grid's color-coded look. Open /
+// needs-coverage stay on the amber pastel treatment so unfilled shifts
+// remain visually distinct from filled ones regardless of position.
 const calendarEvents = computed(() => {
   return filteredShifts.value
     .filter((shift) => !!shift.shift_date)
@@ -761,11 +827,18 @@ const calendarEvents = computed(() => {
         : null
       const assigneePhoto = worker?.avatar_url || worker?.photo_url || null
       const departmentName = shift.department?.department_name || null
+      const positionColor = getPositionColor(shift.position)
+      const isFilled = state === 'filled'
       return {
         id: String(shift.shift_id),
         title,
         start,
         end,
+        // Solid fill for filled shifts; transparent for open/needs-coverage
+        // (state CSS paints the amber pastel body).
+        backgroundColor: isFilled ? positionColor : 'transparent',
+        borderColor: positionColor,
+        textColor: isFilled ? '#ffffff' : undefined,
         classNames: [
           'schedule-event',
           `schedule-event--${state}`,
@@ -777,6 +850,7 @@ const calendarEvents = computed(() => {
           assigneeName,
           assigneePhoto,
           departmentName,
+          positionColor,
         },
       }
     })
@@ -1622,6 +1696,59 @@ onMounted(async () => {
   flex-basis: 100%;
 }
 
+/* ---- Key legend ------------------------------------------------------- */
+/* Horizontal row of position colors (+ Unfilled) shown above the calendar
+   so managers can decode the per-position color coding at a glance. */
+.schedule-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: var(--space-2);
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+}
+
+.schedule-legend__label {
+  font-size: var(--type-meta-size);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schedule-legend__items {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.schedule-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--type-meta-size);
+  color: var(--text-1);
+}
+
+.schedule-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* "Unfilled" swatch mirrors the amber pastel of open/needs-coverage shifts. */
+.schedule-legend__swatch--unfilled {
+  background: var(--block-off-bg);
+  box-shadow: none;
+  border: 1px dashed var(--state-break);
+}
+
 /* ---- Calendar wrap ----------------------------------------------------- */
 .schedule-calendar-wrap {
   background: var(--surface-0);
@@ -1700,13 +1827,14 @@ onMounted(async () => {
 }
 
 /* ---- Event presentation -----------------------------------------------
-   3-color rule (mirrors student dashboard):
-   - Filled shifts   → white card, dark text, hairline border, 3px maroon
-                       left rail, subtle shadow.
-   - Open / needs-coverage → amber-tinted body, dark text, 3px amber left
-                       rail, dashed amber border, status pill top-right.
-   - Selected        → 2px solid maroon outline (outline-offset: -2px).
-   No per-position colors anywhere. */
+   Per-position color rule (Manager Schedule only — Dashboard / Student /
+   Availability grids still follow the 3-color pastel discipline):
+   - Filled shifts   → SOLID per-position color, white text, no left rail
+                       (the whole card IS the color). Background is set
+                       inline by FullCalendar from event.backgroundColor.
+   - Open / needs-coverage → amber pastel body, dark text, dashed amber
+                       border, amber left rail, status pill top-right.
+   - Selected        → 2px solid maroon outline (outline-offset: -2px). */
 .schedule-calendar-wrap :deep(.fc-event.schedule-event) {
   border: none;
   border-radius: var(--radius-sm);
@@ -1714,16 +1842,16 @@ onMounted(async () => {
   overflow: hidden;
   box-shadow: var(--shadow-1);
   cursor: pointer;
-  background: transparent;
   /* Keep event cards above the today-column tint
      (--fc-today-bg-color paints the column body). */
   position: relative;
   z-index: 1;
 }
 
+/* Filled: FullCalendar paints the solid position color inline on the outer
+   event; we just make sure inner text is white. */
 .schedule-calendar-wrap :deep(.fc-event.schedule-event--filled) {
-  background: var(--surface-0);
-  color: var(--text-1);
+  color: #ffffff;
 }
 
 .schedule-calendar-wrap
@@ -1759,32 +1887,21 @@ onMounted(async () => {
   border-radius: var(--radius-sm);
 }
 
-/* Left accent rail (3px) driven by state. */
-.schedule-calendar-wrap :deep(.schedule-event__body)::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-  background: var(--brand-primary);
-}
-
+/* Filled blocks are solid color end-to-end — no left rail, no hairline
+   border. Padding drops back to symmetric so text starts flush. */
 .schedule-calendar-wrap
   :deep(.schedule-event--filled .schedule-event__body) {
-  border: 1px solid var(--border-1);
-  /* Explicit opaque white on the innermost card so the today-column tint
-     (--brand-primary-lt on .fc-day-today) never bleeds through. */
-  background: var(--surface-0);
+  padding: 7px 10px;
+  border: none;
 }
 
+/* Open / needs-coverage keep the pastel body + amber rail + dashed border
+   treatment so unfilled shifts stay instantly recognizable. */
 .schedule-calendar-wrap
   :deep(.schedule-event--open .schedule-event__body),
 .schedule-calendar-wrap
   :deep(.schedule-event--needs-coverage .schedule-event__body) {
-  /* Derived from --block-off-fg (#9CA3AF) at 50% alpha. */
-  border: 1px dashed rgba(156, 163, 175, 0.5);
+  border: 1px dashed var(--state-break);
   background: var(--block-off-bg);
 }
 
@@ -1792,7 +1909,34 @@ onMounted(async () => {
   :deep(.schedule-event--open .schedule-event__body)::before,
 .schedule-calendar-wrap
   :deep(.schedule-event--needs-coverage .schedule-event__body)::before {
-  background: var(--block-off-fg);
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--state-break);
+}
+
+/* Filled-card text — white across the whole stack so it reads against the
+   saturated position color. */
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__time),
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__title),
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__sub),
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__sub-text) {
+  color: #ffffff;
+}
+
+/* Avatar bubble on a colored card: translucent white. */
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__avatar) {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
 }
 
 /* Title is the prominent line — bold, primary-text color. */

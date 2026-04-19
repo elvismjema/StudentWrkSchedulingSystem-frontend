@@ -136,7 +136,7 @@ const icon = computed(() => {
 });
 
 const iconColor = computed(() =>
-  (props.clockedIn || props.onBreak) ? 'white' : '#757575'
+  (props.clockedIn || props.onBreak) ? 'white' : undefined
 );
 
 const label = computed(() => {
@@ -166,16 +166,16 @@ const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'wh
   gap: 8px;
 }
 .clock-banner--active {
-  background: #2E7D32;
+  background: var(--state-active);
   color: white;
 }
 .clock-banner--break {
-  background: #E65100;
+  background: var(--state-break);
   color: white;
 }
 .clock-banner--idle {
-  background: #f5f5f5;
-  color: #616161;
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 .clock-banner__content {
   display: flex;

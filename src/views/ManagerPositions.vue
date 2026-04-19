@@ -2,7 +2,7 @@
   <div class="positions-page">
     <div class="page-header">
       <h1 class="page-title">Department Positions</h1>
-      <v-btn color="#8B1538" variant="outlined" prepend-icon="mdi-plus" @click="createPositionModal.open = true">
+      <v-btn color="primary" variant="outlined" prepend-icon="mdi-plus" @click="createPositionModal.open = true">
         Create Position
       </v-btn>
     </div>
@@ -12,12 +12,12 @@
     </v-alert>
 
     <div v-if="loading" class="loading-container">
-      <v-progress-circular indeterminate color="#8B1538" size="40" />
+      <v-progress-circular indeterminate color="primary" size="40" />
       <p class="loading-text">Loading positions...</p>
     </div>
 
     <div v-else-if="positions.length === 0" class="empty-state">
-      <v-icon size="48" color="#667085">mdi-briefcase-outline</v-icon>
+      <v-icon size="48" color="text-2">mdi-briefcase-outline</v-icon>
       <h3 class="empty-title">No positions yet</h3>
       <p class="empty-subtitle">Create your first position for this department.</p>
     </div>
@@ -35,7 +35,7 @@
               <h3 class="position-name">{{ position.position_name }}</h3>
             </div>
             <div class="position-actions">
-              <v-btn size="small" variant="text" color="#8B1538" @click="openEditPosition(position)">
+              <v-btn size="small" variant="text" color="primary" @click="openEditPosition(position)">
                 <v-icon>mdi-pencil</v-icon>
               </v-btn>
               <v-btn size="small" variant="text" color="error" :disabled="position.workerCount > 0" @click="confirmDeletePosition(position)">
@@ -65,7 +65,7 @@
     <v-dialog v-model="editPositionModal.open" max-width="500px">
       <v-card>
         <v-card-title class="d-flex align-center gap-2 pa-5 pb-3">
-          <v-icon color="#8B1538" start>mdi-pencil</v-icon>
+          <v-icon color="primary" start>mdi-pencil</v-icon>
           Edit Position
         </v-card-title>
         <v-divider />
@@ -89,7 +89,7 @@
           <v-checkbox
             v-model="editPositionModal.form.is_critical"
             label="Critical Position"
-            color="#8B1538"
+            color="primary"
             hide-details
             class="mb-4"
           />
@@ -102,11 +102,11 @@
               <input
                 type="color"
                 class="color-input"
-                :value="editPositionModal.form.color || '#8B1538'"
+                :value="editPositionModal.form.color || DEFAULT_POSITION_COLOR"
                 @input="editPositionModal.form.color = $event.target.value"
               />
-              <span class="color-preview-swatch" :style="{ backgroundColor: editPositionModal.form.color || '#8B1538' }"></span>
-              <span class="color-hex-label">{{ editPositionModal.form.color || '#8B1538' }}</span>
+              <span class="color-preview-swatch" :style="{ backgroundColor: editPositionModal.form.color || DEFAULT_POSITION_COLOR }"></span>
+              <span class="color-hex-label">{{ editPositionModal.form.color || DEFAULT_POSITION_COLOR }}</span>
               <v-btn size="small" variant="text" @click="editPositionModal.form.color = null">Reset</v-btn>
             </div>
           </div>
@@ -114,7 +114,7 @@
         <v-card-actions class="pa-5 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="editPositionModal.open = false">Cancel</v-btn>
-          <v-btn color="#8B1538" variant="elevated" :loading="editPositionModal.saving" @click="saveEditPosition">
+          <v-btn color="primary" variant="elevated" :loading="editPositionModal.saving" @click="saveEditPosition">
             Save Changes
           </v-btn>
         </v-card-actions>
@@ -153,6 +153,13 @@ import { onMounted, reactive, ref } from "vue";
 import apiClient from "../services/services.js";
 import Utils from "../config/utils.js";
 import CreatePositionModal from "../components/CreatePositionModal.vue";
+
+// Default swatch for the position color picker. Mirrors --brand-primary from
+// src/styles/tokens.css; the native <input type="color"> needs a literal hex
+// string, so we cannot reference the CSS variable here.
+// TODO: audit color intent — consider reading from getComputedStyle(:root)
+// at mount so this stays in sync with the token if brand-primary changes.
+const DEFAULT_POSITION_COLOR = "#80162B"; /* brand-primary */
 
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 
@@ -302,7 +309,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 42px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .loading-container {
@@ -315,7 +322,7 @@ onMounted(async () => {
 
 .loading-text {
   margin-top: 12px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .empty-state {
@@ -326,12 +333,12 @@ onMounted(async () => {
 .empty-title {
   margin: 16px 0 8px;
   font-size: 20px;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .empty-subtitle {
   margin: 0;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .positions-grid {
@@ -341,7 +348,7 @@ onMounted(async () => {
 }
 
 .position-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 16px;
 }
 
@@ -361,12 +368,12 @@ onMounted(async () => {
   font-size: 42px;
   line-height: 1;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .position-description {
   margin: 0 0 14px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -377,7 +384,7 @@ onMounted(async () => {
 }
 
 .worker-count {
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -404,7 +411,7 @@ onMounted(async () => {
 
 /* Color picker in edit dialog */
 .color-picker-section {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 10px;
   padding: 14px 16px;
 }
@@ -412,13 +419,13 @@ onMounted(async () => {
 .color-picker-label {
   font-size: 14px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
   margin-bottom: 4px;
 }
 
 .color-picker-hint {
   font-size: 12px;
-  color: #667085;
+  color: var(--text-2);
   margin: 0 0 10px;
 }
 
@@ -431,7 +438,7 @@ onMounted(async () => {
 .color-input {
   width: 44px;
   height: 36px;
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 6px;
   padding: 2px;
   cursor: pointer;
@@ -449,7 +456,7 @@ onMounted(async () => {
 .color-hex-label {
   font-size: 13px;
   font-family: monospace;
-  color: #374151;
+  color: var(--text-2);
 }
 
 @media (max-width: 768px) {

@@ -156,14 +156,19 @@ const handleNotificationClick = (notification) => {
 
 const toggleSidebar = () => {
   emit('toggle-sidebar');
-}hamburger-btn {
-  margin-right:['toggle-sidebar']);
+};
+
+const emit = defineEmits(['toggle-sidebar']);
 </script>
 
 <style scoped>
 .manager-top-bar {
   border-bottom: 1px solid var(--border-1);
   padding: 0 var(--space-2);
+}
+
+.hamburger-btn {
+  margin-right: var(--space-2);
 }
 
 .top-actions {

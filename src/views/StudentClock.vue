@@ -70,7 +70,7 @@
         <v-btn
           v-if="!clockedIn"
           size="x-large"
-          color="success"
+          color="primary"
           variant="flat"
           rounded="pill"
           :disabled="!canClockIn"
@@ -120,7 +120,7 @@
           <!-- #5: End Break with confirmation -->
           <v-btn
             v-else
-            color="success"
+            color="primary"
             variant="flat"
             rounded="pill"
             :size="mobile ? 'x-large' : 'default'"
@@ -247,7 +247,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockInDialog = false">Cancel</v-btn>
-          <v-btn color="success" variant="flat" :loading="clockingIn" @click="doClockIn">Clock In</v-btn>
+          <v-btn color="primary" variant="flat" :loading="clockingIn" @click="doClockIn">Clock In</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -296,7 +296,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="endBreakDialog = false">Cancel</v-btn>
-          <v-btn color="success" variant="flat" :loading="breakLoading" @click="doEndBreak">End Break</v-btn>
+          <v-btn color="primary" variant="flat" :loading="breakLoading" @click="doEndBreak">End Break</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -348,12 +348,17 @@ onMounted(()    => { ticker = setInterval(() => { now.value = Date.now(); }, 100
 onUnmounted(()  => { clearInterval(ticker); });
 
 // ── #1: Inline status display helpers ────────────────────────────────────────
+// Maroon-family palette (matches oc.edu brand + student app tokens):
+//   clocked in   → primary maroon (active/alive feel)
+//   on break     → amber-family neutral (break signal retained)
+//   idle / next  → light maroon tint so the countdown card blends
+//                  with the rest of the student app.
 const statusBg = computed(() => {
-  if (onBreak.value)   return '#E65100';
-  if (clockedIn.value) return '#2E7D32';
-  return '#f5f5f5';
+  if (onBreak.value)   return '#C67B3C';
+  if (clockedIn.value) return '#811429';
+  return '#F8ECEE';
 });
-const statusFg = computed(() => (clockedIn.value || onBreak.value) ? 'white' : '#616161');
+const statusFg = computed(() => (clockedIn.value || onBreak.value) ? 'white' : '#48111C');
 const statusIcon = computed(() => {
   if (onBreak.value)   return 'mdi-coffee-outline';
   if (clockedIn.value) return 'mdi-clock-check-outline';

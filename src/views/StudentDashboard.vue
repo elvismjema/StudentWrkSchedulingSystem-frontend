@@ -77,32 +77,32 @@
       <template v-else>
         <!-- ── Next Shift (priority 2) ───────────────────── -->
         <div class="home-section">
-          <div class="section-eyebrow">{{ nextShiftLabel || 'NEXT SHIFT' }}</div>
+          <div class="section-eyebrow">{{ (nextShiftLabel || 'Up Next').toUpperCase() }}</div>
           <div
             v-if="nextShift"
             class="shift-hero-card"
           >
-            <div class="shift-hero-accent" :style="{ background: nextShiftColor }"></div>
             <div class="shift-hero-body">
-              <div class="shift-hero-dept">
-                {{ nextShift.department_name || nextShift.department?.department_name || 'Shift' }}
+              <div class="shift-hero-date" aria-hidden="true">
+                <div class="shift-hero-date__month">{{ nextShiftMonth }}</div>
+                <div class="shift-hero-date__day">{{ nextShiftDay }}</div>
               </div>
-              <div class="shift-hero-meta">
-                <v-icon size="13" class="mr-1">mdi-calendar-outline</v-icon>
-                {{ formatShiftDate(nextShift) }}
+              <div class="shift-hero-info">
+                <div class="shift-hero-dept">
+                  {{ nextShift.department_name || nextShift.department?.department_name || 'Shift' }}
+                </div>
+                <div class="shift-hero-subtitle">
+                  {{ nextShiftWeekday }} &middot; {{ formatTimeRange(nextShift) }}
+                </div>
+                <div v-if="nextShiftPosition" class="shift-hero-position">
+                  <v-icon size="13" class="mr-1">mdi-badge-account-outline</v-icon>
+                  {{ nextShiftPosition }}
+                </div>
+                <button class="shift-hero-cta" @click="openSwapDialog(nextShift)">
+                  <v-icon size="15" class="mr-1">mdi-account-switch</v-icon>
+                  Request Cover
+                </button>
               </div>
-              <div class="shift-hero-meta">
-                <v-icon size="13" class="mr-1">mdi-clock-outline</v-icon>
-                {{ formatTimeRange(nextShift) }}
-              </div>
-              <div v-if="nextShiftPosition" class="shift-hero-meta">
-                <v-icon size="13" class="mr-1">mdi-badge-account-outline</v-icon>
-                {{ nextShiftPosition }}
-              </div>
-              <button class="shift-hero-cta" @click="openSwapDialog(nextShift)">
-                <v-icon size="15" class="mr-1">mdi-account-switch</v-icon>
-                Request Cover
-              </button>
             </div>
           </div>
           <div v-else class="empty-card">
@@ -288,22 +288,32 @@
 
       <template v-else>
         <!-- Next Shift (desktop) -->
-        <v-card v-if="nextShift" class="next-shift-card mb-6" elevation="0" rounded="lg" border>
-          <div class="next-shift-card__bar" :style="{ backgroundColor: nextShiftColor }"></div>
-          <div class="pa-5 flex-grow-1">
-            <v-chip size="x-small" color="primary" variant="tonal" class="mb-2">{{ nextShiftLabel }}</v-chip>
-            <div class="text-h6 font-weight-bold mb-1">{{ nextShift.department_name || nextShift.department?.department_name || 'Shift' }}</div>
-            <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1"><v-icon size="16" class="mr-1">mdi-calendar</v-icon>{{ formatShiftDate(nextShift) }}</div>
-            <div class="d-flex align-center text-body-2 text-medium-emphasis mb-1"><v-icon size="16" class="mr-1">mdi-clock-outline</v-icon>{{ formatTimeRange(nextShift) }}</div>
-            <div v-if="nextShiftPosition" class="d-flex align-center text-body-2 text-medium-emphasis mb-3"><v-icon size="16" class="mr-1">mdi-badge-account-outline</v-icon>{{ nextShiftPosition }}</div>
-            <v-btn variant="outlined" color="primary" @click="openSwapDialog(nextShift)"><v-icon start>mdi-account-switch</v-icon>Request Cover</v-btn>
+        <div class="next-shift-section mb-6">
+          <div class="section-eyebrow next-shift-eyebrow">{{ (nextShiftLabel || 'Up Next').toUpperCase() }}</div>
+          <div v-if="nextShift" class="next-shift-card">
+            <div class="next-shift-card__body">
+              <div class="next-shift-date" aria-hidden="true">
+                <div class="next-shift-date__month">{{ nextShiftMonth }}</div>
+                <div class="next-shift-date__day">{{ nextShiftDay }}</div>
+              </div>
+              <div class="next-shift-info">
+                <div class="next-shift-dept">{{ nextShift.department_name || nextShift.department?.department_name || 'Shift' }}</div>
+                <div class="next-shift-subtitle">{{ nextShiftWeekday }} &middot; {{ formatTimeRange(nextShift) }}</div>
+                <div v-if="nextShiftPosition" class="next-shift-position">
+                  <v-icon size="14" class="mr-1">mdi-badge-account-outline</v-icon>{{ nextShiftPosition }}
+                </div>
+                <v-btn variant="outlined" color="primary" class="mt-3" @click="openSwapDialog(nextShift)">
+                  <v-icon start>mdi-account-switch</v-icon>Request Cover
+                </v-btn>
+              </div>
+            </div>
           </div>
-        </v-card>
-        <v-card v-else class="mb-6 pa-8 text-center" elevation="0" rounded="lg" border>
-          <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank</v-icon>
-          <div class="text-body-1 text-medium-emphasis">No upcoming shifts</div>
-          <div class="text-caption text-medium-emphasis">Check the Open Shifts tab for available shifts</div>
-        </v-card>
+          <v-card v-else class="pa-8 text-center" elevation="0" rounded="lg" border>
+            <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-blank</v-icon>
+            <div class="text-body-1 text-medium-emphasis">No upcoming shifts</div>
+            <div class="text-caption text-medium-emphasis">Check the Open Shifts tab for available shifts</div>
+          </v-card>
+        </div>
 
         <!-- Week Strip (desktop only) -->
         <WeekStrip :selected-date="selectedDate" :shift-dates="shiftDates" class="mb-6" @select-day="selectedDate = $event" @change-week="onWeekChange" />
@@ -448,7 +458,7 @@ const nextShiftLabel = computed(() => {
   const start = new Date(shiftStartDT(nextShift.value));
   const now = new Date();
   if (!isNaN(start) && start <= now) return "Current Shift";
-  return "Next Shift";
+  return "Up Next";
 });
 
 const nextShiftPosition = computed(() => {
@@ -458,16 +468,35 @@ const nextShiftPosition = computed(() => {
     || '';
 });
 
-const nextShiftColor = computed(() => {
-  const name = (nextShift.value?.department_name || nextShift.value?.department?.department_name || "").toLowerCase();
-  const colors = {
-    barista: "#6F4E37", library: "#196CA2", dining: "#E85D04",
-    maintenance: "#2D6A4F", tutoring: "#7B2D8E", athletics: "#1B4332",
-  };
-  for (const [key, color] of Object.entries(colors)) {
-    if (name.includes(key)) return color;
-  }
-  return "#80162B";
+// Split the next-shift date into the When-I-Work-style components: a
+// month/day bubble on the left and a weekday-prefix on the time row. Keeps
+// the existing tz-aware formatter in utils as source of truth.
+function nextShiftDateObj() {
+  if (!nextShift.value) return null;
+  const raw = nextShift.value.shift_date || shiftDateStr(nextShift.value);
+  if (!raw) return null;
+  const d = raw instanceof Date
+    ? raw
+    : new Date(typeof raw === "string" && raw.length === 10 ? raw + "T00:00:00" : raw);
+  return isNaN(d) ? null : d;
+}
+
+const nextShiftMonth = computed(() => {
+  const d = nextShiftDateObj();
+  if (!d) return "";
+  return d.toLocaleDateString("en-US", { timeZone: TZ, month: "short" }).toUpperCase();
+});
+
+const nextShiftDay = computed(() => {
+  const d = nextShiftDateObj();
+  if (!d) return "";
+  return d.toLocaleDateString("en-US", { timeZone: TZ, day: "numeric" });
+});
+
+const nextShiftWeekday = computed(() => {
+  const d = nextShiftDateObj();
+  if (!d) return "";
+  return d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" });
 });
 
 
@@ -869,11 +898,89 @@ onMounted(loadDashboard);
 </script>
 
 <style scoped>
-/* ─── Shared (desktop retains original look) ─── */
+/* ─── Shared (desktop) ─── */
 .student-dashboard { width: 100%; }
 
-.next-shift-card { overflow: hidden; display: flex; }
-.next-shift-card__bar { width: 5px; flex-shrink: 0; }
+/* Desktop 'Up Next' card — When-I-Work style: date bubble + stacked text,
+   3px maroon left rail. Mirrors the mobile hero card below. */
+.next-shift-section { width: 100%; }
+.next-shift-eyebrow {
+  font-size: var(--type-meta-size);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.next-shift-card {
+  position: relative;
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.next-shift-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--brand-primary);
+}
+.next-shift-card__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 20px 20px 23px;
+}
+.next-shift-date {
+  flex-shrink: 0;
+  width: 64px;
+  padding: 10px 8px;
+  background: var(--brand-primary-lt);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.next-shift-date__month {
+  font-size: var(--type-meta-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brand-primary);
+  line-height: 1;
+}
+.next-shift-date__day {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--brand-primary);
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.next-shift-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.next-shift-dept {
+  font-size: var(--type-h3-size);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-1);
+  line-height: var(--type-h3-line);
+}
+.next-shift-subtitle {
+  font-size: var(--type-body-size);
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.next-shift-position {
+  display: flex;
+  align-items: center;
+  font-size: var(--type-meta-size);
+  color: var(--text-3);
+  margin-top: 6px;
+}
 
 .ack-card { overflow: hidden; display: flex; }
 .ack-card__bar { width: 5px; flex-shrink: 0; background: #F57C00; }
@@ -986,45 +1093,91 @@ onMounted(loadDashboard);
 .ack-btn--accept { background: #80162B; color: #fff; }
 .ack-btn--cover  { background: #F3F4F6; color: #374151; }
 
-/* ── Next Shift Hero Card ── */
+/* ── Next Shift Hero Card (mobile) ──
+   When-I-Work style: date bubble (month + day, maroon-tinted) on the left,
+   stacked text in the center (department · weekday + time · position),
+   3px maroon accent rail on the card's left edge. Same structure as the
+   desktop .next-shift-card so the two variants read as one component. */
 .shift-hero-card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #EBEBEB;
-  display: flex;
+  position: relative;
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
   overflow: hidden;
   transition: box-shadow 0.15s ease;
 }
-.shift-hero-card:active { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.shift-hero-accent {
-  width: 4px;
-  flex-shrink: 0;
+.shift-hero-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--brand-primary);
 }
+.shift-hero-card:active { box-shadow: var(--shadow-2); }
 .shift-hero-body {
-  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px 14px 19px;
+}
+.shift-hero-date {
+  flex-shrink: 0;
+  width: 60px;
+  padding: 8px 6px;
+  background: var(--brand-primary-lt);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.shift-hero-date__month {
+  font-size: var(--type-meta-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brand-primary);
+  line-height: 1;
+}
+.shift-hero-date__day {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--brand-primary);
+  line-height: 1.1;
+  margin-top: 3px;
+}
+.shift-hero-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .shift-hero-dept {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1A1A1A;
-  margin-bottom: 8px;
+  font-size: var(--type-h3-size);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-1);
+  line-height: var(--type-h3-line);
 }
-.shift-hero-meta {
+.shift-hero-subtitle {
+  font-size: var(--type-body-size);
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.shift-hero-position {
   display: flex;
   align-items: center;
-  font-size: 13px;
-  color: #6B7280;
-  margin-bottom: 4px;
+  font-size: var(--type-meta-size);
+  color: var(--text-3);
+  margin-top: 6px;
 }
 .shift-hero-cta {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   margin-top: 12px;
-  background: #80162B;
-  color: #ffffff;
+  background: var(--brand-primary);
+  color: var(--surface-0);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;

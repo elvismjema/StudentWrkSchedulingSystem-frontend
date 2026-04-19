@@ -742,23 +742,11 @@ const filteredShifts = computed(() => {
 })
 
 // --- FullCalendar events ---------------------------------------------------
-// Each event uses FullCalendar's native backgroundColor / borderColor /
-// textColor so filled shifts read as scannable solid blocks (the look
-// restored from commit c0f41c9 — before #227 stripped colors to a 4px
-// rail). Unfilled shifts (open / needs-coverage) use a 45%-alpha tint so
-// the alert badge and dark text stay readable.
-const hexToRgba = (hex, alpha) => {
-  // Fallback RGB = OC maroon-500 (#811429 = rgb(129, 20, 41))
-  if (!hex || typeof hex !== 'string') return `rgba(129, 20, 41, ${alpha})`
-  const cleaned = hex.replace('#', '')
-  if (cleaned.length !== 6) return hex
-  const r = parseInt(cleaned.slice(0, 2), 16)
-  const g = parseInt(cleaned.slice(2, 4), 16)
-  const b = parseInt(cleaned.slice(4, 6), 16)
-  if ([r, g, b].some(Number.isNaN)) return hex
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
+// Events are colored entirely via CSS modifier classes
+// (.schedule-event--filled / --open / --needs-coverage). No per-position
+// color is applied — we follow the student dashboard's 3-color rule:
+// filled = neutral white card + maroon left rail, unfilled = amber tint +
+// amber left rail. See the CSS block below for the state-driven styling.
 const calendarEvents = computed(() => {
   return filteredShifts.value
     .filter((shift) => !!shift.shift_date)
@@ -767,23 +755,16 @@ const calendarEvents = computed(() => {
       const end = `${shift.shift_date}T${normalizeTimeInput(shift.end_time) || '00:00'}:00`
       const title = shift.position?.position_name || 'Shift'
       const state = classifyShiftState(shift)
-      const positionColor = shift.position?.color || '#811429'
       const worker = shift.assignedUser
       const assigneeName = worker
         ? `${worker.fName || ''} ${worker.lName || ''}`.trim() || null
         : null
       const assigneePhoto = worker?.avatar_url || worker?.photo_url || null
-      const isFilled = state === 'filled'
-      const bgColor = isFilled ? positionColor : hexToRgba(positionColor, 0.45)
-      const textColor = isFilled ? '#FFFFFF' : '#1F1214'
       return {
         id: String(shift.shift_id),
         title,
         start,
         end,
-        backgroundColor: bgColor,
-        borderColor: positionColor,
-        textColor,
         classNames: [
           'schedule-event',
           `schedule-event--${state}`,
@@ -792,25 +773,23 @@ const calendarEvents = computed(() => {
         extendedProps: {
           shift,
           state,
-          positionColor,
           assigneeName,
           assigneePhoto,
-          isFilled,
         },
       }
     })
 })
 
 // --- Event content renderer -----------------------------------------------
-// FullCalendar handles the background/border/text color at the event level
-// (see calendarEvents). This renderer just arranges the inner text stack:
-// time · position title · assignee row, plus the open / needs-coverage
-// pill for unfilled shifts.
+// Background / border / text color are driven by the state modifier classes
+// on the event (see calendarEvents and the CSS block below). This renderer
+// just arranges the inner text stack: time · position title · assignee row,
+// plus the open / needs-coverage pill for unfilled shifts.
 const renderEventContent = (arg) => {
-  const { state, assigneeName, assigneePhoto, isFilled } = arg.event.extendedProps || {}
+  const { state, assigneeName, assigneePhoto } = arg.event.extendedProps || {}
 
   const body = document.createElement('div')
-  body.className = `schedule-event__body schedule-event__body--${isFilled ? 'filled' : 'unfilled'}`
+  body.className = 'schedule-event__body'
 
   const time = document.createElement('div')
   time.className = 'schedule-event__time'
@@ -1685,16 +1664,34 @@ onMounted(async () => {
 }
 
 /* ---- Event presentation -----------------------------------------------
-   Filled shifts = solid full-saturation position color block with white
-   text (FullCalendar sets background / border / textColor on the event).
-   Unfilled shifts = 45%-alpha tint of the position color with dark text.
-   Restored from commit c0f41c9 — PR #227's 4px-rail look felt washed out. */
+   3-color rule (mirrors student dashboard):
+   - Filled shifts   → white card, dark text, hairline border, 3px maroon
+                       left rail, subtle shadow.
+   - Open / needs-coverage → amber-tinted body, dark text, 3px amber left
+                       rail, dashed amber border, status pill top-right.
+   - Selected        → 2px solid maroon outline (outline-offset: -2px).
+   No per-position colors anywhere. */
 .schedule-calendar-wrap :deep(.fc-event.schedule-event) {
+  border: none;
   border-radius: var(--radius-sm);
   padding: 0;
   overflow: hidden;
   box-shadow: var(--shadow-1);
   cursor: pointer;
+  background: transparent;
+}
+
+.schedule-calendar-wrap :deep(.fc-event.schedule-event--filled) {
+  background: var(--surface-0);
+  color: var(--text-1);
+}
+
+.schedule-calendar-wrap
+  :deep(.fc-event.schedule-event--open),
+.schedule-calendar-wrap
+  :deep(.fc-event.schedule-event--needs-coverage) {
+  background: var(--state-break-lt);
+  color: var(--text-1);
 }
 
 .schedule-calendar-wrap :deep(.fc-event.schedule-event--selected) {
@@ -1712,16 +1709,43 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 8px 4px 8px;
+  /* Left padding leaves room for the 3px accent rail + a little breathing room. */
+  padding: 4px 8px 4px 11px;
   height: 100%;
   min-height: 28px;
   color: inherit;
+  border-radius: var(--radius-sm);
 }
 
-.schedule-calendar-wrap :deep(.schedule-event__body--unfilled) {
-  /* Dashed border reads as "needs attention" on the tinted fill. */
-  border: 1px dashed rgba(31, 18, 20, 0.35);
-  border-radius: var(--radius-sm);
+/* Left accent rail (3px) driven by state. */
+.schedule-calendar-wrap :deep(.schedule-event__body)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--brand-primary);
+}
+
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__body) {
+  border: 1px solid var(--border-1);
+}
+
+.schedule-calendar-wrap
+  :deep(.schedule-event--open .schedule-event__body),
+.schedule-calendar-wrap
+  :deep(.schedule-event--needs-coverage .schedule-event__body) {
+  border: 1px dashed rgba(198, 123, 60, 0.5);
+}
+
+.schedule-calendar-wrap
+  :deep(.schedule-event--open .schedule-event__body)::before,
+.schedule-calendar-wrap
+  :deep(.schedule-event--needs-coverage .schedule-event__body)::before {
+  background: var(--state-break);
 }
 
 .schedule-calendar-wrap :deep(.schedule-event__title) {
@@ -1737,8 +1761,7 @@ onMounted(async () => {
 .schedule-calendar-wrap :deep(.schedule-event__time) {
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  color: inherit;
-  opacity: 0.85;
+  color: var(--text-2);
 }
 
 .schedule-calendar-wrap :deep(.schedule-event__assignee) {
@@ -1746,8 +1769,7 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   font-size: var(--type-meta-size);
-  color: inherit;
-  opacity: 0.92;
+  color: var(--text-2);
   overflow: hidden;
 }
 
@@ -1755,8 +1777,8 @@ onMounted(async () => {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.3);
-  color: inherit;
+  background: var(--surface-2);
+  color: var(--text-1);
   font-size: 10px;
   font-weight: 600;
   display: inline-flex;
@@ -1764,10 +1786,6 @@ onMounted(async () => {
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-}
-
-.schedule-calendar-wrap :deep(.schedule-event__body--unfilled .schedule-event__avatar) {
-  background: rgba(31, 18, 20, 0.12);
 }
 
 .schedule-calendar-wrap :deep(.schedule-event__avatar img) {

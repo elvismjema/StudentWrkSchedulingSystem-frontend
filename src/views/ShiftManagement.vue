@@ -766,11 +766,15 @@ const filteredShifts = computed(() => {
 // Each position carries an optional hex color (set via the Position settings
 // UI). When missing, we hash the position_id into a fallback palette so each
 // position still gets a stable, distinct color across sessions.
+// Ordered so the four most-used positions (Front Desk / Lifeguard /
+// Equipment Attendant / Gym Manager) land on the reference image's
+// red · green · blue · purple respectively when position_id % 8 maps
+// low integers to the first slots.
 const FALLBACK_POSITION_COLORS = [
-  '#811429', // maroon (brand)
-  '#2E7D32', // green
-  '#1565C0', // blue
-  '#6A1B9A', // purple
+  '#B71C1C', // red     — Front Desk reference
+  '#2E7D32', // green   — Equipment Attendant reference
+  '#1565C0', // blue    — Lifeguard reference
+  '#6A1B9A', // purple  — Gym Manager reference
   '#EF6C00', // orange
   '#00838F', // teal
   '#AD1457', // pink
@@ -1837,21 +1841,24 @@ onMounted(async () => {
    - Selected        → 2px solid maroon outline (outline-offset: -2px). */
 .schedule-calendar-wrap :deep(.fc-event.schedule-event) {
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   padding: 0;
   overflow: hidden;
-  box-shadow: var(--shadow-1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   /* Keep event cards above the today-column tint
      (--fc-today-bg-color paints the column body). */
   position: relative;
   z-index: 1;
+  /* Full-width inside the column — no inset. */
+  margin: 0;
 }
 
 /* Filled: FullCalendar paints the solid position color inline on the outer
-   event; we just make sure inner text is white. */
+   event; we just make sure inner text is white and the card has punch. */
 .schedule-calendar-wrap :deep(.fc-event.schedule-event--filled) {
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
 }
 
 .schedule-calendar-wrap
@@ -1891,8 +1898,15 @@ onMounted(async () => {
    border. Padding drops back to symmetric so text starts flush. */
 .schedule-calendar-wrap
   :deep(.schedule-event--filled .schedule-event__body) {
-  padding: 7px 10px;
+  padding: 8px 10px;
+  min-height: 44px;
   border: none;
+}
+
+.schedule-calendar-wrap
+  :deep(.schedule-event--filled .schedule-event__title) {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* Open / needs-coverage keep the pastel body + amber rail + dashed border

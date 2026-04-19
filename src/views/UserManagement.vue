@@ -117,7 +117,7 @@
       <v-card>
         <v-card-text class="pa-8">
           <div class="worker-dialog-header">
-            <v-avatar size="72" color="#8B1538">
+            <v-avatar size="72" color="primary">
               <span class="text-h5 text-white">{{ selectedWorkerInitials }}</span>
             </v-avatar>
             <div>
@@ -128,7 +128,7 @@
             </div>
           </div>
 
-          <v-tabs v-model="workerDetailsTab" color="#111827" class="mt-6">
+          <v-tabs v-model="workerDetailsTab" color="text-1" class="mt-6">
             <v-tab value="details">Worker Details</v-tab>
             <v-tab value="class">Class Schedule</v-tab>
           </v-tabs>
@@ -138,7 +138,7 @@
               <v-divider class="mb-5" />
               <h3 class="text-h5 font-weight-bold mb-4">Weekly Availability</h3>
 
-              <v-progress-linear v-if="loadingWorkerAvailability" indeterminate color="#8B1538" class="mb-4" />
+              <v-progress-linear v-if="loadingWorkerAvailability" indeterminate color="primary" class="mb-4" />
 
               <div v-else class="weekly-lines">
                 <div
@@ -666,7 +666,7 @@ onMounted(() => {
 .user-management-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .management-card {
@@ -684,18 +684,18 @@ onMounted(() => {
   font-size: 48px;
   line-height: 1.05;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .worker-dialog-email {
   margin-top: 6px;
   font-size: 20px;
-  color: #667085;
+  color: var(--text-2);
   font-weight: 500;
 }
 
 .weekly-lines {
-  border: 1px solid #eaecf0;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -704,7 +704,7 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid #eaecf0;
+  border-bottom: 1px solid var(--border-1);
   background: #fff;
 }
 
@@ -716,12 +716,12 @@ onMounted(() => {
   min-width: 58px;
   font-size: 15px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .weekly-line-value {
   font-size: 14px;
-  color: #475467;
+  color: var(--text-2);
 }
 
 @media (max-width: 1280px) {

@@ -27,7 +27,7 @@ const toggleSidebar = () => {
 
 <style scoped>
 .main-content {
-  background-color: #fafafa;
+  background-color: var(--surface-1);
   min-height: calc(100vh - 60px);
   height: calc(100vh - 60px);
   display: flex;

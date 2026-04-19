@@ -17,7 +17,11 @@
 -->
 
 <template>
-  <div class="availability-grid" :class="{ 'availability-grid--readonly': isReadonly }">
+  <div
+    ref="rootRef"
+    class="availability-grid"
+    :class="{ 'availability-grid--readonly': isReadonly }"
+  >
     <FullCalendar ref="calendarRef" :options="calendarOptions" />
 
     <div v-if="showEmptyOverlay" class="availability-grid__empty">
@@ -27,7 +31,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import FullCalendar from "@fullcalendar/vue3";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -76,6 +80,7 @@ const props = defineProps({
 const emit = defineEmits(["event:click", "event:change", "slot:click"]);
 
 const calendarRef = ref(null);
+const rootRef = ref(null);
 // FullCalendar's DateInput values need seconds.
 const pad = (s) => (String(s).length === 5 ? `${s}:00` : s);
 
@@ -279,6 +284,24 @@ const goToDate = (date) => withApi((api) => api.gotoDate(date));
 const prev = () => withApi((api) => api.prev());
 const next = () => withApi((api) => api.next());
 const today = () => withApi((api) => api.today());
+// Public: parents can call updateSize() after a container transition (e.g.
+// v-dialog enter) so FullCalendar re-measures instead of sitting at 0-height.
+const updateSize = () => withApi((api) => api.updateSize?.());
+
+// Self-heal sizing: if the host container resizes (dialog enter/exit, window
+// resize, tab switch), force FullCalendar to re-measure. Without this the
+// grid renders at 0-height when mounted inside an animating v-dialog.
+let resizeObserver = null;
+onMounted(() => {
+  if (typeof ResizeObserver !== "undefined" && rootRef.value) {
+    resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(rootRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
 
 // Keep the calendar in sync when the range prop changes after mount.
 watch(
@@ -288,7 +311,7 @@ watch(
   }
 );
 
-defineExpose({ goToDate, prev, next, today });
+defineExpose({ goToDate, prev, next, today, updateSize });
 </script>
 
 <style scoped>

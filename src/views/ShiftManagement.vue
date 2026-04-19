@@ -1715,6 +1715,10 @@ onMounted(async () => {
   box-shadow: var(--shadow-1);
   cursor: pointer;
   background: transparent;
+  /* Keep event cards above the today-column tint
+     (--fc-today-bg-color paints the column body). */
+  position: relative;
+  z-index: 1;
 }
 
 .schedule-calendar-wrap :deep(.fc-event.schedule-event--filled) {
@@ -1770,6 +1774,9 @@ onMounted(async () => {
 .schedule-calendar-wrap
   :deep(.schedule-event--filled .schedule-event__body) {
   border: 1px solid var(--border-1);
+  /* Explicit opaque white on the innermost card so the today-column tint
+     (--brand-primary-lt on .fc-day-today) never bleeds through. */
+  background: var(--surface-0);
 }
 
 .schedule-calendar-wrap
@@ -1778,6 +1785,7 @@ onMounted(async () => {
   :deep(.schedule-event--needs-coverage .schedule-event__body) {
   /* Derived from --block-off-fg (#9CA3AF) at 50% alpha. */
   border: 1px dashed rgba(156, 163, 175, 0.5);
+  background: var(--block-off-bg);
 }
 
 .schedule-calendar-wrap

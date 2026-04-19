@@ -73,6 +73,28 @@
     </v-list>
 
     <template #append>
+      <div class="rail-toggle-wrap">
+        <v-tooltip
+          :text="rail ? 'Expand' : 'Collapse'"
+          :disabled="!rail"
+          location="end"
+        >
+          <template #activator="{ props: tooltipProps }">
+            <v-btn
+              v-bind="tooltipProps"
+              variant="text"
+              density="comfortable"
+              class="rail-toggle-btn"
+              :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'"
+              @click="toggleRail"
+            >
+              <v-icon :icon="rail ? 'mdi-chevron-double-right' : 'mdi-chevron-double-left'" size="20" />
+              <span v-if="!rail" class="rail-toggle-label">Collapse</span>
+            </v-btn>
+          </template>
+        </v-tooltip>
+      </div>
+
       <v-divider />
       <div class="user-section">
         <v-list-item class="user-item">
@@ -147,6 +169,10 @@ const adminNavItems = [
   { title: "Manage Departments", icon: "mdi-office-building-cog", route: "/manager/admin/departments" },
 ];
 
+const toggleRail = () => {
+  rail.value = !rail.value;
+};
+
 // Initialise department context on mount so every manager view has a valid
 // department_id in localStorage.  Skipped when already present.
 onMounted(async () => {
@@ -185,15 +211,13 @@ onMounted(async () => {
 
 defineExpose({
   rail,
-  toggleRail: () => {
-    rail.value = !rail.value;
-  }
+  toggleRail,
 });
 </script>
 
 <style scoped>
 .manager-sidebar {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--border-1);
 }
 
 .logo-section {
@@ -203,12 +227,12 @@ defineExpose({
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
 .oc-logo {
-  background-color: #8B1538;
-  color: white;
+  background-color: var(--brand-primary);
+  color: var(--surface-0);
   width: 40px;
   height: 40px;
   display: flex;
@@ -220,35 +244,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.brand-title {
-  font-size: 19px;
-  font-weight: 700;
-  color: #1f2328;
-}
-
-.brand-subtitle {
-  font-size: 14px;
-  color: #667085;
-}
-
-.manager-nav {
-  padding: 8px 12px;
-}
-
-.manager-nav-item {
-  border-radius: 12px;
-  min-height: 66px;
-}
-
-.manager-active-nav-item {
-  background: #f0f6ff;
-  color: #0969da;
-}
-
-.manager-user-wrap {
-  padding: 8px 12px;
-}
-
 .logo-text {
   flex: 1;
 }
@@ -256,13 +251,13 @@ defineExpose({
 .main-title {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
 .sub-title {
   font-size: 11px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   margin-top: 2px;
 }
@@ -272,8 +267,8 @@ defineExpose({
 }
 
 .nav-item {
-  margin: 2px 8px;
-  border-radius: 8px;
+  margin: 2px var(--space-1);
+  border-radius: var(--radius-sm);
   transition: all 0.2s ease;
 }
 
@@ -286,34 +281,57 @@ defineExpose({
 }
 
 .nav-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 .active-nav-item {
-  background-color: #f8e6ea !important;
-  color: #8B1538 !important;
+  background-color: var(--brand-primary-lt) !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-icon {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-list-item-title {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
   font-weight: 500;
 }
 
 .section-divider {
-  margin: 8px 12px;
+  margin: var(--space-1) var(--space-2);
 }
 
 .section-label {
-  padding: 0 16px 6px;
+  padding: 0 var(--space-3) 6px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8B1538;
+  color: var(--brand-primary);
+}
+
+.rail-toggle-wrap {
+  padding: var(--space-1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rail-toggle-btn {
+  color: var(--text-2);
+  text-transform: none;
+  font-size: 13px;
+  letter-spacing: normal;
+  min-width: 0;
+}
+
+.rail-toggle-btn:hover {
+  color: var(--brand-primary);
+  background-color: var(--surface-2);
+}
+
+.rail-toggle-label {
+  margin-left: 6px;
 }
 
 .user-section {
@@ -321,22 +339,22 @@ defineExpose({
 }
 
 .user-item {
-  border-radius: 8px;
-  margin: 0 8px;
+  border-radius: var(--radius-sm);
+  margin: 0 var(--space-1);
 }
 
 .user-avatar {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
 }
 
 .user-initial {
-  color: white;
+  color: var(--surface-0);
   font-weight: 500;
   font-size: 13px;
 }
 
 .user-name {
-  color: #333;
+  color: var(--text-1);
   font-size: 13px;
   font-weight: 600;
 }
@@ -347,7 +365,7 @@ defineExpose({
 }
 
 .user-role {
-  color: #666;
+  color: var(--text-2);
   font-size: 11px;
   margin-top: 2px;
 }
@@ -366,5 +384,9 @@ defineExpose({
 
 .v-navigation-drawer--rail .user-item {
   margin: 0 4px;
+}
+
+.v-navigation-drawer--rail .rail-toggle-wrap {
+  justify-content: center;
 }
 </style>

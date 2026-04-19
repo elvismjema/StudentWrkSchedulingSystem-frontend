@@ -1002,8 +1002,7 @@ const calendarOptions = computed(() => ({
   selectable: true,
   selectMirror: true,
   eventOverlap: true,
-  expandRows: true,
-  height: '100%',
+  height: 'auto',
   eventClick: onCalendarEventClick,
   select: onCalendarSelect,
   eventDrop: onCalendarEventChange,
@@ -1800,8 +1799,17 @@ onMounted(async () => {
   border: 1px solid var(--border-1);
   border-radius: var(--radius-md);
   padding: var(--space-2);
-  min-height: 720px;
   height: 760px;
+  overflow-y: auto;
+}
+
+/* Enforce a minimum slot height so 30-min blocks are never compressed.
+   With slotDuration=30min this means 1 hour = 80px — standard calendar
+   density. Without this, expandRows/height:100% would divide the total
+   container height by the number of slots, making every shift appear
+   shorter than it actually is. */
+.schedule-calendar-wrap :deep(.fc .fc-timegrid-slot) {
+  height: 40px;
 }
 
 .schedule-loading-wrap {

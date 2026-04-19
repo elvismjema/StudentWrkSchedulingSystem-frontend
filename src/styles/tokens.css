@@ -1,0 +1,139 @@
+/**
+ * SWS design tokens — single source of truth for color, spacing, type, and
+ * elevation. The Vuetify theme in src/plugins/vuetify.js mirrors these values;
+ * plain <style scoped> blocks should reference these vars instead of spelling
+ * hex codes a fifth time.
+ *
+ * Do not add hardcoded hex values outside this file and vuetify.js.
+ */
+
+:root {
+  /* ---- Brand ---- */
+  --brand-primary: #80162B;       /* OC maroon — Vuetify primary */
+  --brand-primary-dk: #5E0F20;    /* hover / pressed */
+  --brand-primary-lt: #F6E6EA;    /* active-nav tint, selected row, chip bg */
+  --brand-ink: #1F1214;           /* primary text, subtly warm */
+  --brand-accent: #47121D;        /* hero moments only — NOT success */
+
+  /* ---- Neutrals ---- */
+  --surface-0: #FFFFFF;           /* cards, modals, top bar */
+  --surface-1: #FAFAFA;           /* app background */
+  --surface-2: #F4F4F5;           /* table stripes, disabled wells */
+  --border-1: #E4E4E7;            /* hairlines */
+  --text-1: #1F1214;              /* brand-ink */
+  --text-2: #52525B;              /* secondary text */
+  --text-3: #8A8A93;              /* tertiary / meta / disabled */
+
+  /* ---- State (deliberately NOT maroon) ---- */
+  --state-active: #3F7A4D;        /* clocked in, approved, success */
+  --state-active-lt: #E3F1E7;
+  --state-break: #C67B3C;         /* on break, pending, warning */
+  --state-break-lt: #FBEEDE;
+  --state-alert: #B8402E;         /* overdue, rejected, destructive */
+  --state-alert-lt: #F7E3DE;
+  --state-info: #2F6B8F;          /* neutral informational */
+  --state-info-lt: #E1EEF5;
+
+  /* ---- Positions (off-brand by design) ---- */
+  --position-1: #4F6D8C;          /* slate */
+  --position-2: #6E8E5E;          /* sage */
+  --position-3: #8F6B3F;          /* bronze */
+  --position-4: #5C5A8A;          /* indigo dust */
+  --position-5: #2F6B6F;          /* teal */
+  --position-6: #8A5A6B;          /* dusty rose */
+  --position-7: #6B5A3F;          /* olive */
+  --position-8: #4D4D55;          /* graphite */
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;               /* chips, buttons */
+  --radius-md: 10px;               /* cards, inputs */
+  --radius-lg: 14px;               /* modals */
+
+  /* ---- Elevation ---- */
+  --shadow-1: 0 1px 2px rgba(17, 16, 20, 0.06), 0 1px 1px rgba(17, 16, 20, 0.04);
+  --shadow-2: 0 4px 12px rgba(17, 16, 20, 0.08);
+  --shadow-3: 0 12px 32px rgba(17, 16, 20, 0.12);
+
+  /* ---- Spacing ---- */
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+
+  /* ---- Type ---- */
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Display — page title */
+  --type-display-size: 24px;
+  --type-display-line: 1.25;
+  --type-display-weight: 600;
+
+  /* H2 — section title */
+  --type-h2-size: 18px;
+  --type-h2-line: 1.35;
+  --type-h2-weight: 600;
+
+  /* H3 — card title */
+  --type-h3-size: 15px;
+  --type-h3-line: 1.4;
+  --type-h3-weight: 600;
+
+  /* Body */
+  --type-body-size: 14px;
+  --type-body-line: 1.5;
+  --type-body-weight: 400;
+
+  /* Meta — small label / caption */
+  --type-meta-size: 12px;
+  --type-meta-line: 1.4;
+  --type-meta-weight: 500;
+}
+
+/* ---- Type utility classes ---- */
+.type-display {
+  font-family: var(--font-sans);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-line);
+  font-weight: var(--type-display-weight);
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+}
+
+.type-h2 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-line);
+  font-weight: var(--type-h2-weight);
+  color: var(--text-1);
+}
+
+.type-h3 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-1);
+}
+
+.type-body {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--type-body-weight);
+  color: var(--text-1);
+}
+
+.type-meta {
+  font-family: var(--font-sans);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
+  font-weight: var(--type-meta-weight);
+  color: var(--text-2);
+}
+
+.type-mono {
+  font-family: var(--font-mono);
+}

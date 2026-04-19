@@ -386,13 +386,14 @@
           {{ ackError }}
         </v-alert>
 
-        <div v-if="acknowledgments.length === 0 && !ackLoading" class="empty-state">
+        <div v-if="activeTab === 'shift-acknowledgments' && acknowledgments.length === 0 && !ackLoading" class="empty-state">
           <v-icon size="48" color="grey-lighten-1">mdi-check-decagram</v-icon>
           <p class="text-body-1 text-medium-emphasis mt-2">No pending shift acknowledgments found.</p>
         </div>
 
         <v-card
           v-for="ack in acknowledgments"
+          v-if="activeTab === 'shift-acknowledgments'"
           :key="ack.id"
           elevation="2"
           class="mb-3"

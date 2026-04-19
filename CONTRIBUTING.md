@@ -1,5 +1,21 @@
 # Contributing — SEV Project Frontend
 
+## First-time setup
+
+After cloning, run the hook installer once:
+
+```sh
+sh scripts/setup-hooks.sh
+```
+
+This activates the enforcement hooks in `.githooks/`. Without this step, the hooks do nothing and the rules below are honor-system only.
+
+The hooks enforce two things locally:
+- **Commit-msg hook**: rejects any commit containing AI attribution (`Co-Authored-By: Claude`, `Generated with ChatGPT`, etc. — see `AGENTS.md` for the full list)
+- **Pre-push hook**: blocks direct pushes to `dev` and `main`
+
+See `AGENTS.md` for the full AI-agent contribution policy.
+
 ## Commit Conventions
 
 Use conventional commit format:
@@ -19,7 +35,7 @@ fix(deploy): add missing env var to CI workflow
 refactor(schedule): extract shift card into component
 ```
 
-**No AI tool attributions in commits.** No `Co-Authored-By` lines referencing AI assistants, copilots, or code generators. Commits should reflect the human author only.
+**No AI tool attributions in commits.** No `Co-Authored-By` lines referencing AI assistants, copilots, or code generators. Commits should reflect the human author only. The `commit-msg` hook in `.githooks/` will reject any commit that violates this — see `AGENTS.md` for the full policy and the list of blocked tools.
 
 ## Branch Strategy
 

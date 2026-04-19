@@ -1,139 +1,153 @@
 <template>
-  <div class="dashboard-page">
-    <section class="page-header">
-      <div class="header-text">
-        <h1 class="page-title">{{ managerHeading }}</h1>
-        <p class="page-subtitle">{{ todayLabel }}</p>
-      </div>
-      <div class="header-actions">
-        <v-btn color="#8B1538" prepend-icon="mdi-plus" @click="openCreateShiftPopup">
-          Create Shift
-        </v-btn>
-        <v-btn variant="outlined" prepend-icon="mdi-calendar-month-outline" @click="router.push('/manager/schedule')">
-          View Schedule
-        </v-btn>
+  <PageFrame>
+    <template #header>
+      <PageHeader :title="managerHeading" :subtitle="managerSubtitle">
+        <template #actions>
+          <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreateShiftPopup">
+            Create Shift
+          </v-btn>
+        </template>
+      </PageHeader>
+    </template>
+
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-0">{{ error }}</v-alert>
+
+    <!-- Status strip ------------------------------------------------------ -->
+    <section class="status-strip" aria-label="At-a-glance metrics">
+      <StatCard
+        label="Clocked in now"
+        :value="workingNowCount"
+        :to="{ name: 'manager-schedule', query: { filter: 'today' } }"
+        icon="mdi-account-clock-outline"
+      >
+        <template v-if="clockedInAvatars.length" #subtitle>
+          <span class="avatar-row">
+            <span
+              v-for="a in clockedInAvatars"
+              :key="a.key"
+              class="avatar-row__pill"
+              :title="a.name"
+            >{{ a.initials }}</span>
+            <span v-if="clockedInOverflow > 0" class="avatar-row__overflow">+{{ clockedInOverflow }}</span>
+          </span>
+        </template>
+      </StatCard>
+
+      <StatCard
+        label="Pending approvals"
+        :value="pendingApprovals.length"
+        :subtitle="pendingApprovals[0]?.workerName || ''"
+        :to="{ name: 'manager-approvals' }"
+        icon="mdi-clipboard-check-outline"
+      />
+
+      <StatCard
+        label="Unfilled · next 7 days"
+        :value="unfilledNext7Count"
+        :subtitle="unfilledNext7Subtitle"
+        :to="{ name: 'manager-schedule', query: { filter: 'open' } }"
+        icon="mdi-calendar-alert"
+      />
+
+      <!-- TODO: wire to timecards weekly rollup once backend returns totals. -->
+      <StatCard
+        label="Labor this week"
+        value="—"
+        subtitle="Hours · est. cost"
+        :to="{ name: 'manager-time-pay' }"
+        :mute-zero="false"
+        coming-soon
+        icon="mdi-cash-clock"
+      />
+    </section>
+
+    <!-- Today timeline ---------------------------------------------------- -->
+    <section class="today-section" aria-label="Today's timeline">
+      <header class="today-section__head">
+        <h2 class="type-h2">Today</h2>
+        <span class="type-meta">{{ todayLabel }}</span>
+      </header>
+      <div class="today-section__grid">
+        <AvailabilityGrid
+          mode="readonly"
+          :range="todayRange"
+          :slot-min-time="deptOpeningHour"
+          :slot-max-time="deptClosingHour"
+          :events="todayEvents"
+          @event:click="onTimelineEventClick"
+        />
       </div>
     </section>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
-      {{ error }}
-    </v-alert>
-
-    <v-row class="mb-4">
-      <v-col cols="12" md="6">
-        <v-card elevation="0" class="summary-card">
-          <v-card-text>
-            <div class="summary-label">Working Now</div>
-            <div class="summary-value">{{ workingNowCount }}</div>
-            <div class="summary-caption">Currently clocked-in workers</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" md="6">
-        <v-card elevation="0" class="summary-card">
-          <v-card-text>
-            <div class="summary-label">Coming Up</div>
-            <div class="summary-value">{{ comingUpCount }}</div>
-            <div class="summary-caption">Upcoming shifts today</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <v-row class="mb-4">
-      <v-col cols="12" md="6">
-        <v-card elevation="0" class="content-card">
-          <v-card-text>
-            <div class="card-head">
-              <div>
-                <h2 class="card-title">Pending Approvals</h2>
-                <div class="card-subtitle">{{ pendingApprovals.length }} waiting</div>
+    <!-- Two-up: Needs attention + Upcoming -------------------------------- -->
+    <section class="two-up">
+      <article class="panel">
+        <header class="panel__head">
+          <h2 class="type-h2">Needs attention</h2>
+          <router-link :to="{ name: 'manager-approvals' }" class="panel__link">
+            View all <v-icon size="16">mdi-arrow-right</v-icon>
+          </router-link>
+        </header>
+        <div v-if="pendingApprovals.length === 0" class="panel__empty">
+          <v-icon size="20" color="success">mdi-check-circle-outline</v-icon>
+          <span>All caught up.</span>
+        </div>
+        <ul v-else class="list">
+          <li v-for="item in pendingApprovals.slice(0, 5)" :key="item.id" class="list__row">
+            <router-link :to="{ name: 'manager-approvals', hash: `#item-${item.id}` }" class="list__link">
+              <div class="list__primary">
+                <span class="type-h3">{{ item.workerName }}</span>
+                <span class="list__chip">{{ item.type }}</span>
               </div>
-              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/approvals')">
-                View All
-                <v-icon end>mdi-arrow-right</v-icon>
-              </v-btn>
-            </div>
+              <div class="type-meta list__meta">{{ item.dateLabel }} · {{ item.timeRange }}</div>
+            </router-link>
+          </li>
+        </ul>
+      </article>
 
-            <div v-if="pendingPreview.length === 0" class="empty-state">
-              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
-              <span>All caught up!</span>
-            </div>
-
-            <div v-else class="list-wrap">
-              <div v-for="item in pendingPreview" :key="item.id" class="pending-item">
-                <div class="pending-top-row">
-                  <v-chip size="small" variant="outlined">{{ item.type }}</v-chip>
-                  <v-chip size="small" color="warning" variant="outlined">{{ item.status }}</v-chip>
-                </div>
-                <div class="worker-name">{{ item.workerName }}</div>
-                <div class="meta-line">{{ item.dateLabel }} · {{ item.timeRange }}</div>
+      <article class="panel">
+        <header class="panel__head">
+          <h2 class="type-h2">Upcoming</h2>
+          <router-link :to="{ name: 'manager-schedule' }" class="panel__link">
+            View schedule <v-icon size="16">mdi-arrow-right</v-icon>
+          </router-link>
+        </header>
+        <div v-if="upcomingPreview.length === 0" class="panel__empty">
+          <v-icon size="20" color="success">mdi-check-circle-outline</v-icon>
+          <span>No shifts starting in the next 24 hours.</span>
+        </div>
+        <ul v-else class="list">
+          <li v-for="shift in upcomingPreview" :key="shift.shift_id || shift.id" class="list__row">
+            <router-link :to="{ name: 'manager-schedule' }" class="list__link">
+              <div class="list__primary">
+                <span class="type-h3">{{ shift.positionName }}</span>
+                <span class="list__chip">{{ shift.assigneeName || 'Open' }}</span>
               </div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
+              <div class="type-meta list__meta">{{ shift.dateLabel }} · {{ shift.timeRange }}</div>
+            </router-link>
+          </li>
+        </ul>
+      </article>
+    </section>
 
-      <v-col cols="12" md="6">
-        <v-card elevation="0" class="content-card">
-          <v-card-text>
-            <div class="card-head">
-              <div>
-                <h2 class="card-title">Unfilled Shifts</h2>
-                <div class="card-subtitle">Shifts needing coverage</div>
-              </div>
-              <v-btn variant="text" class="ghost-btn" @click="router.push('/manager/schedule')">
-                View All
-                <v-icon end>mdi-arrow-right</v-icon>
-              </v-btn>
-            </div>
-
-            <div v-if="unfilledPreview.length === 0" class="empty-state">
-              <v-icon size="24" color="success">mdi-check-circle-outline</v-icon>
-              <span>All shifts are filled!</span>
-            </div>
-
-            <div v-else class="list-wrap">
-              <div v-for="shift in unfilledPreview" :key="shift.shift_id" class="unfilled-item">
-                <div class="unfilled-top-row">
-                  <v-chip size="small" color="warning" variant="outlined">{{ shift.departmentName }}</v-chip>
-                  <div class="position-name">{{ shift.positionName }}</div>
-                  <v-spacer />
-                  <v-chip size="small" color="warning" variant="outlined">Open</v-chip>
-                </div>
-                <div class="meta-line">{{ shift.dateLabel }} · {{ shift.timeRange }}</div>
-              </div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <v-row>
-      <v-col cols="12" sm="6">
-        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/time-pay')">
-          <div class="quick-content">
-            <v-icon size="24">mdi-clock-outline</v-icon>
-            <span>Time &amp; Pay</span>
-          </div>
-        </v-btn>
-      </v-col>
-      <v-col cols="12" sm="6">
-        <v-btn block variant="outlined" class="quick-btn" @click="router.push('/manager/workers')">
-          <div class="quick-content">
-            <v-icon size="24">mdi-account-group-outline</v-icon>
-            <span>Student Workers</span>
-          </div>
-        </v-btn>
-      </v-col>
-    </v-row>
-
-  </div>
+    <!-- Demoted shortcuts ------------------------------------------------- -->
+    <nav class="shortcut-links" aria-label="Shortcuts">
+      <button type="button" class="shortcut-links__item" @click="openCreateShiftPopup">Create shift</button>
+      <span class="shortcut-links__sep" aria-hidden="true">·</span>
+      <button type="button" class="shortcut-links__item" @click="router.push({ name: 'manager-templates' })">New template</button>
+      <span class="shortcut-links__sep" aria-hidden="true">·</span>
+      <button type="button" class="shortcut-links__item" @click="router.push({ name: 'manager-student-workers' })">Invite worker</button>
+    </nav>
+  </PageFrame>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import PageFrame from "../components/PageFrame.vue";
+import PageHeader from "../components/PageHeader.vue";
+import StatCard from "../components/StatCard.vue";
+import AvailabilityGrid from "../components/AvailabilityGrid.vue";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
@@ -148,34 +162,33 @@ const swapRequests = ref([]);
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 const currentDeptId = deptContext.department_id || null;
 
+// TODO: department opening/closing hours aren't in the context payload yet.
+const deptOpeningHour = computed(() => deptContext.openingHour || "06:00");
+const deptClosingHour = computed(() => deptContext.closingHour || "23:00");
+
 const managerHeading = computed(() => {
   const firstName = currentUser?.fName || "";
-  return firstName ? `Hi, ${firstName}!` : "Hi, Manager!";
+  return firstName ? `Hey, ${firstName}` : "Hey there";
 });
-
+const managerSubtitle = computed(() => `Manager · ${deptContext.department_name || "Department"}`);
 const todayLabel = computed(() =>
   new Date().toLocaleDateString("en-US", {
-    timeZone: TZ,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+    timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric",
   }),
 );
 
+// ---- Date helpers (preserved from previous version) ---------------------
 const toDateTime = (dateValue, timeValue) => {
   if (!dateValue || !timeValue) return null;
   const [year, month, day] = String(dateValue).split("-").map(Number);
   const [hour, minute] = String(timeValue).split(":").map(Number);
   return new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0, 0);
 };
-
 const formatDateShort = (dateValue) => {
   if (!dateValue) return "—";
   const date = new Date(`${dateValue}T00:00:00`);
   return date.toLocaleDateString("en-US", { timeZone: TZ, month: "short", day: "numeric" });
 };
-
 const formatTime = (timeValue) => {
   if (!timeValue) return "—";
   const [hour, minute] = String(timeValue).split(":");
@@ -183,46 +196,46 @@ const formatTime = (timeValue) => {
   date.setHours(Number(hour || 0), Number(minute || 0), 0, 0);
   return date.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 };
-
 const formatRange = (startTime, endTime) => `${formatTime(startTime)} – ${formatTime(endTime)}`;
-
 const sameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const initialsFor = (fName, lName) => {
+  const a = String(fName || "").trim();
+  const b = String(lName || "").trim();
+  return `${a.charAt(0)}${b.charAt(0)}`.toUpperCase() || "?";
+};
 
-const workingNowCount = computed(() => {
+// TODO: join with clock records to derive on-break / needs-coverage states.
+const workingNow = computed(() => {
   const now = new Date();
   return allShifts.value.filter((shift) => {
     const start = toDateTime(shift.shift_date, shift.start_time);
     const end = toDateTime(shift.shift_date, shift.end_time);
-    if (!start || !end) return false;
-    return !!shift.assigned_user_id && now >= start && now <= end;
-  }).length;
+    return !!shift.assigned_user_id && start && end && now >= start && now <= end;
+  });
 });
-
-const comingUpCount = computed(() => {
-  const now = new Date();
-  return allShifts.value.filter((shift) => {
-    const start = toDateTime(shift.shift_date, shift.start_time);
-    if (!start) return false;
-    return !!shift.assigned_user_id && sameDay(start, now) && start > now;
-  }).length;
-});
+const workingNowCount = computed(() => workingNow.value.length);
+const clockedInAvatars = computed(() =>
+  workingNow.value.slice(0, 3).map((shift) => {
+    const u = shift.assignedUser || shift.user || {};
+    const name = `${u.fName || ""} ${u.lName || ""}`.trim() || "Worker";
+    return { key: shift.shift_id || shift.id || name, initials: initialsFor(u.fName, u.lName), name };
+  }),
+);
+const clockedInOverflow = computed(() =>
+  Math.max(workingNow.value.length - clockedInAvatars.value.length, 0),
+);
 
 const pendingApprovals = computed(() =>
   (swapRequests.value || [])
     .filter((item) => String(item.status || "").toLowerCase() === "pending")
     .map((item) => {
-      const userName =
-        item.requestedBy ||
-        `${item.user?.fName || ""} ${item.user?.lName || ""}`.trim() ||
-        "Unknown Worker";
-
+      const userName = item.requestedBy
+        || `${item.user?.fName || ""} ${item.user?.lName || ""}`.trim()
+        || "Unknown Worker";
       const shiftDate = item.shift?.shift_date || item.shift_date || item.date || null;
       const startTime = item.shift?.start_time || item.start_time || null;
       const endTime = item.shift?.end_time || item.end_time || null;
-
       return {
         id: item.id || `${userName}-${shiftDate || ""}-${startTime || ""}`,
         type: item.requestType || item.type || "Swap",
@@ -234,56 +247,106 @@ const pendingApprovals = computed(() =>
     }),
 );
 
-const pendingPreview = computed(() => pendingApprovals.value.slice(0, 3));
-
-const unfilledShifts = computed(() => {
+const unfilledNext7 = computed(() => {
   const today = new Date();
-  const sorted = (allShifts.value || [])
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const horizon = new Date(startOfToday);
+  horizon.setDate(horizon.getDate() + 7);
+  return (allShifts.value || [])
     .filter((shift) => !shift.assigned_user_id)
     .filter((shift) => {
-      const shiftStart = toDateTime(shift.shift_date, shift.start_time);
-      return shiftStart ? shiftStart >= new Date(today.getFullYear(), today.getMonth(), today.getDate()) : false;
+      const start = toDateTime(shift.shift_date, shift.start_time);
+      return start && start >= startOfToday && start < horizon;
     })
     .sort((a, b) => {
       const aStart = toDateTime(a.shift_date, a.start_time)?.getTime() || 0;
       const bStart = toDateTime(b.shift_date, b.start_time)?.getTime() || 0;
       return aStart - bStart;
     });
-
-  return sorted.map((shift) => ({
-    ...shift,
-    departmentName: shift.department?.department_name || deptContext.department_name || "Department",
-    positionName: shift.position?.position_name || "Position",
-    dateLabel: formatDateShort(shift.shift_date),
-    timeRange: formatRange(shift.start_time, shift.end_time),
-  }));
+});
+const unfilledNext7Count = computed(() => unfilledNext7.value.length);
+const unfilledNext7Subtitle = computed(() => {
+  const next = unfilledNext7.value[0];
+  return next ? `Nearest: ${formatDateShort(next.shift_date)}` : "";
 });
 
-const unfilledPreview = computed(() => unfilledShifts.value.slice(0, 3));
+const upcomingPreview = computed(() => {
+  const now = new Date();
+  const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return (allShifts.value || [])
+    .map((shift) => ({ shift, start: toDateTime(shift.shift_date, shift.start_time) }))
+    .filter(({ start }) => start && start >= now && start < end)
+    .sort((a, b) => a.start - b.start)
+    .slice(0, 5)
+    .map(({ shift }) => {
+      const u = shift.assignedUser || shift.user || {};
+      const assigneeName = shift.assigned_user_id
+        ? (`${u.fName || ""} ${u.lName || ""}`.trim() || "Assigned")
+        : "";
+      return {
+        ...shift,
+        assigneeName,
+        positionName: shift.position?.position_name || "Shift",
+        dateLabel: formatDateShort(shift.shift_date),
+        timeRange: formatRange(shift.start_time, shift.end_time),
+      };
+    });
+});
 
-const openCreateShiftDialog = () => {
-  router.push('/manager/create-shift');
-};
+const todayRange = computed(() => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+});
+
+const todayEvents = computed(() => {
+  const now = new Date();
+  return (allShifts.value || [])
+    .filter((shift) => {
+      const start = toDateTime(shift.shift_date, shift.start_time);
+      return start && sameDay(start, now);
+    })
+    .map((shift) => {
+      const start = toDateTime(shift.shift_date, shift.start_time);
+      const end = toDateTime(shift.shift_date, shift.end_time);
+      const u = shift.assignedUser || shift.user || {};
+      const assigneeName = shift.assigned_user_id
+        ? (`${u.fName || ""} ${u.lName || ""}`.trim() || "Assigned")
+        : "";
+      // TODO: derive clocked-in / on-break / needs-coverage from clock records.
+      const state = shift.assigned_user_id ? "filled" : "open";
+      return {
+        id: shift.shift_id || shift.id,
+        title: shift.position?.position_name || "Shift",
+        start, end,
+        positionId: shift.position_id,
+        positionColor: shift.position?.color || null,
+        assigneeName,
+        state,
+      };
+    });
+});
+
+// No dedicated shift detail modal exists yet — route to schedule so the user
+// can find the shift there. TODO: open ShiftDetailModal when it lands.
+const onTimelineEventClick = () => { router.push({ name: "manager-schedule" }); };
 
 const loadDashboardData = async () => {
   error.value = "";
   try {
     const [shiftsRes, swapsRes] = await Promise.all([
       shiftService.listShifts({ department_id: currentDeptId, is_published: true }),
-      // Fetch manager_pending swap/cover requests from the correct manager endpoint
       apiClient.get("/manager/swap-requests"),
     ]);
-
     allShifts.value = shiftsRes?.data || [];
-    // Normalize to the shape pendingApprovals computed expects
     const raw = swapsRes?.data?.data || swapsRes?.data || [];
     swapRequests.value = raw.map((item) => ({
       id: item.id,
-      status: item.status === 'manager_pending' ? 'pending' : item.status,
-      requestType: item.type === 'find_cover' ? 'Cover Request' : 'Swap Request',
-      requestedBy: item.requester
-        ? `${item.requester.fName} ${item.requester.lName}`
-        : 'Unknown Worker',
+      status: item.status === "manager_pending" ? "pending" : item.status,
+      requestType: item.type === "find_cover" ? "Cover Request" : "Swap Request",
+      requestedBy: item.requester ? `${item.requester.fName} ${item.requester.lName}` : "Unknown Worker",
       shift: item.requesterShift || null,
       shift_date: item.requesterShift?.shift_date || null,
       start_time: item.requesterShift?.start_time || null,
@@ -294,6 +357,7 @@ const loadDashboardData = async () => {
   }
 };
 
+// Preserve existing behavior: Schedule opens CreateShiftModal via query flag.
 const openCreateShiftPopup = () => {
   router.push({ name: "manager-schedule", query: { createShift: "1" } });
 };
@@ -302,166 +366,67 @@ onMounted(loadDashboardData);
 </script>
 
 <style scoped>
-.dashboard-page {
-  padding: 24px;
+.status-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+@media (max-width: 960px) { .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .status-strip { grid-template-columns: 1fr; } }
+
+.avatar-row { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; }
+.avatar-row__pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 999px;
+  background-color: var(--brand-primary-lt); color: var(--brand-primary);
+  font-size: 10px; font-weight: 600;
+}
+.avatar-row__overflow { font-family: var(--font-sans); font-size: var(--type-meta-size); color: var(--text-2); margin-left: 2px; }
+
+.today-section, .panel {
+  background-color: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.today-section__head, .panel__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+}
+.today-section__head { align-items: baseline; }
+.today-section__grid { height: 440px; }
+
+.two-up { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 960px) { .two-up { grid-template-columns: 1fr; } }
+
+.panel__link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--type-meta-size); color: var(--text-2); text-decoration: none;
+}
+.panel__link:hover, .list__link:hover, .shortcut-links__item:hover { color: var(--brand-primary); }
+.panel__empty {
+  display: flex; align-items: center; gap: var(--space-1);
+  color: var(--text-2); min-height: 64px; font-size: var(--type-body-size);
 }
 
-.page-header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+.list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.list__row { border-bottom: 1px solid var(--border-1); }
+.list__row:last-child { border-bottom: 0; }
+.list__link {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-2) 0; text-decoration: none; color: inherit;
 }
+.list__primary { display: flex; align-items: center; gap: var(--space-1); justify-content: space-between; }
+.list__chip {
+  font-family: var(--font-sans); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-2); background-color: var(--surface-2);
+  padding: 2px 6px; border-radius: 999px;
+}
+.list__meta { color: var(--text-2); }
 
-.header-text {
-  min-width: 260px;
+.shortcut-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding-top: var(--space-2); }
+.shortcut-links__item {
+  background: transparent; border: 0; padding: 0;
+  font-family: var(--font-sans); font-size: var(--type-meta-size);
+  color: var(--text-2); cursor: pointer;
 }
-
-.header-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 52px;
-  line-height: 1.05;
-  font-weight: 700;
-  color: #101828;
-}
-
-.page-subtitle {
-  margin: 6px 0 0;
-  color: #667085;
-  font-size: 16px;
-}
-
-.summary-card,
-.content-card {
-  border: 1px solid #e3e5e8;
-  border-radius: 14px;
-}
-
-.summary-label {
-  color: #667085;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.summary-value {
-  margin-top: 2px;
-  font-size: 34px;
-  line-height: 1.1;
-  color: #101828;
-  font-weight: 700;
-}
-
-.summary-caption {
-  margin-top: 4px;
-  color: #667085;
-  font-size: 13px;
-}
-
-.card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.card-title {
-  margin: 0;
-  font-size: 24px;
-  color: #101828;
-  font-weight: 700;
-}
-
-.card-subtitle {
-  color: #667085;
-  font-size: 15px;
-  margin-top: 2px;
-}
-
-.ghost-btn {
-  color: #1f2937;
-}
-
-.list-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.pending-item {
-  border: 1px solid #e3e5e8;
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.pending-top-row,
-.unfilled-top-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.worker-name {
-  margin-top: 8px;
-  font-size: 22px;
-  line-height: 1.15;
-  color: #101828;
-  font-weight: 500;
-}
-
-.meta-line {
-  margin-top: 4px;
-  color: #667085;
-  font-size: 16px;
-}
-
-.unfilled-item {
-  border: 1px solid #f2c48a;
-  background: #fff9f2;
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.position-name {
-  color: #101828;
-  font-weight: 500;
-  font-size: 18px;
-}
-
-.empty-state {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #667085;
-  min-height: 64px;
-}
-
-.quick-btn {
-  height: 104px;
-  min-height: 104px;
-  border-color: #d9dde3;
-}
-
-.quick-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: #1f2937;
-  font-size: 17px;
-}
-
-@media (max-width: 960px) {
-  .page-title {
-    font-size: 40px;
-  }
-}
+.shortcut-links__item:hover { text-decoration: underline; }
+.shortcut-links__sep { color: var(--text-3); font-size: var(--type-meta-size); }
 </style>

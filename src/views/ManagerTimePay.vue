@@ -49,12 +49,18 @@
           </div>
         </div>
         <v-btn
-          color="#8B1538"
+          color="primary"
           variant="flat"
           prepend-icon="mdi-check-all"
           :disabled="pendingCount === 0 || approvingAll"
           :loading="approvingAll"
-          @click="approveAllPending"
+          @click="confirmAction({
+            title: 'Approve All Pending Timecards',
+            message: `Approve ${pendingCount} time entr${pendingCount === 1 ? 'y' : 'ies'}?`,
+            confirmLabel: 'Approve All',
+            confirmColor: 'success',
+            action: approveAllPending,
+          })"
         >
           Approve All
         </v-btn>
@@ -104,7 +110,7 @@
 
       <v-divider />
 
-      <v-progress-linear v-if="loading" indeterminate color="#8B1538" />
+      <v-progress-linear v-if="loading" indeterminate color="primary" />
 
       <v-table class="timecard-table" fixed-header>
         <thead>
@@ -174,7 +180,13 @@
                   variant="text"
                   color="success"
                   :disabled="updatingStatusKey === statusKey(row, 'approved')"
-                  @click="setStatus(row, 'approved')"
+                  @click="confirmAction({
+                    title: 'Approve Timecard',
+                    message: `Approve ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Approve',
+                    confirmColor: 'success',
+                    action: () => setStatus(row, 'approved'),
+                  })"
                 >
                   <v-icon>mdi-check</v-icon>
                 </v-btn>
@@ -184,7 +196,13 @@
                   variant="text"
                   color="error"
                   :disabled="updatingStatusKey === statusKey(row, 'rejected')"
-                  @click="setStatus(row, 'rejected')"
+                  @click="confirmAction({
+                    title: 'Reject Timecard',
+                    message: `Reject ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Reject',
+                    confirmColor: 'error',
+                    action: () => setStatus(row, 'rejected'),
+                  })"
                 >
                   <v-icon>mdi-close</v-icon>
                 </v-btn>
@@ -195,7 +213,13 @@
                   variant="text"
                   color="primary"
                   :disabled="updatingStatusKey === statusKey(row, 'pending')"
-                  @click="setStatus(row, 'pending')"
+                  @click="confirmAction({
+                    title: 'Reset to Pending',
+                    message: `Reset ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry to pending for ${periodLabel}?`,
+                    confirmLabel: 'Reset',
+                    confirmColor: 'primary',
+                    action: () => setStatus(row, 'pending'),
+                  })"
                 >
                   <v-icon>mdi-restore</v-icon>
                 </v-btn>
@@ -225,7 +249,7 @@
         </v-card-title>
         <v-divider />
 
-        <v-tabs v-model="detailTab" color="#8B1538" class="px-4 pt-2">
+        <v-tabs v-model="detailTab" color="primary" class="px-4 pt-2">
           <v-tab value="punch-log">Punch Log</v-tab>
           <v-tab value="exceptions">Exceptions</v-tab>
           <v-tab value="summary">Summary</v-tab>
@@ -234,7 +258,7 @@
         <v-divider />
 
         <v-card-text>
-          <v-progress-linear v-if="detailLoading" indeterminate color="#8B1538" class="mb-3" />
+          <v-progress-linear v-if="detailLoading" indeterminate color="primary" class="mb-3" />
 
           <v-window v-model="detailTab">
             <v-window-item value="punch-log">
@@ -322,13 +346,39 @@
               </v-row>
 
               <div class="d-flex gap-2 mt-4">
-                <v-btn color="success" variant="tonal" @click="setStatus(selectedRow, 'approved', true)">Approve</v-btn>
-                <v-btn color="error" variant="tonal" @click="setStatus(selectedRow, 'rejected', true)">Reject</v-btn>
+                <v-btn
+                  color="success"
+                  variant="tonal"
+                  @click="confirmAction({
+                    title: 'Approve Timecard',
+                    message: `Approve ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Approve',
+                    confirmColor: 'success',
+                    action: () => setStatus(selectedRow, 'approved', true),
+                  })"
+                >Approve</v-btn>
+                <v-btn
+                  color="error"
+                  variant="tonal"
+                  @click="confirmAction({
+                    title: 'Reject Timecard',
+                    message: `Reject ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Reject',
+                    confirmColor: 'error',
+                    action: () => setStatus(selectedRow, 'rejected', true),
+                  })"
+                >Reject</v-btn>
                 <v-btn
                   v-if="selectedRow?.status !== 'pending'"
                   color="primary"
                   variant="text"
-                  @click="setStatus(selectedRow, 'pending', true)"
+                  @click="confirmAction({
+                    title: 'Reset to Pending',
+                    message: `Reset ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry to pending for ${periodLabel}?`,
+                    confirmLabel: 'Reset',
+                    confirmColor: 'primary',
+                    action: () => setStatus(selectedRow, 'pending', true),
+                  })"
                 >
                   Reset to Pending
                 </v-btn>
@@ -336,6 +386,24 @@
             </v-window-item>
           </v-window>
         </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- Confirmation dialog — driven by confirmAction() helper -->
+    <v-dialog v-model="dialogOpen" max-width="440" persistent>
+      <v-card>
+        <v-card-title class="text-h6">{{ pendingAction.title }}</v-card-title>
+        <v-card-text>{{ pendingAction.message }}</v-card-text>
+        <v-card-actions class="justify-end gap-2 pa-4">
+          <v-btn variant="text" @click="dialogOpen = false">Cancel</v-btn>
+          <v-btn
+            :color="pendingAction.confirmColor"
+            variant="flat"
+            @click="runPendingAction"
+          >
+            {{ pendingAction.confirmLabel }}
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -350,7 +418,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import timePayService from "../services/timePayService.js";
 import { TZ, localDateStr } from "../utils/tz.js";
 
-const HOURLY_RATE = 10;
+const HOURLY_RATE = 10; // TODO: replace with per-worker rate from API — see follow-up issue
 const ANCHOR_DATE = new Date("2026-03-30T00:00:00");
 
 const rows = ref([]);
@@ -380,6 +448,36 @@ const snackbar = reactive({
   message: "",
   color: "success",
 });
+
+// --- Confirmation dialog state ---
+const dialogOpen = ref(false);
+const pendingAction = reactive({
+  title: "",
+  message: "",
+  confirmLabel: "Confirm",
+  confirmColor: "primary",
+  action: null,
+});
+
+/**
+ * Open the confirmation dialog. Pass an `action` callback that will be invoked
+ * only when the user clicks the confirm button.
+ */
+const confirmAction = ({ title, message, confirmLabel, confirmColor, action }) => {
+  pendingAction.title = title;
+  pendingAction.message = message;
+  pendingAction.confirmLabel = confirmLabel || "Confirm";
+  pendingAction.confirmColor = confirmColor || "primary";
+  pendingAction.action = action;
+  dialogOpen.value = true;
+};
+
+const runPendingAction = () => {
+  dialogOpen.value = false;
+  if (typeof pendingAction.action === "function") {
+    pendingAction.action();
+  }
+};
 
 /**
  * Return a normalised worker descriptor from a possibly-null worker object.

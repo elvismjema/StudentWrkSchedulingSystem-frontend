@@ -12,25 +12,6 @@
             Create Shift
           </v-btn>
 
-          <v-btn-toggle
-            v-model="currentView"
-            mandatory
-            density="comfortable"
-            variant="outlined"
-            color="primary"
-            class="schedule-view-toggle"
-          >
-            <v-btn value="timeGridDay" size="small">Day</v-btn>
-            <v-btn value="timeGridWeek" size="small">Week</v-btn>
-            <v-btn
-              value="listMonth"
-              size="small"
-              :title="'Month — list view'"
-            >
-              Month
-            </v-btn>
-          </v-btn-toggle>
-
           <div class="schedule-nav-group">
             <v-btn icon variant="outlined" density="comfortable" @click="previousPeriod" aria-label="Previous">
               <v-icon>mdi-chevron-left</v-icon>
@@ -76,15 +57,6 @@
           <v-btn value="needs-coverage" size="small">Needs coverage</v-btn>
         </v-btn-toggle>
 
-        <v-switch
-          v-model="filterOnlyMyApprovals"
-          label="Only my approvals"
-          hide-details
-          density="compact"
-          color="primary"
-          class="schedule-filter-switch"
-        />
-
         <div v-if="selectedShift" class="schedule-selected-note type-meta">
           Selected: {{ selectedShift.position?.position_name }} ·
           {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
@@ -109,6 +81,10 @@
         <div class="schedule-legend__item">
           <span class="schedule-legend__swatch schedule-legend__swatch--unfilled"></span>
           <span class="schedule-legend__text">Unfilled</span>
+        </div>
+        <div class="schedule-legend__item">
+          <span class="schedule-legend__swatch schedule-legend__swatch--unacknowledged"></span>
+          <span class="schedule-legend__text">Not acknowledged</span>
         </div>
       </div>
     </div>
@@ -648,6 +624,42 @@ const filters = ref({
 // Auto-fit hours: defaults fall back to 06:00–23:00 when department hours
 // can't be resolved. Set in loadDepartmentCalendarHours().
 const calendarHours = ref({ slotMinTime: '06:00:00', slotMaxTime: '23:00:00' })
+
+// Expand calendar bounds to always cover all actual shift start/end times.
+// This prevents shifts from being visually clipped when department hours are
+// narrower than the actual shifts on the schedule.
+const effectiveCalendarHours = computed(() => {
+  const timeToMins = (t) => {
+    const parts = String(t || '').split(':').map(Number)
+    return (parts[0] || 0) * 60 + (parts[1] || 0)
+  }
+  const minsToTime = (m) => {
+    const clamped = Math.max(0, Math.min(24 * 60, m))
+    const h = Math.floor(clamped / 60)
+    const min = clamped % 60
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`
+  }
+
+  let minMins = timeToMins(calendarHours.value.slotMinTime)
+  let maxMins = timeToMins(calendarHours.value.slotMaxTime)
+
+  for (const shift of shifts.value) {
+    if (shift.start_time) {
+      const s = timeToMins(shift.start_time)
+      if (s < minMins) minMins = s
+    }
+    if (shift.end_time) {
+      const e = timeToMins(shift.end_time)
+      if (e > maxMins) maxMins = e
+    }
+  }
+
+  // Add 30-minute padding around the earliest/latest shift
+  return {
+    slotMinTime: minsToTime(Math.max(0, minMins - 30)),
+    slotMaxTime: minsToTime(Math.min(24 * 60, maxMins + 30)),
+  }
+})
 const calendarHoursSource = ref('fallback') // 'department' | 'fallback'
 const departmentHoursByDay = ref({})
 
@@ -833,6 +845,15 @@ const calendarEvents = computed(() => {
       const departmentName = shift.department?.department_name || null
       const positionColor = getPositionColor(shift.position)
       const isFilled = state === 'filled'
+
+      // Determine if the assigned worker has acknowledged this shift.
+      // A shift is unacknowledged when it has an assignee but no
+      // acknowledgement record with acknowledged === true for that user.
+      const acks = shift.acknowledgements || []
+      const isAcknowledged = !isFilled || acks.some(
+        (a) => Number(a.userId) === Number(shift.assigned_user_id) && a.acknowledged === true
+      )
+
       return {
         id: String(shift.shift_id),
         title,
@@ -840,12 +861,15 @@ const calendarEvents = computed(() => {
         end,
         // Solid fill for filled shifts; transparent for open/needs-coverage
         // (state CSS paints the amber pastel body).
+        // Unacknowledged filled shifts use a semi-transparent version of the
+        // position color so the manager can see the shift is not yet acknowledged.
         backgroundColor: isFilled ? positionColor : 'transparent',
         borderColor: positionColor,
         textColor: isFilled ? '#ffffff' : undefined,
         classNames: [
           'schedule-event',
           `schedule-event--${state}`,
+          isFilled && !isAcknowledged ? 'schedule-event--unacknowledged' : null,
           selectedShift.value?.shift_id === shift.shift_id ? 'schedule-event--selected' : null,
         ].filter(Boolean),
         extendedProps: {
@@ -855,6 +879,7 @@ const calendarEvents = computed(() => {
           assigneePhoto,
           departmentName,
           positionColor,
+          isAcknowledged,
         },
       }
     })
@@ -866,7 +891,7 @@ const calendarEvents = computed(() => {
 // just arranges the inner text stack: time · position title · assignee row,
 // plus the open / needs-coverage pill for unfilled shifts.
 const renderEventContent = (arg) => {
-  const { state, assigneeName, assigneePhoto, departmentName } =
+  const { state, assigneeName, assigneePhoto, departmentName, isAcknowledged } =
     arg.event.extendedProps || {}
 
   const body = document.createElement('div')
@@ -929,6 +954,14 @@ const renderEventContent = (arg) => {
     body.appendChild(badge)
   }
 
+  // Show a warning badge when a filled shift hasn't been acknowledged yet.
+  if (state === 'filled' && isAcknowledged === false) {
+    const badge = document.createElement('span')
+    badge.className = 'schedule-event__badge schedule-event__badge--unacknowledged'
+    badge.textContent = '⚠ Not acknowledged'
+    body.appendChild(badge)
+  }
+
   return { domNodes: [body] }
 }
 
@@ -957,8 +990,8 @@ const calendarOptions = computed(() => ({
   allDaySlot: false,
   firstDay: 0,
   events: calendarEvents.value,
-  slotMinTime: calendarHours.value.slotMinTime,
-  slotMaxTime: calendarHours.value.slotMaxTime,
+  slotMinTime: effectiveCalendarHours.value.slotMinTime,
+  slotMaxTime: effectiveCalendarHours.value.slotMaxTime,
   slotDuration: '00:30:00',
   slotLabelInterval: '01:00:00',
   snapDuration: '00:15:00',
@@ -1753,6 +1786,14 @@ onMounted(async () => {
   border: 1px dashed var(--state-break);
 }
 
+.schedule-legend__swatch--unacknowledged {
+  background: #b0b0b0;
+  opacity: 0.55;
+  filter: saturate(0.6);
+  box-shadow: none;
+  border: 1px solid #ffc107;
+}
+
 /* ---- Calendar wrap ----------------------------------------------------- */
 .schedule-calendar-wrap {
   background: var(--surface-0);
@@ -2044,6 +2085,20 @@ onMounted(async () => {
   color: var(--surface-0);
   background: var(--state-alert);
   border: 1px solid var(--state-alert);
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__badge--unacknowledged) {
+  color: #7a4f00;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+}
+
+/* Unacknowledged filled shifts: reduced opacity so managers immediately notice
+   they differ from fully-confirmed shifts. Once the worker acknowledges, the
+   class is removed and the card returns to full opacity. */
+.schedule-calendar-wrap :deep(.fc-event.schedule-event--unacknowledged) {
+  opacity: 0.55;
+  filter: saturate(0.6);
 }
 
 /* ---- Empty-day "+ Create shift" affordance ---------------------------- */

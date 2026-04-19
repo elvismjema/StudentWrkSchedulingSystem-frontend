@@ -364,10 +364,12 @@ defineExpose({ goToDate, prev, next, today });
   opacity: 0.9;
 }
 .availability-grid :deep(.availability-grid__bg--available) {
-  background: var(--state-active-lt) !important;
+  background: var(--block-avail-bg) !important;
+  border-left: 2px solid var(--block-avail-fg) !important;
 }
 .availability-grid :deep(.availability-grid__bg--unavailable) {
-  background: var(--state-alert-lt) !important;
+  background: var(--block-off-bg) !important;
+  border-left: 2px solid var(--block-off-fg) !important;
 }
 
 /* ---- Shift event presentation ----------------------------------------- */

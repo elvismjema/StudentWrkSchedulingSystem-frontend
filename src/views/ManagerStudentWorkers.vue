@@ -79,10 +79,10 @@
             <div class="availability-summary-head">
               <h4 class="availability-title">Weekly Availability</h4>
               <div class="availability-totals">
-                <v-chip size="x-small" variant="tonal" color="success">
+                <v-chip size="x-small" variant="tonal" color="blockAvailFg">
                   Available {{ countSlotsByType(worker, 'available') }}
                 </v-chip>
-                <v-chip size="x-small" variant="tonal" color="error">
+                <v-chip size="x-small" variant="tonal" color="blockOffLabel">
                   Unavailable {{ countSlotsByType(worker, 'unavailable') }}
                 </v-chip>
               </div>
@@ -156,10 +156,10 @@
                   <div class="availability-summary-head">
                     <h4 class="section-title">Weekly Availability</h4>
                     <div class="availability-totals">
-                      <v-chip size="small" variant="tonal" color="success">
+                      <v-chip size="small" variant="tonal" color="blockAvailFg">
                         Available {{ countSlotsByType(workerModal.selectedWorker, 'available') }}
                       </v-chip>
-                      <v-chip size="small" variant="tonal" color="error">
+                      <v-chip size="small" variant="tonal" color="blockOffLabel">
                         Unavailable {{ countSlotsByType(workerModal.selectedWorker, 'unavailable') }}
                       </v-chip>
                     </div>
@@ -881,15 +881,18 @@ watch(activeTab, (nextTab) => {
 }
 
 .preview-bar--available {
-  background-color: var(--state-active);
+  background-color: var(--block-avail-bg);
+  border-left: 2px solid var(--block-avail-fg);
 }
 
 .preview-bar--unavailable {
-  background-color: var(--state-alert);
+  background-color: var(--block-off-bg);
+  border-left: 2px solid var(--block-off-fg);
 }
 
 .preview-bar--class {
-  background-color: var(--state-info);
+  background-color: var(--block-class-bg);
+  border-left: 2px solid var(--block-class-fg);
 }
 
 .preview-bar-empty {

@@ -49,12 +49,18 @@
           </div>
         </div>
         <v-btn
-          color="#8B1538"
+          color="primary"
           variant="flat"
           prepend-icon="mdi-check-all"
           :disabled="pendingCount === 0 || approvingAll"
           :loading="approvingAll"
-          @click="approveAllPending"
+          @click="confirmAction({
+            title: 'Approve All Pending Timecards',
+            message: `Approve ${pendingCount} time entr${pendingCount === 1 ? 'y' : 'ies'}?`,
+            confirmLabel: 'Approve All',
+            confirmColor: 'success',
+            action: approveAllPending,
+          })"
         >
           Approve All
         </v-btn>
@@ -104,7 +110,7 @@
 
       <v-divider />
 
-      <v-progress-linear v-if="loading" indeterminate color="#8B1538" />
+      <v-progress-linear v-if="loading" indeterminate color="primary" />
 
       <v-table class="timecard-table" fixed-header>
         <thead>
@@ -130,12 +136,30 @@
           >
             <td>
               <div class="worker-cell">
-                <v-avatar size="38" color="#f5ecef">
+                <v-avatar size="38" color="brandPrimaryLt">
                   <span class="avatar-initials">{{ getInitials(row.worker) }}</span>
                 </v-avatar>
                 <div>
-                  <div class="worker-name">{{ row.worker.fName }} {{ row.worker.lName }}</div>
-                  <div class="worker-email">{{ row.worker.email }}</div>
+                  <div v-if="workerLabel(row.worker).deleted" class="worker-name worker-name--deleted">
+                    <v-tooltip
+                      text="This time record belongs to a user that was removed from the system. It is kept for payroll integrity."
+                      location="top"
+                    >
+                      <template #activator="{ props: tooltipProps }">
+                        <span v-bind="tooltipProps" class="deleted-label">Deleted user</span>
+                      </template>
+                    </v-tooltip>
+                    <v-chip
+                      color="error"
+                      size="x-small"
+                      variant="tonal"
+                      class="ml-1"
+                    >
+                      Deleted
+                    </v-chip>
+                  </div>
+                  <div v-else class="worker-name">{{ workerLabel(row.worker).name }}</div>
+                  <div class="worker-email">{{ workerLabel(row.worker).email }}</div>
                 </div>
               </div>
             </td>
@@ -156,7 +180,13 @@
                   variant="text"
                   color="success"
                   :disabled="updatingStatusKey === statusKey(row, 'approved')"
-                  @click="setStatus(row, 'approved')"
+                  @click="confirmAction({
+                    title: 'Approve Timecard',
+                    message: `Approve ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Approve',
+                    confirmColor: 'success',
+                    action: () => setStatus(row, 'approved'),
+                  })"
                 >
                   <v-icon>mdi-check</v-icon>
                 </v-btn>
@@ -166,7 +196,13 @@
                   variant="text"
                   color="error"
                   :disabled="updatingStatusKey === statusKey(row, 'rejected')"
-                  @click="setStatus(row, 'rejected')"
+                  @click="confirmAction({
+                    title: 'Reject Timecard',
+                    message: `Reject ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Reject',
+                    confirmColor: 'error',
+                    action: () => setStatus(row, 'rejected'),
+                  })"
                 >
                   <v-icon>mdi-close</v-icon>
                 </v-btn>
@@ -177,7 +213,13 @@
                   variant="text"
                   color="primary"
                   :disabled="updatingStatusKey === statusKey(row, 'pending')"
-                  @click="setStatus(row, 'pending')"
+                  @click="confirmAction({
+                    title: 'Reset to Pending',
+                    message: `Reset ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry to pending for ${periodLabel}?`,
+                    confirmLabel: 'Reset',
+                    confirmColor: 'primary',
+                    action: () => setStatus(row, 'pending'),
+                  })"
                 >
                   <v-icon>mdi-restore</v-icon>
                 </v-btn>
@@ -192,7 +234,13 @@
       <v-card>
         <v-card-title class="d-flex align-center justify-space-between">
           <div>
-            {{ selectedRow?.worker?.fName }} {{ selectedRow?.worker?.lName }}
+            <template v-if="workerLabel(selectedRow?.worker).deleted">
+              <span class="deleted-label">Deleted user</span>
+              <v-chip color="error" size="x-small" variant="tonal" class="ml-1">Deleted</v-chip>
+            </template>
+            <template v-else>
+              {{ selectedRow?.worker?.fName }} {{ selectedRow?.worker?.lName }}
+            </template>
             <div class="text-caption text-medium-emphasis">{{ selectedRow?.worker?.email }}</div>
           </div>
           <v-btn icon variant="text" @click="detailDialog = false">
@@ -201,7 +249,7 @@
         </v-card-title>
         <v-divider />
 
-        <v-tabs v-model="detailTab" color="#8B1538" class="px-4 pt-2">
+        <v-tabs v-model="detailTab" color="primary" class="px-4 pt-2">
           <v-tab value="punch-log">Punch Log</v-tab>
           <v-tab value="exceptions">Exceptions</v-tab>
           <v-tab value="summary">Summary</v-tab>
@@ -210,7 +258,7 @@
         <v-divider />
 
         <v-card-text>
-          <v-progress-linear v-if="detailLoading" indeterminate color="#8B1538" class="mb-3" />
+          <v-progress-linear v-if="detailLoading" indeterminate color="primary" class="mb-3" />
 
           <v-window v-model="detailTab">
             <v-window-item value="punch-log">
@@ -298,13 +346,39 @@
               </v-row>
 
               <div class="d-flex gap-2 mt-4">
-                <v-btn color="success" variant="tonal" @click="setStatus(selectedRow, 'approved', true)">Approve</v-btn>
-                <v-btn color="error" variant="tonal" @click="setStatus(selectedRow, 'rejected', true)">Reject</v-btn>
+                <v-btn
+                  color="success"
+                  variant="tonal"
+                  @click="confirmAction({
+                    title: 'Approve Timecard',
+                    message: `Approve ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Approve',
+                    confirmColor: 'success',
+                    action: () => setStatus(selectedRow, 'approved', true),
+                  })"
+                >Approve</v-btn>
+                <v-btn
+                  color="error"
+                  variant="tonal"
+                  @click="confirmAction({
+                    title: 'Reject Timecard',
+                    message: `Reject ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
+                    confirmLabel: 'Reject',
+                    confirmColor: 'error',
+                    action: () => setStatus(selectedRow, 'rejected', true),
+                  })"
+                >Reject</v-btn>
                 <v-btn
                   v-if="selectedRow?.status !== 'pending'"
                   color="primary"
                   variant="text"
-                  @click="setStatus(selectedRow, 'pending', true)"
+                  @click="confirmAction({
+                    title: 'Reset to Pending',
+                    message: `Reset ${workerLabel(selectedRow?.worker).deleted ? 'this' : workerLabel(selectedRow?.worker).name + '\u2019s'} time entry to pending for ${periodLabel}?`,
+                    confirmLabel: 'Reset',
+                    confirmColor: 'primary',
+                    action: () => setStatus(selectedRow, 'pending', true),
+                  })"
                 >
                   Reset to Pending
                 </v-btn>
@@ -312,6 +386,24 @@
             </v-window-item>
           </v-window>
         </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- Confirmation dialog — driven by confirmAction() helper -->
+    <v-dialog v-model="dialogOpen" max-width="440" persistent>
+      <v-card>
+        <v-card-title class="text-h6">{{ pendingAction.title }}</v-card-title>
+        <v-card-text>{{ pendingAction.message }}</v-card-text>
+        <v-card-actions class="justify-end gap-2 pa-4">
+          <v-btn variant="text" @click="dialogOpen = false">Cancel</v-btn>
+          <v-btn
+            :color="pendingAction.confirmColor"
+            variant="flat"
+            @click="runPendingAction"
+          >
+            {{ pendingAction.confirmLabel }}
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -326,7 +418,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import timePayService from "../services/timePayService.js";
 import { TZ, localDateStr } from "../utils/tz.js";
 
-const HOURLY_RATE = 10;
+const HOURLY_RATE = 10; // TODO: replace with per-worker rate from API — see follow-up issue
 const ANCHOR_DATE = new Date("2026-03-30T00:00:00");
 
 const rows = ref([]);
@@ -356,6 +448,52 @@ const snackbar = reactive({
   message: "",
   color: "success",
 });
+
+// --- Confirmation dialog state ---
+const dialogOpen = ref(false);
+const pendingAction = reactive({
+  title: "",
+  message: "",
+  confirmLabel: "Confirm",
+  confirmColor: "primary",
+  action: null,
+});
+
+/**
+ * Open the confirmation dialog. Pass an `action` callback that will be invoked
+ * only when the user clicks the confirm button.
+ */
+const confirmAction = ({ title, message, confirmLabel, confirmColor, action }) => {
+  pendingAction.title = title;
+  pendingAction.message = message;
+  pendingAction.confirmLabel = confirmLabel || "Confirm";
+  pendingAction.confirmColor = confirmColor || "primary";
+  pendingAction.action = action;
+  dialogOpen.value = true;
+};
+
+const runPendingAction = () => {
+  dialogOpen.value = false;
+  if (typeof pendingAction.action === "function") {
+    pendingAction.action();
+  }
+};
+
+/**
+ * Return a normalised worker descriptor from a possibly-null worker object.
+ * When the worker record is missing (deleted user), `deleted` is true and
+ * `name` / `email` carry sentinel display values.
+ */
+const workerLabel = (worker) => {
+  if (!worker || (!worker.fName && !worker.lName && !worker.email)) {
+    return { name: "Deleted user", email: "", deleted: true };
+  }
+  return {
+    name: `${worker.fName || ""} ${worker.lName || ""}`.trim() || "Deleted user",
+    email: worker.email || "",
+    deleted: false,
+  };
+};
 
 const statusOptions = [
   { label: "All Statuses", value: "all" },
@@ -443,7 +581,7 @@ const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { styl
 const getInitials = (worker) => {
   const first = worker?.fName?.[0] || "";
   const last = worker?.lName?.[0] || "";
-  return `${first}${last}`.toUpperCase() || "W";
+  return `${first}${last}`.toUpperCase() || "?";
 };
 
 const capitalize = (value) => {
@@ -603,17 +741,20 @@ const exportCsv = () => {
     "Period Start",
     "Period End",
   ];
-  const lines = rows.value.map((row) => ([
-    `${row.worker.fName} ${row.worker.lName}`,
-    row.worker.email,
-    Number(row.regular_hours || 0).toFixed(2),
-    Number(row.overtime_hours || 0).toFixed(2),
-    Number(row.total_hours || 0).toFixed(2),
-    Number(row.estimated_pay || 0).toFixed(2),
-    row.status,
-    periodStartStr.value,
-    periodEndStr.value,
-  ]));
+  const lines = rows.value.map((row) => {
+    const wl = workerLabel(row.worker);
+    return [
+      wl.deleted ? "Deleted user" : wl.name,
+      wl.email,
+      Number(row.regular_hours || 0).toFixed(2),
+      Number(row.overtime_hours || 0).toFixed(2),
+      Number(row.total_hours || 0).toFixed(2),
+      Number(row.estimated_pay || 0).toFixed(2),
+      row.status,
+      periodStartStr.value,
+      periodEndStr.value,
+    ];
+  });
   const csv = [header, ...lines].map((cols) => cols.map((col) => `"${String(col).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -656,12 +797,12 @@ onMounted(loadRows);
   font-size: 2rem;
   line-height: 1.15;
   margin: 0;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .page-subtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-2);
   max-width: 760px;
 }
 
@@ -684,7 +825,7 @@ onMounted(loadRows);
 
 .filters-card,
 .table-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
 }
 
@@ -703,7 +844,7 @@ onMounted(loadRows);
 }
 
 .timecard-table th {
-  color: #6b7280;
+  color: var(--text-2);
   font-weight: 600;
 }
 
@@ -718,7 +859,7 @@ onMounted(loadRows);
 }
 
 .avatar-initials {
-  color: #8b1538;
+  color: var(--brand-primary);
   font-weight: 700;
 }
 
@@ -726,27 +867,39 @@ onMounted(loadRows);
   font-weight: 600;
 }
 
+.worker-name--deleted {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deleted-label {
+  font-style: italic;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
 .worker-email {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--text-2);
 }
 
 .empty-row {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-2);
   padding: 18px 12px;
 }
 
 .empty-exception {
   display: flex;
   align-items: center;
-  color: #166534;
+  color: var(--state-active);
   padding: 8px 2px;
 }
 
 .stat-label {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--text-2);
 }
 
 .stat-value {

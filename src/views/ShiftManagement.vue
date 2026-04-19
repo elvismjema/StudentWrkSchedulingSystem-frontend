@@ -760,6 +760,7 @@ const calendarEvents = computed(() => {
         ? `${worker.fName || ''} ${worker.lName || ''}`.trim() || null
         : null
       const assigneePhoto = worker?.avatar_url || worker?.photo_url || null
+      const departmentName = shift.department?.department_name || null
       return {
         id: String(shift.shift_id),
         title,
@@ -775,6 +776,7 @@ const calendarEvents = computed(() => {
           state,
           assigneeName,
           assigneePhoto,
+          departmentName,
         },
       }
     })
@@ -786,24 +788,28 @@ const calendarEvents = computed(() => {
 // just arranges the inner text stack: time · position title · assignee row,
 // plus the open / needs-coverage pill for unfilled shifts.
 const renderEventContent = (arg) => {
-  const { state, assigneeName, assigneePhoto } = arg.event.extendedProps || {}
+  const { state, assigneeName, assigneePhoto, departmentName } =
+    arg.event.extendedProps || {}
 
   const body = document.createElement('div')
   body.className = 'schedule-event__body'
 
+  // Line 1 — time range (muted).
   const time = document.createElement('div')
   time.className = 'schedule-event__time'
   time.textContent = arg.timeText || ''
   body.appendChild(time)
 
+  // Line 2 — position title (bold, primary).
   const title = document.createElement('div')
   title.className = 'schedule-event__title'
   title.textContent = arg.event.title || ''
   body.appendChild(title)
 
+  // Line 3 — assignee (filled) or department (unfilled).
   if (assigneeName) {
     const assignee = document.createElement('div')
-    assignee.className = 'schedule-event__assignee'
+    assignee.className = 'schedule-event__sub schedule-event__assignee'
 
     const avatar = document.createElement('span')
     avatar.className = 'schedule-event__avatar'
@@ -818,11 +824,19 @@ const renderEventContent = (arg) => {
     assignee.appendChild(avatar)
 
     const name = document.createElement('span')
-    name.className = 'schedule-event__assignee-name'
+    name.className = 'schedule-event__sub-text'
     name.textContent = assigneeName
     assignee.appendChild(name)
 
     body.appendChild(assignee)
+  } else if (departmentName) {
+    const dept = document.createElement('div')
+    dept.className = 'schedule-event__sub schedule-event__department'
+    const text = document.createElement('span')
+    text.className = 'schedule-event__sub-text'
+    text.textContent = departmentName
+    dept.appendChild(text)
+    body.appendChild(dept)
   }
 
   if (state === 'open') {
@@ -1658,9 +1672,31 @@ onMounted(async () => {
   color: var(--text-3);
 }
 
-/* Selection mirror uses brand primary — token-based. */
+/* Selection mirror / drag-create ghost — brand-primary outline over a tinted
+   body, rounded to match real events. The mirror renders the time label
+   inside; we bump its size & color so "8:00 AM – 12:00 PM" reads clearly
+   before the shift is committed. */
 .schedule-calendar-wrap :deep(.fc .fc-highlight) {
   background-color: var(--brand-primary-lt);
+  border: 2px solid var(--brand-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-event-mirror) {
+  background-color: var(--brand-primary-lt) !important;
+  border: 2px solid var(--brand-primary) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-1);
+  color: var(--brand-primary-dk);
+}
+
+.schedule-calendar-wrap :deep(.fc .fc-event-mirror .fc-event-time),
+.schedule-calendar-wrap :deep(.fc .fc-event-mirror .fc-event-title) {
+  color: var(--brand-primary-dk);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 2px 6px;
 }
 
 /* ---- Event presentation -----------------------------------------------
@@ -1708,11 +1744,13 @@ onMounted(async () => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  /* Left padding leaves room for the 3px accent rail + a little breathing room. */
-  padding: 4px 8px 4px 11px;
+  gap: 3px;
+  /* Left padding leaves room for the 3px accent rail + breathing room; vertical
+     padding is generous so the 3-line stack (time · title · assignee) has room
+     to breathe like the old hand-rolled blocks. */
+  padding: 7px 10px 7px 13px;
   height: 100%;
-  min-height: 28px;
+  min-height: 40px;
   color: inherit;
   border-radius: var(--radius-sm);
 }
@@ -1749,29 +1787,45 @@ onMounted(async () => {
   background: var(--block-off-fg);
 }
 
+/* Title is the prominent line — bold, primary-text color. */
 .schedule-calendar-wrap :deep(.schedule-event__title) {
   font-size: var(--type-h3-size);
-  line-height: var(--type-h3-line);
-  font-weight: var(--type-h3-weight);
-  color: inherit;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Leave room for corner badge so title doesn't collide with it. */
+  padding-right: 4px;
 }
 
+/* Time sits above the title, monospace + muted. */
 .schedule-calendar-wrap :deep(.schedule-event__time) {
   font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
+  font-size: 11px;
+  line-height: 1.3;
   color: var(--text-2);
+  letter-spacing: 0.01em;
 }
 
-.schedule-calendar-wrap :deep(.schedule-event__assignee) {
+/* Sub row — assignee (with avatar) or department name. */
+.schedule-calendar-wrap :deep(.schedule-event__sub) {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: var(--type-meta-size);
+  line-height: 1.3;
   color: var(--text-2);
   overflow: hidden;
+  min-width: 0;
+}
+
+.schedule-calendar-wrap :deep(.schedule-event__sub-text) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .schedule-calendar-wrap :deep(.schedule-event__avatar) {
@@ -1795,10 +1849,10 @@ onMounted(async () => {
   object-fit: cover;
 }
 
-.schedule-calendar-wrap :deep(.schedule-event__assignee-name) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* On very short blocks (<40min) the third line wraps the card; hide the sub
+   row but keep time + title so the event is still readable. */
+.schedule-calendar-wrap :deep(.fc-timegrid-event-short .schedule-event__sub) {
+  display: none;
 }
 
 /* ---- State badges (top-right) ----------------------------------------- */

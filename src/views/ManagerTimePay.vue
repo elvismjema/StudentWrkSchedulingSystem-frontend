@@ -130,12 +130,30 @@
           >
             <td>
               <div class="worker-cell">
-                <v-avatar size="38" color="#f5ecef">
+                <v-avatar size="38" color="brandPrimaryLt">
                   <span class="avatar-initials">{{ getInitials(row.worker) }}</span>
                 </v-avatar>
                 <div>
-                  <div class="worker-name">{{ row.worker.fName }} {{ row.worker.lName }}</div>
-                  <div class="worker-email">{{ row.worker.email }}</div>
+                  <div v-if="workerLabel(row.worker).deleted" class="worker-name worker-name--deleted">
+                    <v-tooltip
+                      text="This time record belongs to a user that was removed from the system. It is kept for payroll integrity."
+                      location="top"
+                    >
+                      <template #activator="{ props: tooltipProps }">
+                        <span v-bind="tooltipProps" class="deleted-label">Deleted user</span>
+                      </template>
+                    </v-tooltip>
+                    <v-chip
+                      color="error"
+                      size="x-small"
+                      variant="tonal"
+                      class="ml-1"
+                    >
+                      Deleted
+                    </v-chip>
+                  </div>
+                  <div v-else class="worker-name">{{ workerLabel(row.worker).name }}</div>
+                  <div class="worker-email">{{ workerLabel(row.worker).email }}</div>
                 </div>
               </div>
             </td>
@@ -192,7 +210,13 @@
       <v-card>
         <v-card-title class="d-flex align-center justify-space-between">
           <div>
-            {{ selectedRow?.worker?.fName }} {{ selectedRow?.worker?.lName }}
+            <template v-if="workerLabel(selectedRow?.worker).deleted">
+              <span class="deleted-label">Deleted user</span>
+              <v-chip color="error" size="x-small" variant="tonal" class="ml-1">Deleted</v-chip>
+            </template>
+            <template v-else>
+              {{ selectedRow?.worker?.fName }} {{ selectedRow?.worker?.lName }}
+            </template>
             <div class="text-caption text-medium-emphasis">{{ selectedRow?.worker?.email }}</div>
           </div>
           <v-btn icon variant="text" @click="detailDialog = false">
@@ -357,6 +381,22 @@ const snackbar = reactive({
   color: "success",
 });
 
+/**
+ * Return a normalised worker descriptor from a possibly-null worker object.
+ * When the worker record is missing (deleted user), `deleted` is true and
+ * `name` / `email` carry sentinel display values.
+ */
+const workerLabel = (worker) => {
+  if (!worker || (!worker.fName && !worker.lName && !worker.email)) {
+    return { name: "Deleted user", email: "", deleted: true };
+  }
+  return {
+    name: `${worker.fName || ""} ${worker.lName || ""}`.trim() || "Deleted user",
+    email: worker.email || "",
+    deleted: false,
+  };
+};
+
 const statusOptions = [
   { label: "All Statuses", value: "all" },
   { label: "Pending", value: "pending" },
@@ -443,7 +483,7 @@ const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { styl
 const getInitials = (worker) => {
   const first = worker?.fName?.[0] || "";
   const last = worker?.lName?.[0] || "";
-  return `${first}${last}`.toUpperCase() || "W";
+  return `${first}${last}`.toUpperCase() || "?";
 };
 
 const capitalize = (value) => {
@@ -603,17 +643,20 @@ const exportCsv = () => {
     "Period Start",
     "Period End",
   ];
-  const lines = rows.value.map((row) => ([
-    `${row.worker.fName} ${row.worker.lName}`,
-    row.worker.email,
-    Number(row.regular_hours || 0).toFixed(2),
-    Number(row.overtime_hours || 0).toFixed(2),
-    Number(row.total_hours || 0).toFixed(2),
-    Number(row.estimated_pay || 0).toFixed(2),
-    row.status,
-    periodStartStr.value,
-    periodEndStr.value,
-  ]));
+  const lines = rows.value.map((row) => {
+    const wl = workerLabel(row.worker);
+    return [
+      wl.deleted ? "Deleted user" : wl.name,
+      wl.email,
+      Number(row.regular_hours || 0).toFixed(2),
+      Number(row.overtime_hours || 0).toFixed(2),
+      Number(row.total_hours || 0).toFixed(2),
+      Number(row.estimated_pay || 0).toFixed(2),
+      row.status,
+      periodStartStr.value,
+      periodEndStr.value,
+    ];
+  });
   const csv = [header, ...lines].map((cols) => cols.map((col) => `"${String(col).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -656,12 +699,12 @@ onMounted(loadRows);
   font-size: 2rem;
   line-height: 1.15;
   margin: 0;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .page-subtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-2);
   max-width: 760px;
 }
 
@@ -684,7 +727,7 @@ onMounted(loadRows);
 
 .filters-card,
 .table-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
 }
 
@@ -703,7 +746,7 @@ onMounted(loadRows);
 }
 
 .timecard-table th {
-  color: #6b7280;
+  color: var(--text-2);
   font-weight: 600;
 }
 
@@ -718,7 +761,7 @@ onMounted(loadRows);
 }
 
 .avatar-initials {
-  color: #8b1538;
+  color: var(--brand-primary);
   font-weight: 700;
 }
 
@@ -726,27 +769,39 @@ onMounted(loadRows);
   font-weight: 600;
 }
 
+.worker-name--deleted {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deleted-label {
+  font-style: italic;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
 .worker-email {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--text-2);
 }
 
 .empty-row {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-2);
   padding: 18px 12px;
 }
 
 .empty-exception {
   display: flex;
   align-items: center;
-  color: #166534;
+  color: var(--state-active);
   padding: 8px 2px;
 }
 
 .stat-label {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--text-2);
 }
 
 .stat-value {

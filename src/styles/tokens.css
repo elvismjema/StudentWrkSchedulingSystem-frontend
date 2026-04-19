@@ -44,6 +44,19 @@
   --state-info: #2F6B8F;          /* neutral informational */
   --state-info-lt: #E1EEF5;
 
+  /* ---- Block palette (pastel state blocks) ----
+     Block palette — desaturated pastel surfaces for calendar/grid blocks.
+     Use these for availability grids, schedule events, and anywhere state
+     is rendered as a filled block. Canonical reference: the student
+     availability calendar (StudentAvailability.vue). */
+  --block-avail-bg: rgba(13, 148, 136, 0.15);   /* mint */
+  --block-avail-fg: #0D9488;                     /* teal — border + label */
+  --block-off-bg: rgba(156, 163, 175, 0.18);    /* grey */
+  --block-off-fg: #9CA3AF;                       /* muted grey — border */
+  --block-off-label: #6B7280;                    /* darker grey — label text */
+  --block-class-bg: rgba(220, 38, 38, 0.18);    /* pink */
+  --block-class-fg: #DC2626;                     /* red — border + label */
+
   /* ---- Positions (off-brand by design) ---- */
   --position-1: #4F6D8C;          /* slate */
   --position-2: #6E8E5E;          /* sage */

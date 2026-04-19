@@ -66,6 +66,15 @@ const swsLight = {
     stateInfo: "#2F6B8F",
     stateInfoLt: "#E1EEF5",
 
+    // --- Block palette (pastel state blocks) ---
+    // Foreground colors for calendar/grid block borders + labels. Mirrors
+    // the --block-*-fg tokens in tokens.css. Background values are alpha'd
+    // rgba — kept as CSS vars only since Vuetify color keys don't need rgba.
+    blockAvailFg: "#0D9488",
+    blockOffFg: "#9CA3AF",
+    blockOffLabel: "#6B7280",
+    blockClassFg: "#DC2626",
+
     // --- Position palette (off-brand by design) ---
     position1: "#4F6D8C",
     position2: "#6E8E5E",

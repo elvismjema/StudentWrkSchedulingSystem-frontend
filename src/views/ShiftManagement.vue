@@ -1690,7 +1690,7 @@ onMounted(async () => {
   :deep(.fc-event.schedule-event--open),
 .schedule-calendar-wrap
   :deep(.fc-event.schedule-event--needs-coverage) {
-  background: var(--state-break-lt);
+  background: var(--block-off-bg);
   color: var(--text-1);
 }
 
@@ -1738,14 +1738,15 @@ onMounted(async () => {
   :deep(.schedule-event--open .schedule-event__body),
 .schedule-calendar-wrap
   :deep(.schedule-event--needs-coverage .schedule-event__body) {
-  border: 1px dashed rgba(198, 123, 60, 0.5);
+  /* Derived from --block-off-fg (#9CA3AF) at 50% alpha. */
+  border: 1px dashed rgba(156, 163, 175, 0.5);
 }
 
 .schedule-calendar-wrap
   :deep(.schedule-event--open .schedule-event__body)::before,
 .schedule-calendar-wrap
   :deep(.schedule-event--needs-coverage .schedule-event__body)::before {
-  background: var(--state-break);
+  background: var(--block-off-fg);
 }
 
 .schedule-calendar-wrap :deep(.schedule-event__title) {

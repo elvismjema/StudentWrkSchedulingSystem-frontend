@@ -2299,17 +2299,17 @@ onMounted(async () => {
   opacity: 0.75;
 }
 .m-cal-block--class {
-  background: rgba(220, 38, 38, 0.18);
-  border-left: 2px solid #DC2626;
+  background: var(--block-class-bg);
+  border-left: 2px solid var(--block-class-fg);
   cursor: default;
 }
 .m-cal-block--available {
-  background: rgba(13, 148, 136, 0.15);
-  border-left: 2px solid #0D9488;
+  background: var(--block-avail-bg);
+  border-left: 2px solid var(--block-avail-fg);
 }
 .m-cal-block--unavailable {
-  background: rgba(156, 163, 175, 0.18);
-  border-left: 2px solid #9CA3AF;
+  background: var(--block-off-bg);
+  border-left: 2px solid var(--block-off-fg);
 }
 .m-cal-block-label {
   font-size: 8px;
@@ -2322,7 +2322,7 @@ onMounted(async () => {
   max-width: 100%;
   padding: 0 2px;
 }
-.m-cal-block--class .m-cal-block-label { color: #DC2626; }
-.m-cal-block--available .m-cal-block-label { color: #0D9488; }
-.m-cal-block--unavailable .m-cal-block-label { color: #6B7280; }
+.m-cal-block--class .m-cal-block-label { color: var(--block-class-fg); }
+.m-cal-block--available .m-cal-block-label { color: var(--block-avail-fg); }
+.m-cal-block--unavailable .m-cal-block-label { color: var(--block-off-label); }
 </style>

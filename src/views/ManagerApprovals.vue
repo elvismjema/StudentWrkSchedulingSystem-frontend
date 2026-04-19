@@ -15,7 +15,7 @@
           variant="tonal"
           color="primary"
           prepend-icon="mdi-refresh"
-          :loading="loading || swapsLoading || ackLoading"
+          :loading="loading || swapsLoading"
           @click="loadAll"
         >
           Refresh
@@ -40,16 +40,6 @@
         <v-badge
           v-if="pendingSwapCount > 0"
           :content="pendingSwapCount"
-          color="primary"
-          inline
-          class="ml-2"
-        />
-      </v-tab>
-      <v-tab value="shift-acknowledgments">
-        Shift Acknowledgments
-        <v-badge
-          v-if="unacknowledgedCount > 0"
-          :content="unacknowledgedCount"
           color="primary"
           inline
           class="ml-2"
@@ -378,56 +368,6 @@
         </template>
       </v-tabs-window-item>
 
-      <!-- ─── Shift Acknowledgments Tab ──────────────────────────────── -->
-      <v-tabs-window-item value="shift-acknowledgments">
-        <v-progress-linear v-if="ackLoading" indeterminate color="primary" class="mb-4" />
-
-        <v-alert v-if="ackError" type="error" variant="tonal" class="mb-4">
-          {{ ackError }}
-        </v-alert>
-
-        <div v-if="activeTab === 'shift-acknowledgments' && acknowledgments.length === 0 && !ackLoading" class="empty-state">
-          <v-icon size="48" color="grey-lighten-1">mdi-check-decagram</v-icon>
-          <p class="text-body-1 text-medium-emphasis mt-2">No pending shift acknowledgments found.</p>
-        </div>
-
-        <v-card
-          v-for="ack in acknowledgments"
-          v-if="activeTab === 'shift-acknowledgments'"
-          :key="ack.id"
-          elevation="2"
-          class="mb-3"
-        >
-          <v-card-text>
-            <div class="d-flex align-start justify-space-between flex-wrap gap-2">
-              <div>
-                <div class="text-subtitle-1 font-weight-bold">
-                  {{ ack.user?.fName }} {{ ack.user?.lName }}
-                  <span class="text-caption text-medium-emphasis ml-1">{{ ack.user?.email }}</span>
-                </div>
-                <div class="d-flex align-center gap-2 mt-1 flex-wrap">
-                  <v-chip size="x-small" variant="tonal">
-                    {{ ack.shift?.department?.department_name || 'Department' }}
-                  </v-chip>
-                  <v-chip size="x-small" variant="tonal">
-                    {{ formatDate(ack.shift?.shift_date) }}
-                  </v-chip>
-                  <v-chip
-                    size="x-small"
-                    :color="ack.acknowledged ? 'success' : 'warning'"
-                    variant="flat"
-                  >
-                    {{ ack.acknowledged ? 'Acknowledged' : 'Pending' }}
-                  </v-chip>
-                </div>
-                <div v-if="ack.acknowledgedAt" class="text-caption text-medium-emphasis mt-1">
-                  Acknowledged on {{ formatDateTime(ack.acknowledgedAt) }}
-                </div>
-              </div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-tabs-window-item>
     </v-tabs-window>
   </v-container>
 
@@ -448,13 +388,10 @@ const currentDeptId = deptContext.department_id || null
 const activeTab = ref('time-off')
 const loading = ref(false)
 const swapsLoading = ref(false)
-const ackLoading = ref(false)
 const actioning = ref(null)
 const timeOffError = ref('')
-const ackError = ref('')
 const timeOffRequests = ref([])
 const swapRequests = ref([])
-const acknowledgments = ref([])
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
 const pendingTimeOffCount = computed(() =>
@@ -493,9 +430,6 @@ const hasPendingSwapActions = computed(() =>
   actionableTradeRequests.value.length > 0
 )
 
-const unacknowledgedCount = computed(() =>
-  acknowledgments.value.filter(a => !a.acknowledged).length
-)
 
 const loadTimeOffRequests = async () => {
   loading.value = true
@@ -539,23 +473,6 @@ const loadSwapRequests = async () => {
   }
 }
 
-const loadAcknowledgments = async () => {
-  ackLoading.value = true
-  ackError.value = ''
-  try {
-    const params = new URLSearchParams()
-    if (currentDeptId) params.append('departmentId', currentDeptId)
-    params.append('acknowledged', 'false')
-
-    const response = await apiClient.get(`/shift-acknowledgements?${params.toString()}`)
-    acknowledgments.value = response?.data?.data || response?.data || []
-  } catch (err) {
-    ackError.value = 'Failed to load shift acknowledgments.'
-    console.error(err)
-  } finally {
-    ackLoading.value = false
-  }
-}
 
 const actionTimeOff = async (req, status) => {
   const key = `${req.id}-${status}`
@@ -621,7 +538,6 @@ const formatDateTime = (dateStr) => {
 const loadAll = () => {
   loadTimeOffRequests()
   loadSwapRequests()
-  loadAcknowledgments()
 }
 
 onMounted(loadAll)

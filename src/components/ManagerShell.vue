@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <ManagerSidebar ref="sidebarRef" />
-    <ManagerTopBar />
+    <ManagerTopBar @toggle-sidebar="toggleRail" />
 
     <v-main class="main-content">
       <v-container fluid class="role-content pa-0">
@@ -26,6 +26,13 @@ import ManagerTopBar from "./ManagerTopBar.vue";
 // toggle the rail (e.g. responsive breakpoints). The top bar no longer has a
 // hamburger — the rail toggle lives inside the sidebar footer.
 const sidebarRef = ref(null);
+
+// Toggle sidebar rail mode
+const toggleSidebar = () => {
+  if (sidebarRef.value) {
+    sidebarRef.value.toggleRail();
+  }
+};
 </script>
 
 <style scoped>

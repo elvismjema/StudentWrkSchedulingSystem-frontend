@@ -72,44 +72,6 @@
       </template>
     </v-list>
 
-    <template #append>
-      <div class="rail-toggle-wrap">
-        <v-tooltip
-          :text="rail ? 'Expand' : 'Collapse'"
-          :disabled="!rail"
-          location="end"
-        >
-          <template #activator="{ props: tooltipProps }">
-            <v-btn
-              v-bind="tooltipProps"
-              variant="text"
-              density="comfortable"
-              class="rail-toggle-btn"
-              :aria-label="rail ? 'Expand sidebar' : 'Collapse sidebar'"
-              @click="toggleRail"
-            >
-              <v-icon :icon="rail ? 'mdi-chevron-double-right' : 'mdi-chevron-double-left'" size="20" />
-              <span v-if="!rail" class="rail-toggle-label">Collapse</span>
-            </v-btn>
-          </template>
-        </v-tooltip>
-      </div>
-
-      <v-divider />
-      <div class="user-section">
-        <v-list-item class="user-item">
-          <template #prepend>
-            <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">{{ displayInitial }}</span>
-            </v-avatar>
-          </template>
-          <div v-if="!rail" class="user-info">
-            <div class="user-name">{{ displayName }}</div>
-            <div class="user-role">{{ displayRole }}</div>
-          </div>
-        </v-list-item>
-      </div>
-    </template>
   </v-navigation-drawer>
 </template>
 
@@ -122,20 +84,6 @@ const drawer = ref(true);
 const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
 
-const displayName = computed(() => {
-  const first = user.value?.fName || "";
-  const last = user.value?.lName || "";
-  const fullName = `${first} ${last}`.trim();
-  return fullName || "User";
-});
-
-const displayRole = computed(() => {
-  const role = (user.value?.role || "").toLowerCase();
-  if (role === "admin") return "Admin";
-  if (role === "manager") return "Manager";
-  return "Student";
-});
-
 const displayDepartment = computed(() => {
   const context = Utils.getStore("currentDepartmentContext");
   if (context?.department_name) return context.department_name;
@@ -144,12 +92,6 @@ const displayDepartment = computed(() => {
 });
 
 const bannerTitle = computed(() => displayDepartment.value);
-
-const displayInitial = computed(() => {
-  const first = user.value?.fName?.[0] || "";
-  const last = user.value?.lName?.[0] || "";
-  return `${first}${last}`.toUpperCase() || "U";
-});
 
 const isAdmin = computed(() => {
   return (user.value?.role || "").toLowerCase() === "admin";

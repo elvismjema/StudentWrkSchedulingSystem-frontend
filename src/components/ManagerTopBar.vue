@@ -5,6 +5,16 @@
     class="manager-top-bar"
     color="surface-0"
   >
+    <v-btn
+      icon
+      variant="text"
+      class="menu-btn"
+      aria-label="Toggle sidebar"
+      @click="emit('toggle-sidebar')"
+    >
+      <v-icon icon="mdi-menu" size="24" />
+    </v-btn>
+
     <v-spacer />
 
     <div class="top-actions">
@@ -95,6 +105,7 @@ import { useRouter } from "vue-router";
 import Utils from "../config/utils";
 import NotificationDropdown from "./NotificationDropdown.vue";
 
+const emit = defineEmits(["toggle-sidebar"]);
 const router = useRouter();
 const menuOpen = ref(false);
 const user = ref(Utils.getStore("user") || {});
@@ -142,6 +153,11 @@ const handleNotificationClick = (notification) => {
   // Reserved for future routing based on notification type.
   console.log("Manager notification clicked:", notification);
 };
+
+const toggleSidebar = () => {
+  emit('toggle-sidebar');
+}hamburger-btn {
+  margin-right:['toggle-sidebar']);
 </script>
 
 <style scoped>

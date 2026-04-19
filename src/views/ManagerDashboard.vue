@@ -51,9 +51,9 @@
 
       <!-- TODO: wire to timecards weekly rollup once backend returns totals. -->
       <StatCard
-        label="Labor this week"
+        label="Hours this week"
         value="—"
-        subtitle="Hours · est. cost"
+        subtitle="Estimated payroll"
         :to="{ name: 'manager-time-pay' }"
         :mute-zero="false"
         coming-soon

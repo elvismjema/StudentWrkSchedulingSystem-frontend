@@ -30,7 +30,7 @@
         v-if="!clockedIn"
         size="small"
         variant="flat"
-        color="success"
+        color="primary"
         :loading="loading"
         :disabled="loading"
         prepend-icon="mdi-login"
@@ -167,7 +167,8 @@ const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'wh
   gap: 8px;
 }
 .clock-banner--active {
-  background: var(--state-active);
+  /* Keep student mobile clock banner in the maroon family */
+  background: var(--brand-primary, #811429);
   color: white;
 }
 .clock-banner--break {

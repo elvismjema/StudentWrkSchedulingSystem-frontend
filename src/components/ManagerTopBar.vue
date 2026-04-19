@@ -157,8 +157,6 @@ const handleNotificationClick = (notification) => {
 const toggleSidebar = () => {
   emit('toggle-sidebar');
 };
-
-const emit = defineEmits(['toggle-sidebar']);
 </script>
 
 <style scoped>

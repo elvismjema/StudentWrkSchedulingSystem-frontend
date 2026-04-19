@@ -41,28 +41,32 @@
       </v-btn>
 
       <!-- State: clocked in, not on break → Start Break + Clock Out -->
+      <!-- Both actions get the same outlined-white treatment on the maroon
+           banner so they read with equal weight. The maroon banner itself
+           is the dominant visual; the buttons are secondary affordances. -->
       <template v-if="clockedIn && !onBreak">
         <v-btn
           size="small"
           variant="outlined"
-          :color="breakBtnColor"
+          color="white"
           :loading="loading"
           :disabled="loading"
           prepend-icon="mdi-coffee-outline"
           aria-label="Start break"
-          class="mr-2"
+          class="clock-banner-btn mr-2"
           @click.stop="$emit('start-break')"
         >
           Start Break
         </v-btn>
         <v-btn
           size="small"
-          variant="flat"
-          :color="clockOutBtnColor"
+          variant="outlined"
+          color="white"
           :loading="loading"
           :disabled="loading"
           prepend-icon="mdi-logout"
           aria-label="Clock out"
+          class="clock-banner-btn clock-banner-btn--emphasis"
           @click.stop="$emit('clock-out')"
         >
           Clock Out
@@ -151,9 +155,9 @@ const ariaLabel = computed(() => {
   return text;
 });
 
-// Button colors adapt to banner background so text stays legible
-const clockOutBtnColor  = computed(() => props.clockedIn && !props.onBreak ? 'white' : 'error');
-const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'white' : 'default');
+// (Button colors are now handled declaratively in the template; both
+// actions on the active maroon banner use an outlined-white treatment
+// so they read with equal weight.)
 </script>
 
 <style scoped>
@@ -206,5 +210,24 @@ const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'wh
 .clock-banner__actions :deep(.v-btn) {
   white-space: nowrap;
   min-width: max-content;
+}
+
+/* Clock-banner action buttons: equal-weight outlined-white pills on the
+   maroon banner. The emphasis variant (Clock Out) gets a thicker border
+   so the primary action still reads first without switching to a loud
+   fill that would fight the maroon background. */
+.clock-banner-btn :deep(.v-btn__overlay) { opacity: 0; }
+.clock-banner-btn {
+  letter-spacing: 0.3px;
+  text-transform: none;
+  font-weight: 600;
+}
+.clock-banner-btn--emphasis :deep(.v-btn__content) {
+  font-weight: 700;
+}
+.clock-banner-btn--emphasis {
+  /* A whisker heavier border + subtle halo makes Clock Out the primary CTA
+     without introducing a fourth color. */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 </style>

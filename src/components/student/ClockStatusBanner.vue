@@ -160,6 +160,7 @@ const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'wh
 .clock-banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   padding: 10px 16px;
   border-radius: 12px;
   transition: background-color 0.3s;
@@ -197,5 +198,12 @@ const breakBtnColor     = computed(() => props.clockedIn && !props.onBreak ? 'wh
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Prevent button labels from being cut mid-word on narrow viewports */
+.clock-banner__actions :deep(.v-btn) {
+  white-space: nowrap;
+  min-width: max-content;
 }
 </style>

@@ -104,7 +104,7 @@ defineExpose({
 
 <style scoped>
 .admin-sidebar {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--border-1);
 }
 
 .logo-section {
@@ -118,7 +118,7 @@ defineExpose({
 }
 
 .oc-logo {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
   color: white;
   width: 40px;
   height: 40px;
@@ -134,12 +134,12 @@ defineExpose({
 .brand-title {
   font-size: 19px;
   font-weight: 700;
-  color: #1f2328;
+  color: var(--text-1);
 }
 
 .brand-subtitle {
   font-size: 14px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .admin-nav {
@@ -152,8 +152,8 @@ defineExpose({
 }
 
 .admin-active-nav-item {
-  background: #f0f6ff;
-  color: #0969da;
+  background: var(--state-info-lt);
+  color: var(--state-info);
 }
 
 .admin-user-wrap {
@@ -166,6 +166,9 @@ defineExpose({
 }
 
 .admin-user-avatar {
+  /* TODO: audit color intent — this distinct red marks the admin avatar and
+     does not map cleanly to state-alert (--state-alert is warmer, less
+     saturated). Left as-is pending a design decision. */
   background: #b71c1c;
 }
 
@@ -184,12 +187,12 @@ defineExpose({
 .admin-user-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--text-1);
 }
 
 .admin-user-role {
   font-size: 14px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .logo-text {
@@ -199,13 +202,13 @@ defineExpose({
 .main-title {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
 .sub-title {
   font-size: 11px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   margin-top: 2px;
 }
@@ -229,20 +232,20 @@ defineExpose({
 }
 
 .nav-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 .active-nav-item {
-  background-color: #f8e6ea !important;
-  color: #8B1538 !important;
+  background-color: var(--brand-primary-lt) !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-icon {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-list-item-title {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
   font-weight: 500;
 }
 
@@ -256,7 +259,7 @@ defineExpose({
 }
 
 .user-avatar {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
 }
 
 .user-initial {
@@ -266,7 +269,7 @@ defineExpose({
 }
 
 .user-name {
-  color: #333;
+  color: var(--text-1);
   font-size: 13px;
   font-weight: 600;
 }
@@ -277,7 +280,7 @@ defineExpose({
 }
 
 .user-role {
-  color: #666;
+  color: var(--text-2);
   font-size: 11px;
   margin-top: 2px;
 }

@@ -147,7 +147,7 @@ defineExpose({
 
 <style scoped>
 .sidebar {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--border-1);
 }
 
 .logo-section {
@@ -161,7 +161,7 @@ defineExpose({
 }
 
 .oc-logo {
-  background-color: #8B1538; /* OC Maroon */
+  background-color: var(--brand-primary);
   color: white;
   width: 40px;
   height: 40px;
@@ -181,13 +181,13 @@ defineExpose({
 .main-title {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
 .sub-title {
   font-size: 11px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   margin-top: 2px;
 }
@@ -211,20 +211,20 @@ defineExpose({
 }
 
 .nav-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 .active-nav-item {
-  background-color: #f8e6ea !important; /* Light maroon/pink background */
-  color: #8B1538 !important; /* OC Maroon */
+  background-color: var(--brand-primary-lt) !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-icon {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-list-item-title {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
   font-weight: 500;
 }
 
@@ -238,7 +238,7 @@ defineExpose({
 }
 
 .user-avatar {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
 }
 
 .user-initial {
@@ -248,7 +248,7 @@ defineExpose({
 }
 
 .user-name {
-  color: #333;
+  color: var(--text-1);
   font-size: 13px;
   font-weight: 600;
 }
@@ -259,7 +259,7 @@ defineExpose({
 }
 
 .user-role {
-  color: #666;
+  color: var(--text-2);
   font-size: 11px;
   margin-top: 2px;
 }

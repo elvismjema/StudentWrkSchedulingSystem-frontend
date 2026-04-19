@@ -7,11 +7,11 @@
         <p class="page-subtitle">{{ workers.length }} student workers</p>
       </div>
       <div class="header-actions">
-        <v-btn color="#8B1538" prepend-icon="mdi-account-plus" @click="openAddWorkerDialog">
+        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAddWorkerDialog">
           Add Worker
         </v-btn>
         <v-btn 
-          color="#8B1538" 
+          color="primary" 
           variant="outlined" 
           prepend-icon="mdi-briefcase-plus" 
           @click="goToPositionsScreen"
@@ -41,13 +41,13 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
-      <v-progress-circular indeterminate color="#8B1538" size="40" />
+      <v-progress-circular indeterminate color="primary" size="40" />
       <p class="loading-text">Loading workers...</p>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredWorkers.length === 0" class="empty-state">
-      <v-icon size="48" color="#667085">mdi-account-group-outline</v-icon>
+      <v-icon size="48" color="text-2">mdi-account-group-outline</v-icon>
       <h3 class="empty-title">No workers in your department yet</h3>
       <p class="empty-subtitle">Start by adding student workers to your department</p>
     </div>
@@ -64,7 +64,7 @@
         <v-card-text class="worker-card-content">
           <!-- Worker Avatar and Info -->
           <div class="worker-header">
-            <v-avatar class="worker-avatar" color="#8B1538" size="48">
+            <v-avatar class="worker-avatar" color="primary" size="48">
               <span class="avatar-text">{{ getWorkerInitials(worker) }}</span>
             </v-avatar>
             <div class="worker-info">
@@ -124,7 +124,7 @@
       <v-card v-if="workerModal.selectedWorker">
         <v-card-title class="modal-header">
           <div class="modal-worker-info">
-            <v-avatar class="modal-avatar" color="#8B1538" size="56">
+            <v-avatar class="modal-avatar" color="primary" size="56">
               <span class="avatar-text">{{ getWorkerInitials(workerModal.selectedWorker) }}</span>
             </v-avatar>
             <div>
@@ -181,7 +181,7 @@
                 <div class="schedule-header">
                   <h4 class="section-title">Class Schedule</h4>
                   <v-btn
-                    color="#8B1538"
+                    color="primary"
                     variant="outlined"
                     :loading="loadingSchedule"
                     @click="loadClassSchedule"
@@ -193,7 +193,7 @@
 
                 <!-- Loading Schedule -->
                 <div v-if="loadingSchedule" class="schedule-loading">
-                  <v-progress-circular indeterminate color="#8B1538" size="32" />
+                  <v-progress-circular indeterminate color="primary" size="32" />
                   <p>Loading class schedule...</p>
                 </div>
 
@@ -204,7 +204,7 @@
 
                 <!-- No Schedule Data -->
                 <div v-else-if="!classSchedule || classSchedule.length === 0" class="no-schedule">
-                  <v-icon size="32" color="#667085">mdi-calendar-blank-outline</v-icon>
+                  <v-icon size="32" color="text-2">mdi-calendar-blank-outline</v-icon>
                   <p>No class schedule found</p>
                 </div>
 
@@ -232,7 +232,7 @@
                           :key="`${meeting.days.join('-')}-${meeting.start_time}`"
                           class="meeting-time"
                         >
-                          <v-chip size="small" color="#8B1538" variant="outlined">
+                          <v-chip size="small" color="primary" variant="outlined">
                             {{ formatMeetingDays(meeting.days) }}
                           </v-chip>
                           <span class="time-range">
@@ -708,13 +708,13 @@ watch(activeTab, (nextTab) => {
   margin: 0;
   font-size: 40px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
   line-height: 1.1;
 }
 
 .page-subtitle {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -743,7 +743,7 @@ watch(activeTab, (nextTab) => {
 
 .loading-text {
   margin-top: 16px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -756,12 +756,12 @@ watch(activeTab, (nextTab) => {
   margin: 16px 0 8px;
   font-size: 20px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .empty-subtitle {
   margin: 0 0 24px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -772,7 +772,7 @@ watch(activeTab, (nextTab) => {
 }
 
 .worker-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -812,7 +812,7 @@ watch(activeTab, (nextTab) => {
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
@@ -824,7 +824,7 @@ watch(activeTab, (nextTab) => {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .availability-summary-head {
@@ -859,7 +859,7 @@ watch(activeTab, (nextTab) => {
 .preview-day-label {
   font-size: 9px;
   font-weight: 700;
-  color: #98a2b3;
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1;
@@ -881,21 +881,21 @@ watch(activeTab, (nextTab) => {
 }
 
 .preview-bar--available {
-  background-color: #16a34a;
+  background-color: var(--state-active);
 }
 
 .preview-bar--unavailable {
-  background-color: #dc2626;
+  background-color: var(--state-alert);
 }
 
 .preview-bar--class {
-  background-color: #0277bd;
+  background-color: var(--state-info);
 }
 
 .preview-bar-empty {
   height: 20px;
   border-radius: 4px;
-  background-color: #f3f4f6;
+  background-color: var(--surface-2);
   width: 100%;
 }
 
@@ -918,12 +918,12 @@ watch(activeTab, (nextTab) => {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .modal-worker-email {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -953,16 +953,16 @@ watch(activeTab, (nextTab) => {
 
 .detail-label {
   font-weight: 600;
-  color: #374151;
+  color: var(--text-2);
   min-width: 80px;
 }
 
 .detail-value {
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .modal-availability {
-  border-top: 1px solid #e3e5e8;
+  border-top: 1px solid var(--border-1);
   padding-top: 20px;
 }
 
@@ -970,16 +970,16 @@ watch(activeTab, (nextTab) => {
   min-height: 420px;
   max-height: 60vh;
   overflow: auto;
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 10px;
-  background: #ffffff;
+  background: #fff;
 }
 
 .section-title {
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .schedule-section {
@@ -1000,7 +1000,7 @@ watch(activeTab, (nextTab) => {
   justify-content: center;
   padding: 40px;
   text-align: center;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .no-schedule {
@@ -1010,7 +1010,7 @@ watch(activeTab, (nextTab) => {
   justify-content: center;
   padding: 40px;
   text-align: center;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .schedule-list {
@@ -1020,7 +1020,7 @@ watch(activeTab, (nextTab) => {
 }
 
 .course-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 8px;
 }
 
@@ -1028,7 +1028,7 @@ watch(activeTab, (nextTab) => {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .course-details {
@@ -1037,13 +1037,13 @@ watch(activeTab, (nextTab) => {
 
 .course-id {
   font-size: 12px;
-  color: #667085;
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
 .course-instructors {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
 }
 
 .instructor {
@@ -1064,7 +1064,7 @@ watch(activeTab, (nextTab) => {
 
 .time-range {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
 }
 
 .modal-actions {

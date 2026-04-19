@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <ManagerSidebar ref="sidebarRef" />
-    <ManagerTopBar @toggle-sidebar="toggleRail" />
+    <ManagerTopBar @toggle-sidebar="toggleSidebar" />
 
     <v-main class="main-content">
       <v-container fluid class="role-content pa-0">

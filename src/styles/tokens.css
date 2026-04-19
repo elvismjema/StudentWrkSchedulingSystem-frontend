@@ -8,12 +8,22 @@
  */
 
 :root {
-  /* ---- Brand ---- */
-  --brand-primary: #80162B;       /* OC maroon — Vuetify primary */
-  --brand-primary-dk: #5E0F20;    /* hover / pressed */
-  --brand-primary-lt: #F6E6EA;    /* active-nav tint, selected row, chip bg */
+  /* ---- Brand ----
+     Institutional OC palette. Pulled directly from oc.edu/brand and verified
+     against live computed CSS on oc.edu (.bg-maroon-500 = #811429,
+     .text-maroon-600 = #48111c, .bg-silver = #d5dfe7, .bg-cream = #f4ecd0).
+     Do NOT switch to the athletics-department maroon (#660000) — this is a
+     staff/student app, not an athletics product. */
+  --brand-primary: #811429;       /* OC maroon — Vuetify primary */
+  --brand-primary-dk: #48111C;    /* hover / pressed — OC "maroon-600" */
+  --brand-primary-lt: #F4E6EA;    /* active-nav tint, selected row, chip bg (derived) */
   --brand-ink: #1F1214;           /* primary text, subtly warm */
-  --brand-accent: #47121D;        /* hero moments only — NOT success */
+  --brand-accent: #48111C;        /* hero moments only — NOT success */
+
+  /* OC institutional secondaries — available for panels, illustrations, and
+     tertiary surfaces. Not aliased to Vuetify semantic keys. */
+  --brand-silver: #D5DFE7;        /* OC Silver — blue-gray panel */
+  --brand-cream: #F4ECD0;         /* OC Cream — warm off-white */
 
   /* ---- Neutrals ---- */
   --surface-0: #FFFFFF;           /* cards, modals, top bar */

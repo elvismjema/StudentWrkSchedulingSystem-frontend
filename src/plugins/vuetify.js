@@ -34,18 +34,22 @@ const swsLight = {
   dark: false,
   colors: {
     // --- Vuetify semantic keys ---
-    primary: "#80162B",           // brand-primary (OC maroon)
-    secondary: "#E1E1E1",
-    accent: "#47121D",            // brand-accent (hero moments, NOT success)
+    // Institutional OC palette (oc.edu/brand — verified via live CSS).
+    // Not the athletics #660000 — this is a staff/student app.
+    primary: "#811429",           // brand-primary (OC maroon-500)
+    secondary: "#D5DFE7",         // OC Silver (institutional, not athletics)
+    accent: "#48111C",            // brand-accent / OC maroon-600
     success: "#3F7A4D",           // state-active — was aliased to maroon; fixed
     warning: "#C67B3C",           // state-break
     error: "#B8402E",             // state-alert
     info: "#2F6B8F",              // state-info
 
     // --- Brand ---
-    brandPrimaryDk: "#5E0F20",
-    brandPrimaryLt: "#F6E6EA",
+    brandPrimaryDk: "#48111C",    // OC maroon-600 (hover / pressed)
+    brandPrimaryLt: "#F4E6EA",
     brandInk: "#1F1214",
+    brandSilver: "#D5DFE7",       // OC Silver (institutional)
+    brandCream: "#F4ECD0",        // OC Cream
 
     // --- Surfaces / borders ---
     surface1: "#FAFAFA",

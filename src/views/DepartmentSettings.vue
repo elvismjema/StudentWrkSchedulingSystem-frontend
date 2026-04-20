@@ -1,172 +1,43 @@
-<template>
-  <div class="department-settings-container">
-    <v-card class="settings-card" elevation="2">
-      <v-card-title class="text-h4 mb-4">
-        <v-icon left>mdi-cog</v-icon>
-        Department Settings
+﻿<template>
+  <div class="department-hours-container">
+    <v-card class="hours-card" elevation="2">
+      <v-card-title class="text-h4 mb-2">
+        <v-icon left>mdi-clock-outline</v-icon>
+        Department Hours
       </v-card-title>
 
       <v-card-text>
-        <!-- Loading State -->
-        <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
+        <!-- Loading -->
+        <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4"></v-progress-linear>
 
-        <!-- Error Alert -->
-        <v-alert v-if="error" type="error" dismissible @click:close="error = null" class="mb-4">
-          {{ error }}
+        <!-- No department warning -->
+        <v-alert v-if="!loading && !selectedDepartmentId" type="warning" class="mb-4">
+          No department found. Make sure you are assigned to a department as a manager.
         </v-alert>
 
+        <!-- Department name header -->
+        <div v-if="selectedDepartmentId && departmentName" class="mb-4 d-flex align-center">
+          <v-icon class="mr-2" color="primary">mdi-office-building-outline</v-icon>
+          <span class="text-h6 font-weight-medium">{{ departmentName }}</span>
+        </div>
+
         <!-- Success Alert -->
-        <v-alert v-if="successMessage" type="success" dismissible @click:close="successMessage = null" class="mb-4">
+        <v-alert v-if="successMessage" type="success" closable @click:close="successMessage = null" class="mb-4">
           {{ successMessage }}
         </v-alert>
 
-        <!-- Department Selection -->
-        <v-select
-          v-model="selectedDepartmentId"
-          :items="departments"
-          item-title="department_name"
-          item-value="department_id"
-          label="Select Department"
-          outlined
-          dense
-          class="mb-6"
-          @update:modelValue="loadDepartmentData"
-        ></v-select>
+        <!-- Error Alert -->
+        <v-alert v-if="error" type="error" closable @click:close="error = null" class="mb-4">
+          {{ error }}
+        </v-alert>
 
-        <v-divider class="mb-6"></v-divider>
-
-        <!-- Department Settings Form -->
-        <v-form v-if="selectedDepartmentId" ref="settingsForm" v-model="formValid">
-          <h3 class="text-h5 mb-4">General Settings</h3>
-
-          <!-- Department Name -->
-          <v-text-field
-            v-model="departmentSettings.department_name"
-            label="Department Name"
-            outlined
-            dense
-            :rules="[rules.required]"
-            class="mb-3"
-          ></v-text-field>
-
-          <!-- Description -->
-          <v-textarea
-            v-model="departmentSettings.description"
-            label="Description"
-            outlined
-            dense
-            rows="3"
-            class="mb-3"
-          ></v-textarea>
-
-          <h3 class="text-h5 mb-4 mt-6">Scheduling Policies</h3>
-
-          <!-- Buffer Time Between Classes -->
-          <v-text-field
-            v-model.number="departmentSettings.buffer_time_minutes"
-            label="Buffer Time Between Classes (minutes)"
-            outlined
-            dense
-            type="number"
-            min="0"
-            :rules="[rules.required, rules.nonNegative]"
-            hint="Minimum time gap required between scheduled shifts/classes"
-            persistent-hint
-            class="mb-4"
-          ></v-text-field>
-
-          <!-- Break Hours Required -->
-          <v-text-field
-            v-model.number="departmentSettings.break_hours_required"
-            label="Break Hours Required"
-            outlined
-            dense
-            type="number"
-            min="0"
-            :rules="[rules.nonNegative]"
-            hint="Minimum break hours required for employees"
-            persistent-hint
-            class="mb-4"
-          ></v-text-field>
-
-          <!-- Open During Breaks -->
-          <v-switch
-            v-model="departmentSettings.open_during_breaks"
-            label="Open During Academic Breaks"
-            color="primary"
-            class="mb-4"
-          ></v-switch>
-
-          <h3 class="text-h5 mb-4 mt-6">Staffing Requirements</h3>
-
-          <!-- Minimum Staff Required -->
-          <v-text-field
-            v-model.number="departmentSettings.min_staff_required"
-            label="Minimum Staff Required"
-            outlined
-            dense
-            type="number"
-            min="1"
-            :rules="[rules.required, rules.positive]"
-            class="mb-4"
-          ></v-text-field>
-
-          <h3 class="text-h5 mb-4 mt-6">Time Tracking Settings</h3>
-
-          <!-- Late Threshold -->
-          <v-text-field
-            v-model.number="departmentSettings.late_threshold_minutes"
-            label="Late Threshold (minutes)"
-            outlined
-            dense
-            type="number"
-            min="0"
-            :rules="[rules.nonNegative]"
-            hint="Grace period before marking an employee as late"
-            persistent-hint
-            class="mb-4"
-          ></v-text-field>
-
-          <!-- Early Threshold -->
-          <v-text-field
-            v-model.number="departmentSettings.early_threshold_minutes"
-            label="Early Clock-Out Threshold (minutes)"
-            outlined
-            dense
-            type="number"
-            min="0"
-            :rules="[rules.nonNegative]"
-            hint="Grace period for early clock-outs"
-            persistent-hint
-            class="mb-4"
-          ></v-text-field>
-
-          <!-- Notify on Time Discrepancy -->
-          <v-switch
-            v-model="departmentSettings.notify_on_time_discrepancy"
-            label="Notify on Time Discrepancy"
-            color="primary"
-            class="mb-4"
-          ></v-switch>
-
-          <!-- Save Button -->
-          <v-btn
-            color="primary"
-            size="large"
-            @click="saveDepartmentSettings"
-            :loading="saving"
-            :disabled="!formValid"
-            class="mt-4"
-          >
-            <v-icon left>mdi-content-save</v-icon>
-            Save Settings
-          </v-btn>
-        </v-form>
-
-        <!-- Department Hours Section -->
-        <div v-if="selectedDepartmentId" class="mt-8">
-          <v-divider class="mb-6"></v-divider>
-          <h3 class="text-h5 mb-4">Department Hours</h3>
+        <!-- Department Hours -->
+        <div v-if="selectedDepartmentId && !loading">
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            Set the open and close hours for each day of the week. The Schedule and Calendar views will
+            display only the range from the earliest open time to the latest close time across all open days.
+            Default hours are 6:00 AM – 7:00 PM.
+          </p>
 
           <v-expansion-panels v-model="hoursPanel" class="mb-4">
             <v-expansion-panel
@@ -175,21 +46,44 @@
             >
               <v-expansion-panel-title>
                 <div class="d-flex align-center justify-space-between w-100">
-                  <span>{{ getDayName(dayHours.day_of_week) }}</span>
-                  <span class="text-caption mr-4">
-                    {{ dayHours.open_time || 'Not Set' }} - {{ dayHours.close_time || 'Not Set' }}
+                  <div class="d-flex align-center">
+                    <v-chip
+                      v-if="dayHours.is_closed"
+                      color="error"
+                      size="x-small"
+                      variant="tonal"
+                      class="mr-2"
+                    >Closed</v-chip>
+                    <span :class="{ 'text-medium-emphasis': dayHours.is_closed }">
+                      {{ getDayName(dayHours.day_of_week) }}
+                    </span>
+                  </div>
+                  <span class="text-caption mr-4" v-if="!dayHours.is_closed">
+                    {{ formatTimeDisplay(dayHours.open_time) }} – {{ formatTimeDisplay(dayHours.close_time) }}
                   </span>
+                  <span class="text-caption mr-4 text-medium-emphasis" v-else>Closed all day</span>
                 </div>
               </v-expansion-panel-title>
+
               <v-expansion-panel-text>
-                <v-row>
+                <!-- Closed toggle -->
+                <v-switch
+                  v-model="dayHours.is_closed"
+                  label="Mark as Closed (department is not open this day)"
+                  color="error"
+                  density="compact"
+                  class="mb-3"
+                ></v-switch>
+
+                <!-- Open/Close times (hidden when closed) -->
+                <v-row v-if="!dayHours.is_closed">
                   <v-col cols="12" md="6">
                     <v-text-field
                       v-model="dayHours.open_time"
                       label="Open Time"
                       type="time"
-                      outlined
-                      dense
+                      variant="outlined"
+                      density="compact"
                     ></v-text-field>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -197,20 +91,21 @@
                       v-model="dayHours.close_time"
                       label="Close Time"
                       type="time"
-                      outlined
-                      dense
+                      variant="outlined"
+                      density="compact"
                     ></v-text-field>
                   </v-col>
                 </v-row>
+
                 <v-btn
                   color="primary"
                   size="small"
                   @click="saveDepartmentHours(dayHours)"
-                  :loading="savingHours"
+                  :loading="dayHours._saving"
                   class="mt-2"
                 >
-                  <v-icon left>mdi-content-save</v-icon>
-                  Save Hours
+                  <v-icon start>mdi-content-save</v-icon>
+                  Save
                 </v-btn>
               </v-expansion-panel-text>
             </v-expansion-panel>
@@ -222,212 +117,204 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import DepartmentServices from '../services/departmentServices.js';
+import UserRoleServices from '../services/userRoleServices.js';
 import Utils from '../config/utils.js';
 
-// State
+// ── State ──────────────────────────────────────────────────────────────────────
 const loading = ref(false);
-const saving = ref(false);
-const savingHours = ref(false);
 const error = ref(null);
 const successMessage = ref(null);
-const formValid = ref(false);
-const settingsForm = ref(null);
 const hoursPanel = ref(null);
 
-const departments = ref([]);
 const selectedDepartmentId = ref(null);
-const departmentSettings = ref({
-  department_name: '',
-  description: '',
-  buffer_time_minutes: 0,
-  break_hours_required: 0,
-  open_during_breaks: false,
-  min_staff_required: 1,
-  late_threshold_minutes: 5,
-  early_threshold_minutes: 5,
-  notify_on_time_discrepancy: true
-});
-
+const departmentName = ref('');
 const departmentHours = ref([]);
 
-// Validation Rules
-const rules = {
-  required: (v) => !!v || v === 0 || 'This field is required',
-  nonNegative: (v) => v >= 0 || 'Value must be non-negative',
-  positive: (v) => v > 0 || 'Value must be positive'
+// ── Constants ──────────────────────────────────────────────────────────────────
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DEFAULT_OPEN  = '06:00';
+const DEFAULT_CLOSE = '19:00';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const getDayName = (dayNumber) => DAYS[dayNumber] || 'Unknown';
+
+const formatTimeDisplay = (timeStr) => {
+  if (!timeStr) return 'Not Set';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return 'Not Set';
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-// Days of the week
-const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-const getDayName = (dayNumber) => {
-  return daysOfWeek[dayNumber] || 'Unknown';
-};
-
-// Initialize department hours for all days
-const initializeDepartmentHours = () => {
-  departmentHours.value = daysOfWeek.map((day, index) => ({
+// Build the 7-day skeleton with defaults
+const buildDefaultHours = () =>
+  DAYS.map((_, index) => ({
     day_of_week: index,
-    open_time: null,
-    close_time: null,
+    open_time: DEFAULT_OPEN,
+    close_time: DEFAULT_CLOSE,
     department_id: selectedDepartmentId.value,
     is_default: true,
-    hours_id: null
+    is_closed: false,
+    hours_id: null,
+    _saving: false,
   }));
-};
 
-// Load all departments
-const loadDepartments = async () => {
-  try {
-    loading.value = true;
-    error.value = null;
-    const response = await DepartmentServices.getDepartments();
-    if (response.data.success) {
-      departments.value = response.data.data;
-      
-      // Auto-select first department or user's department
-      const user = Utils.getStore('user');
-      if (user && user.department_id) {
-        selectedDepartmentId.value = user.department_id;
-      } else if (departments.value.length > 0) {
-        selectedDepartmentId.value = departments.value[0].department_id;
-      }
-      
-      if (selectedDepartmentId.value) {
-        await loadDepartmentData();
-      }
-    }
-  } catch (err) {
-    error.value = 'Failed to load departments: ' + (err.response?.data?.message || err.message);
-  } finally {
-    loading.value = false;
-  }
-};
-
-// Load department data
-const loadDepartmentData = async () => {
+// ── Data loading ───────────────────────────────────────────────────────────────
+const loadDepartmentHours = async () => {
   if (!selectedDepartmentId.value) return;
-  
+
+  // Always start with defaults so the UI is usable even if the fetch fails
+  departmentHours.value = buildDefaultHours();
+
   try {
-    loading.value = true;
-    error.value = null;
-    
-    // Load department settings
-    const deptResponse = await DepartmentServices.getDepartment(selectedDepartmentId.value);
-    if (deptResponse.data.success) {
-      departmentSettings.value = { ...deptResponse.data.data };
+    const res = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
+    const saved = res?.data?.data || [];
+
+    // Merge saved rows into the default skeleton
+    saved.forEach((row) => {
+      const idx = departmentHours.value.findIndex((h) => h.day_of_week === row.day_of_week);
+      if (idx !== -1) {
+        departmentHours.value[idx] = {
+          ...departmentHours.value[idx],
+          ...row,
+          open_time:  row.open_time  || (row.is_closed ? null : DEFAULT_OPEN),
+          close_time: row.close_time || (row.is_closed ? null : DEFAULT_CLOSE),
+          is_closed:  row.is_closed ?? false,
+          _saving: false,
+        };
+      }
+    });
+  } catch {
+    // Table may not exist yet or no rows saved — defaults are already in place,
+    // so just silently continue. The manager can save hours normally.
+  }
+};
+
+const loadDepartmentName = async () => {
+  if (!selectedDepartmentId.value || departmentName.value) return;
+  try {
+    const res = await DepartmentServices.getDepartment(selectedDepartmentId.value);
+    if (res?.data?.data?.department_name) {
+      departmentName.value = res.data.data.department_name;
     }
-    
-    // Load department hours
-    const hoursResponse = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
-    if (hoursResponse.data.success && hoursResponse.data.data.length > 0) {
-      // Map existing hours to the structure
-      initializeDepartmentHours();
-      hoursResponse.data.data.forEach(hours => {
-        const index = departmentHours.value.findIndex(h => h.day_of_week === hours.day_of_week);
-        if (index !== -1) {
-          departmentHours.value[index] = {
-            ...departmentHours.value[index],
-            ...hours
-          };
-        }
-      });
-    } else {
-      initializeDepartmentHours();
-    }
-  } catch (err) {
-    error.value = 'Failed to load department data: ' + (err.response?.data?.message || err.message);
+  } catch {
+    // Non-fatal
+  }
+};
+
+const resolveAndLoad = async (deptId, deptNameValue) => {
+  selectedDepartmentId.value = deptId;
+  departmentName.value = deptNameValue || '';
+  loading.value = true;
+  try {
+    await Promise.all([loadDepartmentHours(), loadDepartmentName()]);
   } finally {
     loading.value = false;
   }
 };
 
-// Save department settings
-const saveDepartmentSettings = async () => {
-  if (!settingsForm.value || !formValid.value) return;
-  
-  try {
-    saving.value = true;
-    error.value = null;
-    successMessage.value = null;
-    
-    const response = await DepartmentServices.updateDepartment(
-      selectedDepartmentId.value,
-      departmentSettings.value
-    );
-    
-    if (response.data.success) {
-      successMessage.value = 'Department settings saved successfully!';
-      departmentSettings.value = { ...response.data.data };
-    }
-  } catch (err) {
-    error.value = 'Failed to save department settings: ' + (err.response?.data?.message || err.message);
-  } finally {
-    saving.value = false;
-  }
-};
-
-// Save department hours
+// ── Save ───────────────────────────────────────────────────────────────────────
 const saveDepartmentHours = async (dayHours) => {
+  dayHours._saving = true;
+  error.value = null;
+  successMessage.value = null;
+
+  const payload = {
+    department_id: selectedDepartmentId.value,
+    day_of_week:   dayHours.day_of_week,
+    open_time:     dayHours.is_closed ? null : dayHours.open_time,
+    close_time:    dayHours.is_closed ? null : dayHours.close_time,
+    is_default:    true,
+    is_closed:     dayHours.is_closed ?? false,
+  };
+
   try {
-    savingHours.value = true;
-    error.value = null;
-    successMessage.value = null;
-    
-    const hoursData = {
-      department_id: selectedDepartmentId.value,
-      day_of_week: dayHours.day_of_week,
-      open_time: dayHours.open_time,
-      close_time: dayHours.close_time,
-      is_default: true
-    };
-    
-    let response;
+    let res;
     if (dayHours.hours_id) {
-      // Update existing hours
-      response = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, hoursData);
+      res = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, payload);
     } else {
-      // Create new hours
-      response = await DepartmentServices.createDepartmentHours(hoursData);
+      res = await DepartmentServices.createDepartmentHours(payload);
     }
-    
-    if (response.data.success) {
-      successMessage.value = `Hours for ${getDayName(dayHours.day_of_week)} saved successfully!`;
-      // Update the hours_id if it was a new entry
-      if (!dayHours.hours_id && response.data.data.hours_id) {
-        dayHours.hours_id = response.data.data.hours_id;
+
+    if (res?.data?.success) {
+      successMessage.value = `${getDayName(dayHours.day_of_week)} hours saved.`;
+      if (!dayHours.hours_id && res.data.data?.hours_id) {
+        dayHours.hours_id = res.data.data.hours_id;
       }
     }
   } catch (err) {
-    error.value = 'Failed to save department hours: ' + (err.response?.data?.message || err.message);
+    error.value = 'Failed to save hours: ' + (err.response?.data?.message || err.message);
   } finally {
-    savingHours.value = false;
+    dayHours._saving = false;
   }
 };
 
-// Lifecycle
-onMounted(() => {
-  loadDepartments();
+// ── Department context resolution ──────────────────────────────────────────────
+const onDeptContextReady = (e) => {
+  const ctx = e.detail;
+  if (ctx?.department_id && !selectedDepartmentId.value) {
+    resolveAndLoad(ctx.department_id, ctx.department_name);
+  }
+};
+
+onMounted(async () => {
+  window.addEventListener('departmentContextReady', onDeptContextReady);
+
+  // 1. Try localStorage context first (set by ManagerSidebar on every page load)
+  const ctx = Utils.getStore('currentDepartmentContext');
+  if (ctx?.department_id) {
+    await resolveAndLoad(ctx.department_id, ctx.department_name);
+    return;
+  }
+
+  // 2. Fall back to fetching memberships directly
+  const user = Utils.getStore('user') || {};
+  const userId = user.userId || user.id || user.user_id;
+  if (!userId) return;
+
+  loading.value = true;
+  try {
+    const res = await UserRoleServices.getUserDepartments(userId);
+    const memberships = res?.data || [];
+    const mgr = memberships.find((m) => m.is_active && (m.role?.permission_level || 0) >= 50);
+    const membership = mgr || memberships.find((m) => m.is_active) || memberships[0];
+
+    if (membership) {
+      const deptId = membership.department_id;
+      const name   = membership.department?.department_name || '';
+      Utils.setStore('currentDepartmentContext', {
+        department_id:   deptId,
+        department_name: name,
+        role_name:       membership.role?.role_name || 'Manager',
+        role_id:         membership.role_id,
+      });
+      await resolveAndLoad(deptId, name);
+    }
+  } catch (err) {
+    error.value = 'Failed to resolve your department: ' + (err.response?.data?.message || err.message);
+  } finally {
+    loading.value = false;
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('departmentContextReady', onDeptContextReady);
 });
 </script>
 
 <style scoped>
-.department-settings-container {
+.department-hours-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
-.settings-card {
+.hours-card {
   border-radius: 14px;
   padding: 24px;
-}
-
-h3 {
-  color: #1f2328;
-  font-weight: 600;
 }
 
 .w-100 {

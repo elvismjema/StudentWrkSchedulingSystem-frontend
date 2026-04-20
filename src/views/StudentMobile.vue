@@ -288,11 +288,16 @@ const handleSignOut = () => {
 }
 
 /* ─── Bottom Navigation ─── */
+/* Anchored to viewport bottom but clamped to the centered phone column
+   on desktop (StudentShell sets max-width: 480px). On phones the column
+   equals viewport width, so the bottom nav spans the screen as expected. */
 .mobile-bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   z-index: 1000;
   display: flex;
   align-items: flex-start;

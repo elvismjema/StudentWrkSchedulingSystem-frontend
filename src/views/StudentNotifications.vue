@@ -128,6 +128,7 @@ onMounted(() => {
 .notifications-container {
   padding: 24px;
   width: 100%;
+  overflow-x: hidden;
 }
 
 .notifications-header {
@@ -180,6 +181,9 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .notification-card:hover {
@@ -219,6 +223,9 @@ onMounted(() => {
   color: #333;
   line-height: 1.3;
   margin-bottom: 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-description {
@@ -226,12 +233,17 @@ onMounted(() => {
   color: #666;
   line-height: 1.4;
   margin-bottom: 8px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-time {
   font-size: 13px;
   color: #999;
   line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .notification-indicator {

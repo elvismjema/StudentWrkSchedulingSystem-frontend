@@ -73,26 +73,26 @@
               variant="outlined"
               color="primary"
               prepend-icon="mdi-account-switch"
-              aria-label="Find cover for this shift"
+              aria-label="Request cover for this shift"
               @click.stop="$emit('find-cover', shift)"
             >
-              Find Cover
+              Request Cover
             </v-btn>
             <v-btn
               v-if="canTrade"
               size="small"
               variant="outlined"
               prepend-icon="mdi-swap-horizontal"
-              aria-label="Trade this shift"
+              aria-label="Swap this shift"
               @click.stop="$emit('trade', shift)"
             >
-              Trade
+              Swap
             </v-btn>
             <v-btn
               v-if="canClockIn"
               size="small"
               variant="flat"
-              color="success"
+              color="primary"
               prepend-icon="mdi-login"
               aria-label="Clock in for this shift"
               @click.stop="$emit('clock-in', shift)"
@@ -119,6 +119,8 @@
 
 <script setup>
 import { computed } from 'vue';
+import { buildDateTime } from '../../utils/shiftDateTime.js';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   shift: { type: Object, required: true },
@@ -148,21 +150,11 @@ const departmentColor = computed(() => {
   return props.shift.department_color || props.shift.departmentColor || DEPARTMENT_COLORS.default;
 });
 
-/** Combine separate shift_date + time fields into a parseable datetime string */
-const buildDateTime = (shift, timeField) => {
-  const time = shift[timeField];
-  if (!time) return null;
-  if (time.includes('T') || time.includes('-')) return time;
-  const date = shift.shift_date || shift.date;
-  if (date) return date + 'T' + time;
-  return null;
-};
-
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d)) return '';
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const formattedTime = computed(() => {
@@ -175,7 +167,7 @@ const formattedTime = computed(() => {
 const statusLabel = computed(() => {
   if (props.isOpenShift) return 'Open';
   if (props.shift.status === 'pending_acknowledgement') return 'Unacknowledged';
-  if (props.shift.swap_requested) return 'Cover Requested';
+  if (props.shift.swap_requested) return 'Cover Request';
   return null;
 });
 

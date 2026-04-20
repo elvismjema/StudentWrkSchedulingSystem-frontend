@@ -651,11 +651,11 @@ onMounted(() => {
 .admin-departments-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .admin-page-header {
-  border-bottom: 1px solid #e3e5e8;
+  border-bottom: 1px solid var(--border-1);
   padding-bottom: 1.25rem;
 }
 
@@ -689,16 +689,17 @@ onMounted(() => {
 }
 
 .dept-card:hover {
-  border-color: #93003320;
+  /* brand-primary-dk at ~12% alpha — no token with alpha exists today. */
+  border-color: color-mix(in srgb, var(--brand-primary-dk) 12%, transparent);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
 }
 
 .dept-card--active {
-  border-color: #930033 !important;
+  border-color: var(--brand-primary-dk) !important;
 }
 
 .dept-name {
-  color: #1f2328;
+  color: var(--text-1);
 }
 
 .dept-desc {

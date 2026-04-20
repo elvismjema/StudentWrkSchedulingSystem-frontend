@@ -44,7 +44,7 @@ export default {
     return apiClient.post(`/student/open-shifts/${shiftId}/claim`);
   },
 
-  // ─── Shift Swap / Find Cover ─────────────────────────────────────
+  // ─── Cover Request / Swap Request ───────────────────────────────
   findCover(shiftId, data = {}) {
     return apiClient.post(`/student/shifts/${shiftId}/find-cover`, data);
   },
@@ -98,11 +98,11 @@ export default {
 
   // ─── Clock In/Out ────────────────────────────────────────────────
   clockIn(payload) {
-    return apiClient.post("/clock-records/clock-in", payload);
+    return apiClient.post("/student/clock-in", payload);
   },
 
-  clockOut(recordId) {
-    return apiClient.patch(`/clock-records/${recordId}/clock-out`, {});
+  clockOut(payload = {}) {
+    return apiClient.post("/student/clock-out", payload);
   },
 
   startBreak(recordId) {
@@ -127,10 +127,7 @@ export default {
 
   // ─── Notifications ───────────────────────────────────────────────
   getNotifications(params = {}) {
-    const userId = getUserId();
-    return apiClient.get("/notifications", {
-      params: { userId, ...params },
-    });
+    return apiClient.get("/notifications", { params });
   },
 
   markNotificationRead(id) {
@@ -142,9 +139,8 @@ export default {
   },
 
   getUnreadNotificationCount() {
-    const userId = getUserId();
     return apiClient.get("/notifications", {
-      params: { userId, unread: true },
+      params: { unread: true },
     });
   },
 
@@ -170,12 +166,11 @@ export default {
 
   // ─── Shift Acknowledgements ──────────────────────────────────────
   getPendingAcknowledgements() {
-    const userId = getUserId();
-    return apiClient.get(`/shift-acknowledgements/user/${userId}`);
+    return apiClient.get('/student/acknowledgements');
   },
 
   acknowledgeShift(acknowledgementId) {
-    return apiClient.patch(`/shift-acknowledgements/${acknowledgementId}/acknowledge`, {});
+    return apiClient.put(`/student/acknowledgements/${acknowledgementId}`, {});
   },
 
   // ─── Departments ─────────────────────────────────────────────────

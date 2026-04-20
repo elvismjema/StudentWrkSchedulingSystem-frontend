@@ -374,6 +374,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import qualificationService from '@/services/qualificationService'
+import { TZ } from '@/utils/tz.js'
 
 const store = useStore()
 
@@ -456,7 +457,7 @@ const getStatusColor = (status) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return ''
-  return new Date(dateString).toLocaleDateString()
+  return new Date(dateString).toLocaleDateString('en-US', { timeZone: TZ })
 }
 
 const loadStudents = async () => {

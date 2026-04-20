@@ -1,16 +1,390 @@
-<template>
-  <div class="availability-container">
+﻿<template>
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MOBILE LAYOUT                               -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div v-if="mobile" class="hours-screen">
+
+    <!-- Segmented control -->
+    <div class="m-segment-wrap">
+      <div class="m-segment">
+        <button
+          class="m-seg-btn"
+          :class="{ 'm-seg-btn--active': mobileTab === 'availability' }"
+          @click="mobileTab = 'availability'"
+        >My Availability</button>
+        <button
+          class="m-seg-btn"
+          :class="{ 'm-seg-btn--active': mobileTab === 'timeoff' }"
+          @click="mobileTab = 'timeoff'"
+        >
+          Time Off
+          <span v-if="exceptions.length" class="m-seg-badge">{{ exceptions.length }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="m-loading">
+      <v-progress-circular indeterminate size="28" width="2" color="#80162B" />
+    </div>
+
+    <!-- ─── AVAILABILITY TAB ─── -->
+    <div v-if="mobileTab === 'availability'" class="m-tab-content">
+
+      <!-- Sync status card (compact) -->
+      <div class="m-sync-card" :class="'m-sync-card--' + statusTone">
+        <div class="m-sync-row">
+          <v-icon
+            :icon="statusTone === 'success' ? 'mdi-check-circle' : statusTone === 'error' ? 'mdi-alert-circle' : 'mdi-information'"
+            size="18"
+            :color="statusTone === 'success' ? '#0D9488' : statusTone === 'error' ? '#DC2626' : '#F59E0B'"
+          />
+          <span class="m-sync-label">Class sync: {{ statusLabel }}</span>
+        </div>
+      </div>
+
+      <!-- Unified view toggle: List / Week / Day -->
+      <div class="m-view-toggle">
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'list' }"
+          @click="mobileViewMode = 'list'"
+        >
+          <v-icon icon="mdi-format-list-bulleted" size="14" class="mr-1" />List
+        </button>
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' && mobileCalendarMode === 'week' }"
+          @click="mobileViewMode = 'calendar'; mobileCalendarMode = 'week'"
+        >
+          <v-icon icon="mdi-calendar-week" size="14" class="mr-1" />Week
+        </button>
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' && mobileCalendarMode === 'day' }"
+          @click="mobileViewMode = 'calendar'; mobileCalendarMode = 'day'"
+        >
+          <v-icon icon="mdi-calendar-today" size="14" class="mr-1" />Day
+        </button>
+      </div>
+
+      <!-- Week / day navigation -->
+      <div class="m-range-nav">
+        <button class="m-range-nav-btn" @click="goPrevRange">
+          <v-icon icon="mdi-chevron-left" size="16" />
+        </button>
+        <div class="m-range-nav-label">{{ mobileRangeLabel }}</div>
+        <button class="m-range-nav-btn" @click="goNextRange">
+          <v-icon icon="mdi-chevron-right" size="16" />
+        </button>
+        <button
+          class="m-range-today-btn"
+          :class="{ 'm-range-today-btn--active': mobileWeekOffset === 0 }"
+          @click="goToCurrentWeek"
+        >
+          Today
+        </button>
+      </div>
+
+      <!-- Day pills: only shown when they add navigation value (List view or Day calendar).
+           In Week calendar mode they duplicate the grid column headers, so we hide them. -->
+      <div
+        v-if="mobileViewMode === 'list' || (mobileViewMode === 'calendar' && mobileCalendarMode === 'day')"
+        class="m-day-selector"
+      >
+        <button
+          v-if="mobileViewMode === 'list'"
+          class="m-day-pill"
+          :class="{ 'm-day-pill--active': mobileDayIndex === -1 }"
+          @click="mobileDayIndex = -1"
+        >
+          <span class="m-day-pill-dow">All</span>
+        </button>
+        <button
+          v-for="dow in DAY_ORDER"
+          :key="`pill-${dow}`"
+          class="m-day-pill"
+          :class="{
+            'm-day-pill--active': isMobileDaySelected(dow),
+          }"
+          @click="selectMobileDay(dow)"
+        >
+          <span class="m-day-pill-dow">{{ DOW_LABELS[dow].slice(0, 3) }}</span>
+          <span class="m-day-pill-date">{{ formatShortMonthDay(mobileWeekDatesByDow[dow]) }}</span>
+        </button>
+      </div>
+
+      <!-- ═══ CALENDAR VIEW ═══ -->
+      <div v-if="mobileViewMode === 'calendar'" class="m-cal">
+        <!-- Legend -->
+        <div class="m-cal-legend">
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--class"></span>Class</span>
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--available"></span>Available</span>
+          <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--unavailable"></span>Unavailable</span>
+        </div>
+
+        <!-- Grid -->
+        <div class="m-cal-grid" :class="{ 'm-cal-grid--day': mobileCalendarMode === 'day' }">
+          <!-- Time gutter -->
+          <div class="m-cal-gutter">
+            <div class="m-cal-gutter-header"></div>
+            <div v-for="hour in calGridHours" :key="hour" class="m-cal-gutter-label">
+              {{ hour > 12 ? hour - 12 : hour }}{{ hour >= 12 ? 'p' : 'a' }}
+            </div>
+          </div>
+          <!-- Week columns -->
+          <template v-if="mobileCalendarMode === 'week'">
+            <div v-for="dow in DAY_ORDER" :key="`week-col-${dow}`" class="m-cal-col">
+              <div class="m-cal-col-header">
+                <span class="m-cal-col-dow">{{ DOW_LABELS[dow].slice(0, 3) }}</span>
+                <span class="m-cal-col-date">{{ formatShortMonthDay(mobileWeekDatesByDow[dow]) }}</span>
+              </div>
+              <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
+                <!-- Hour grid lines -->
+                <div v-for="(hour, i) in calGridHours" :key="`week-line-${dow}-${hour}`" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
+                <!-- Blocks -->
+                <div
+                  v-for="block in getCalBlocksForDay(dow)"
+                  :key="block.tempId"
+                  class="m-cal-block"
+                  :class="{
+                    'm-cal-block--class': isClassScheduleBlock(block),
+                    'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
+                    'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
+                  }"
+                  :style="calcBlockStyle(block)"
+                  @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+                >
+                  <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Single-day column -->
+          <template v-else>
+            <div class="m-cal-col m-cal-col--single">
+              <div class="m-cal-col-header">
+                <span class="m-cal-col-dow">{{ DOW_LABELS[mobileCalendarDay].slice(0, 3) }}</span>
+                <span class="m-cal-col-date">{{ formatLongDate(mobileWeekDatesByDow[mobileCalendarDay]) }}</span>
+              </div>
+              <div class="m-cal-col-body" :style="{ height: calGridHours.length * 40 + 'px' }">
+                <div v-for="(hour, i) in calGridHours" :key="`day-line-${hour}`" class="m-cal-hour-line" :style="{ top: i * 40 + 'px' }"></div>
+                <div
+                  v-for="block in getCalBlocksForDay(mobileCalendarDay)"
+                  :key="block.tempId"
+                  class="m-cal-block"
+                  :class="{
+                    'm-cal-block--class': isClassScheduleBlock(block),
+                    'm-cal-block--available': !isClassScheduleBlock(block) && block.availabilityType === 'available',
+                    'm-cal-block--unavailable': !isClassScheduleBlock(block) && block.availabilityType === 'unavailable',
+                  }"
+                  :style="calcBlockStyle(block)"
+                  @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+                >
+                  <span class="m-cal-block-label">{{ calBlockLabel(block) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ═══ LIST VIEW ═══ -->
+      <template v-if="mobileViewMode === 'list'">
+        <!-- Day-by-day blocks list -->
+        <div v-if="mobileFilteredBlocks.length" class="m-day-list">
+          <div v-for="group in mobileFilteredBlocks" :key="group.dow" class="m-day-group">
+            <div class="m-day-label">{{ group.label }} · {{ group.dateLabel }}</div>
+            <div class="m-block-cards">
+              <div
+                v-for="block in group.blocks"
+                :key="block.tempId"
+                class="m-block-card"
+                :class="{
+                  'm-block-card--available': block.availabilityType === 'available' && !isClassScheduleBlock(block),
+                  'm-block-card--unavailable': block.availabilityType === 'unavailable' && !isClassScheduleBlock(block),
+                  'm-block-card--class': isClassScheduleBlock(block),
+                }"
+                @click="isClassScheduleBlock(block) ? null : (editForm = { ...block }, showEditDialog = true)"
+              >
+                <div class="m-block-accent"></div>
+                <div class="m-block-info">
+                  <div class="m-block-time">{{ formatTimeLabel(block.startTime) }} - {{ formatTimeLabel(block.endTime) }}</div>
+                  <div class="m-block-type">
+                    {{ isClassScheduleBlock(block) ? 'Class Time' : block.availabilityType === 'available' ? 'Available' : 'Unavailable' }}
+                    <span v-if="isClassScheduleBlock(block)" class="m-block-locked">
+                      <v-icon icon="mdi-lock" size="10" /> Locked
+                    </span>
+                  </div>
+                </div>
+                <v-icon v-if="!isClassScheduleBlock(block)" icon="mdi-chevron-right" size="18" color="#bbb" class="m-block-chevron" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!loading" class="m-empty">
+          <v-icon icon="mdi-calendar-blank-outline" size="48" color="#ccc" />
+          <div class="m-empty-title">No availability set</div>
+          <div class="m-empty-sub">Tap the + button to add your weekly hours</div>
+        </div>
+      </template>
+
+      <!-- Floating Add button -->
+      <button class="m-fab" @click="showMobileAddSheet = true">
+        <v-icon icon="mdi-plus" size="24" color="white" />
+      </button>
+
+      <!-- Save bar (shows when changes exist) -->
+      <transition name="slide-up">
+        <div v-if="hasChanges" class="m-save-bar">
+          <button class="m-save-btn" :disabled="saving" @click="saveChanges">
+            {{ saving ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </transition>
+    </div>
+
+    <!-- ─── TIME OFF TAB ─── -->
+    <div v-if="mobileTab === 'timeoff'" class="m-tab-content">
+
+      <div v-if="exceptions.length" class="m-timeoff-list">
+        <div v-for="exc in exceptions" :key="exc.id" class="m-timeoff-card">
+          <div class="m-timeoff-date">{{ formatDate(exc.specificDate) }}</div>
+          <div class="m-timeoff-detail">
+            <span>{{ formatTimeLabel(exc.startTime) }} - {{ formatTimeLabel(exc.endTime) }}</span>
+            <span class="m-timeoff-chip" :class="exc.availabilityType === 'unavailable' ? 'm-timeoff-chip--off' : 'm-timeoff-chip--on'">
+              {{ exc.availabilityType === 'unavailable' ? 'Off' : 'Available' }}
+            </span>
+          </div>
+          <button class="m-timeoff-remove" @click="removeException(exc)">
+            <v-icon icon="mdi-close" size="16" color="#999" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else class="m-empty">
+        <v-icon icon="mdi-calendar-check" size="48" color="#ccc" />
+        <div class="m-empty-title">No time-off requests</div>
+        <div class="m-empty-sub">Request specific dates off and your manager will review them</div>
+      </div>
+
+      <!-- Add time off button -->
+      <button class="m-fab" @click="showExceptionDialog = true">
+        <v-icon icon="mdi-plus" size="24" color="white" />
+      </button>
+    </div>
+
+    <!-- ─── MOBILE ADD AVAILABILITY BOTTOM SHEET ─── -->
+    <v-dialog v-model="showMobileAddSheet" :fullscreen="false" max-width="100vw" transition="dialog-bottom-transition" content-class="m-bottom-sheet-dialog">
+      <v-card class="m-bottom-sheet">
+        <div class="m-sheet-handle"></div>
+        <div class="m-sheet-title">Add Availability Block</div>
+
+        <div class="m-sheet-field">
+          <label class="m-sheet-label">Day</label>
+          <select v-model="createForm.dayOfWeek" class="m-sheet-select">
+            <option v-for="(label, dow) in DOW_LABELS" :key="dow" :value="Number(dow)">{{ label }}</option>
+          </select>
+        </div>
+
+        <div class="m-sheet-type-row">
+          <button
+            class="m-type-btn" :class="{ 'm-type-btn--active-avail': createForm.availabilityType === 'available' }"
+            @click="createForm.availabilityType = 'available'"
+          >Available</button>
+          <button
+            class="m-type-btn" :class="{ 'm-type-btn--active-unavail': createForm.availabilityType === 'unavailable' }"
+            @click="createForm.availabilityType = 'unavailable'"
+          >Unavailable</button>
+        </div>
+
+        <div class="m-sheet-time-row">
+          <div class="m-sheet-field m-sheet-field--half">
+            <label class="m-sheet-label">Start</label>
+            <input v-model="createForm.startTime" type="time" class="m-sheet-input" />
+          </div>
+          <div class="m-sheet-field m-sheet-field--half">
+            <label class="m-sheet-label">End</label>
+            <input v-model="createForm.endTime" type="time" class="m-sheet-input" />
+          </div>
+        </div>
+
+        <div class="m-sheet-actions">
+          <button class="m-sheet-cancel" @click="showMobileAddSheet = false">Cancel</button>
+          <button class="m-sheet-confirm" @click="confirmCreate(); showMobileAddSheet = false;">Add</button>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <!-- Shared dialogs (Edit block, Exception, Snackbar) -->
+    <v-dialog v-model="showEditDialog" max-width="420">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-pencil-outline" class="mr-2" />
+          Edit Block
+        </v-card-title>
+        <v-card-text>
+          <v-btn-toggle v-model="editForm.availabilityType" mandatory density="comfortable" rounded="lg" class="mb-4">
+            <v-btn value="available" :color="editForm.availabilityType === 'available' ? UI_COLORS.available : undefined">Available</v-btn>
+            <v-btn value="unavailable" :color="editForm.availabilityType === 'unavailable' ? 'error' : undefined">Unavailable</v-btn>
+          </v-btn-toggle>
+          <v-row>
+            <v-col cols="6"><v-text-field v-model="editForm.startTime" type="time" label="Start" variant="outlined" density="comfortable" /></v-col>
+            <v-col cols="6"><v-text-field v-model="editForm.endTime" type="time" label="End" variant="outlined" density="comfortable" /></v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteBlock"><v-icon start>mdi-delete</v-icon>Delete</v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmEdit">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showExceptionDialog" max-width="480">
+      <v-card>
+        <v-card-title>Request Time Off</v-card-title>
+        <v-card-text>
+          <v-form ref="exceptionFormRef" v-model="exceptionFormValid">
+            <v-text-field v-model="exceptionForm.specificDate" type="date" label="Date" variant="outlined" density="comfortable" class="mb-3" :rules="[requiredRule]" />
+            <v-row>
+              <v-col cols="6"><v-text-field v-model="exceptionForm.startTime" type="time" label="Start" variant="outlined" density="comfortable" :rules="[requiredRule]" /></v-col>
+              <v-col cols="6"><v-text-field v-model="exceptionForm.endTime" type="time" label="End" variant="outlined" density="comfortable" :rules="[requiredRule]" /></v-col>
+            </v-row>
+            <v-select v-model="exceptionForm.availabilityType" :items="['available', 'unavailable']" label="Type" variant="outlined" density="comfortable" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showExceptionDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">{{ snackbar.text }}</v-snackbar>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- DESKTOP LAYOUT (unchanged)                  -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div v-else class="availability-container">
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">My Availability</h1>
       <p class="page-subtitle">
-        Click on time slots to mark when you're available or unavailable to work.
+        Drag on the calendar to mark when you're available or unavailable each week. Click a block to edit or delete it.
       </p>
     </div>
 
     <!-- Mode Toggle + Action Buttons -->
     <div class="action-buttons">
-      <v-btn-toggle v-model="gridMode" mandatory color="#0D9488" rounded="lg" density="comfortable">
+      <v-btn-toggle v-model="gridMode" mandatory :color="UI_COLORS.available" rounded="lg" density="comfortable">
         <v-btn value="available" prepend-icon="mdi-calendar-check">
           Mark Available
         </v-btn>
@@ -20,7 +394,7 @@
       </v-btn-toggle>
       <v-spacer />
       <v-btn
-        color="#0D9488"
+        :color="UI_COLORS.available"
         variant="flat"
         :loading="saving"
         :disabled="!hasChanges"
@@ -28,58 +402,86 @@
       >
         Save Changes
       </v-btn>
-      <v-btn variant="outlined" @click="clearAll">Clear All</v-btn>
-
+      <v-btn variant="outlined" @click="clearAll">Clear Manual Blocks</v-btn>
+      <v-chip size="small" variant="tonal" color="primary">
+        Class schedule auto-sync: ON
+      </v-chip>
     </div>
+
+    <!-- Legend -->
+    <div class="legend-row">
+      <span class="legend-item">
+        <span class="legend-dot available-dot" />
+        Available
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot unavailable-dot" />
+        Unavailable
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot class-dot" />
+        Class Time (auto-synced, locked)
+      </span>
+    </div>
+
+    <v-alert
+      :type="statusTone"
+      variant="tonal"
+      border="start"
+      density="comfortable"
+      class="mb-4"
+    >
+      <div>
+        <div>
+          <div class="text-body-2 font-weight-medium">Class Schedule Sync: {{ statusLabel }}</div>
+          <div class="text-caption text-medium-emphasis">
+            Last synced: {{ formatDateTime(syncStatus.lastSyncedAt) }}
+            · Term: {{ syncStatus.termCode || 'N/A' }}
+            · Class blocks: {{ syncStatus.totalClassBlocks ?? 0 }}
+            · Updated this sync: {{ syncStatus.updated ?? 0 }}
+            <span v-if="syncStatus.error"> · {{ syncStatus.error }}</span>
+          </div>
+        </div>
+      </div>
+    </v-alert>
 
     <!-- Loading Indicator -->
-    <v-progress-linear v-if="loading" indeterminate color="#8B1538" class="mb-4" />
+    <v-progress-linear v-if="loading" indeterminate :color="UI_COLORS.brand" class="mb-4" />
 
-    <!-- Weekly Grid -->
-    <div class="grid-card">
-      <table class="availability-grid">
-        <thead>
-          <tr>
-            <th class="time-header">Time</th>
-            <th v-for="day in days" :key="day.value" class="day-header">{{ day.label }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="hour in timeSlots" :key="hour.value">
-            <td class="time-cell">{{ hour.label }}</td>
-            <td
-              v-for="day in days"
-              :key="`${day.value}-${hour.value}`"
-              class="slot-cell"
-              :class="{
-                'available': isAvailable(day.value, hour.value),
-                'unavailable-slot': isUnavailable(day.value, hour.value),
-                disabled: hour.disabled
-              }"
-              @click="hour.disabled ? null : openTimeRangeDialog(day, hour.value)"
-            />
-          </tr>
-        </tbody>
-      </table>
+    <!-- FullCalendar weekly availability grid -->
+    <div :class="['calendar-card', gridMode === 'unavailable' ? 'mode-unavailable' : 'mode-available']">
+      <FullCalendar ref="calendarRef" :options="calendarOptions" />
     </div>
 
-    <!-- Time Range Dialog -->
-    <v-dialog v-model="showTimeRangeDialog" max-width="420">
+    <!-- Create Dialog -->
+    <v-dialog v-model="showCreateDialog" max-width="420">
       <v-card>
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-clock-outline" class="mr-2" />
-          {{ gridMode === 'available' ? 'Set Availability' : 'Set Unavailability' }} — {{ timeRangeForm.dayLabel }}
+          Add Block — {{ dowLabel(createForm.dayOfWeek) }}
         </v-card-title>
         <v-card-text>
-          <p class="text-body-2 text-grey mb-4">
-            Choose the time range you are
-            <strong>{{ gridMode === 'available' ? 'available' : 'unavailable' }}</strong>
-            on <strong>{{ timeRangeForm.dayLabel }}</strong>.
-          </p>
+          <p class="text-body-2 text-grey mb-3">Choose the type and time range for this block.</p>
+          <v-btn-toggle
+            v-model="createForm.availabilityType"
+            mandatory
+            density="comfortable"
+            rounded="lg"
+            class="mb-4"
+          >
+            <v-btn value="available" :color="createForm.availabilityType === 'available' ? UI_COLORS.available : undefined">
+              <v-icon start>mdi-calendar-check</v-icon>
+              Available
+            </v-btn>
+            <v-btn value="unavailable" :color="createForm.availabilityType === 'unavailable' ? 'error' : undefined">
+              <v-icon start>mdi-calendar-remove</v-icon>
+              Unavailable
+            </v-btn>
+          </v-btn-toggle>
           <v-row>
             <v-col cols="6">
               <v-text-field
-                v-model="timeRangeForm.startTime"
+                v-model="createForm.startTime"
                 type="time"
                 label="Start Time"
                 variant="outlined"
@@ -88,7 +490,7 @@
             </v-col>
             <v-col cols="6">
               <v-text-field
-                v-model="timeRangeForm.endTime"
+                v-model="createForm.endTime"
                 type="time"
                 label="End Time"
                 variant="outlined"
@@ -96,28 +498,79 @@
               />
             </v-col>
           </v-row>
-          <p v-if="timeRangeForm.startTime && timeRangeForm.endTime" class="text-body-2 mt-1">
-            <v-icon icon="mdi-check-circle" color="#0D9488" size="16" class="mr-1" />
-            {{ formatTimeLabel(timeRangeForm.startTime) }} – {{ formatTimeLabel(timeRangeForm.endTime) }}
-          </p>
         </v-card-text>
         <v-card-actions>
-          <v-btn variant="text" color="error" @click="clearDaySlots">Clear Day</v-btn>
           <v-spacer />
-          <v-btn variant="text" @click="showTimeRangeDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" @click="applyTimeRange">Apply</v-btn>
+          <v-btn variant="text" @click="showCreateDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmCreate">Add</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- Time Off Requests (formerly Availability Exceptions) -->
+    <!-- Edit Dialog -->
+    <v-dialog v-model="showEditDialog" max-width="420">
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-pencil-outline" class="mr-2" />
+          Edit Block — {{ dowLabel(editForm.dayOfWeek) }}
+        </v-card-title>
+        <v-card-text>
+          <v-btn-toggle
+            v-model="editForm.availabilityType"
+            mandatory
+            density="comfortable"
+            rounded="lg"
+            class="mb-4"
+          >
+            <v-btn value="available" :color="editForm.availabilityType === 'available' ? UI_COLORS.available : undefined">
+              <v-icon start>mdi-calendar-check</v-icon>
+              Available
+            </v-btn>
+            <v-btn value="unavailable" :color="editForm.availabilityType === 'unavailable' ? 'error' : undefined">
+              <v-icon start>mdi-calendar-remove</v-icon>
+              Unavailable
+            </v-btn>
+          </v-btn-toggle>
+          <v-row>
+            <v-col cols="6">
+              <v-text-field
+                v-model="editForm.startTime"
+                type="time"
+                label="Start Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field
+                v-model="editForm.endTime"
+                type="time"
+                label="End Time"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteBlock">
+            <v-icon start>mdi-delete</v-icon>
+            Delete
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" @click="confirmEdit">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Time Off Requests -->
     <div class="exceptions-section">
       <h2 class="exceptions-title">Time Off Requests</h2>
       <p class="exceptions-subtitle">
         Request specific dates when you are unavailable — your manager will review and approve.
       </p>
 
-      <!-- Existing exceptions list -->
       <div v-if="exceptions.length" class="exceptions-list">
         <v-card
           v-for="exc in exceptions"
@@ -129,7 +582,7 @@
             <div>
               <strong>{{ formatDate(exc.specificDate) }}</strong>
               <span class="ml-2 text-grey">
-                {{ formatTimeLabel(exc.startTime) }} – {{ formatTimeLabel(exc.endTime) }}
+                {{ formatTimeLabel(exc.startTime) }} — {{ formatTimeLabel(exc.endTime) }}
               </span>
               <v-chip size="x-small" class="ml-2" :color="exc.availabilityType === 'unavailable' ? 'error' : 'success'" variant="tonal">
                 {{ exc.availabilityType }}
@@ -194,7 +647,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showExceptionDialog = false">Cancel</v-btn>
-          <v-btn color="#0D9488" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
+          <v-btn :color="UI_COLORS.available" variant="flat" :loading="savingException" @click="saveException">Save</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -203,56 +656,76 @@
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
       {{ snackbar.text }}
     </v-snackbar>
-
   </div>
 </template>
 
 <script setup>
-
 import { computed, onMounted, ref } from "vue";
+import { useDisplay } from "vuetify";
+import FullCalendar from "@fullcalendar/vue3";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
 import Utils from "../config/utils.js";
 import availabilityService from "../services/availabilityService.js";
+import departmentServices from "../services/departmentServices.js";
+import studentService from "../services/studentService.js";
 
+const { mobile } = useDisplay();
 const currentUser = Utils.getStore("user") || {};
 const userId = currentUser.userId || currentUser.id;
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+// --- Mobile tab toggle ---
+const mobileTab = ref('availability');
+const showMobileAddSheet = ref(false);
+const mobileViewMode = ref('calendar'); // 'list' or 'calendar'
+const mobileDayIndex = ref(-1); // -1=All, 0=Sun, 1=Mon, etc.
+const mobileCalendarMode = ref("week"); // 'week' or 'day'
+const mobileWeekOffset = ref(0);
+const mobileCalendarDay = ref(new Date().getDay());
+
+const UI_COLORS = Object.freeze({
+  available: "#0D9488",
+  unavailable: "#DC2626",
+  classSchedule: "#9A3412",
+  brand: "#8B1538",
+});
+
+// --- FullCalendar ref ---
+const calendarRef = ref(null);
 
 // --- State ---
 const loading = ref(false);
 const saving = ref(false);
 const savingException = ref(false);
-const gridMode = ref('available'); // 'available' | 'unavailable'
-const selectedSlots = ref(new Set()); // available (green)
-const unavailableSlots = ref(new Set()); // unavailable (red)
-const initialSlots = ref(new Set());
-const initialUnavailableSlots = ref(new Set());
+const syncingClassSchedule = ref(false);
+const syncStatus = ref({
+  status: "never_synced",
+  lastSyncedAt: null,
+  termCode: null,
+  totalClassBlocks: 0,
+  updated: 0,
+  error: null,
+});
+const calendarHours = ref({ slotMinTime: "05:00:00", slotMaxTime: "24:00:00" });
+const gridMode = ref("available");
+
+// blocks: array of { tempId, dayOfWeek, startTime (HH:mm), endTime (HH:mm), availabilityType }
+const blocks = ref([]);
+const initialFingerprint = ref("");
 const existingRecords = ref([]);
+let tempIdCounter = 0;
+
+// Dialog state
+const showCreateDialog = ref(false);
+const createForm = ref({ dayOfWeek: 1, startTime: "", endTime: "", availabilityType: "available" });
+const showEditDialog = ref(false);
+const editForm = ref({ tempId: "", dayOfWeek: 1, startTime: "", endTime: "", availabilityType: "available" });
+
+// Exception form state
 const showExceptionDialog = ref(false);
 const exceptionFormRef = ref(null);
 const exceptionFormValid = ref(false);
-const snackbar = ref({ show: false, text: "", color: "success" });
-const showTimeRangeDialog = ref(false);
-const timeRangeForm = ref({ dayValue: null, dayLabel: "", startTime: "", endTime: "" });
-
-// --- Days and Time Slots ---
-const days = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 2 },
-  { label: "Wed", value: 3 },
-  { label: "Thu", value: 4 },
-  { label: "Fri", value: 5 },
-  { label: "Sat", value: 6 },
-  { label: "Sun", value: 0 },
-];
-
-const timeSlots = [];
-for (let h = 6; h <= 24; h++) {
-  const normalizedHour = h === 24 ? 0 : h;
-  const period = normalizedHour >= 12 ? "PM" : "AM";
-  const display = normalizedHour > 12 ? normalizedHour - 12 : normalizedHour === 0 ? 12 : normalizedHour;
-  timeSlots.push({ label: `${display}:00 ${period}`, value: h, disabled: h === 24 });
-}
-
-// --- Exception Form ---
 const exceptionForm = ref({
   specificDate: "",
   startTime: "",
@@ -260,34 +733,132 @@ const exceptionForm = ref({
   availabilityType: "unavailable",
 });
 
-const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
+const snackbar = ref({ show: false, text: "", color: "success" });
 
-// --- Computed ---
-const hasChanges = computed(() => {
-  if (selectedSlots.value.size !== initialSlots.value.size) return true;
-  for (const key of selectedSlots.value) {
-    if (!initialSlots.value.has(key)) return true;
-  }
-  if (unavailableSlots.value.size !== initialUnavailableSlots.value.size) return true;
-  for (const key of unavailableSlots.value) {
-    if (!initialUnavailableSlots.value.has(key)) return true;
-  }
-  return false;
-});
+// --- Day-of-week mappings ---
+// Reference week: 2024-01-01 (Mon) â€¦ 2024-01-07 (Sun)
+const DOW_TO_DATE = {
+  1: "2024-01-01",
+  2: "2024-01-02",
+  3: "2024-01-03",
+  4: "2024-01-04",
+  5: "2024-01-05",
+  6: "2024-01-06",
+  0: "2024-01-07",
+};
 
-const exceptions = computed(() =>
-  existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
-);
+const DOW_LABELS = {
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+  0: "Sunday",
+};
+
+const dowLabel = (dow) => DOW_LABELS[dow] ?? "";
 
 // --- Helpers ---
-const slotKey = (day, hour) => `${day}-${hour}`;
-
-const isAvailable = (day, hour) => selectedSlots.value.has(slotKey(day, hour));
-const isUnavailable = (day, hour) => unavailableSlots.value.has(slotKey(day, hour));
-
-const notify = (text, color = "success") => {
-  snackbar.value = { show: true, text, color };
+const startOfWeekMonday = (dateInput = new Date()) => {
+  const d = new Date(dateInput);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return d;
 };
+
+const addDays = (dateInput, days) => {
+  const d = new Date(dateInput);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d;
+};
+
+const formatShortMonthDay = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const formatLongDate = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatWeekRange = (start, end) => {
+  if (!start || !end) return "";
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return "";
+
+  const sameMonth = startDate.getMonth() === endDate.getMonth();
+  const sameYear = startDate.getFullYear() === endDate.getFullYear();
+
+  if (sameMonth && sameYear) {
+    return `${startDate.toLocaleDateString("en-US", { month: "short" })} ${startDate.getDate()}-${endDate.getDate()}, ${endDate.getFullYear()}`;
+  }
+
+  if (sameYear) {
+    return `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${endDate.getFullYear()}`;
+  }
+
+  return `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+};
+
+const normalizeToHHMM = (t) => (t ? String(t).slice(0, 5) : "");
+const notify = (text, color = "success") => { snackbar.value = { show: true, text, color }; };
+const requiredRule = (v) => (v !== null && v !== undefined && v !== "" ? true : "Required");
+const isNotFoundError = (error) => Number(error?.response?.status) === 404;
+
+const isClassScheduleRecord = (record) =>
+  record?.sourceType === "class_schedule"
+  || record?.recurrencePattern === "class_schedule"
+  || Boolean(record?.isSystemManaged);
+
+const isClassScheduleBlock = (block) =>
+  block?.sourceType === "class_schedule" || Boolean(block?.isSystemManaged);
+
+const overlaps = (startA, endA, startB, endB) => startA < endB && endA > startB;
+
+const hasManualBlockOverlap = (candidate, excludeTempId = null) =>
+  blocks.value
+    .filter(
+      (block) =>
+        !isClassScheduleBlock(block)
+        && block.tempId !== excludeTempId
+        && Number(block.dayOfWeek) === Number(candidate.dayOfWeek)
+    )
+    .some((block) => overlaps(candidate.startTime, candidate.endTime, block.startTime, block.endTime));
+
+const findFirstOverlapPair = (manualBlocks) => {
+  const ordered = [...manualBlocks].sort((a, b) => {
+    if (Number(a.dayOfWeek) !== Number(b.dayOfWeek)) {
+      return Number(a.dayOfWeek) - Number(b.dayOfWeek);
+    }
+    return String(a.startTime).localeCompare(String(b.startTime));
+  });
+
+  for (let i = 0; i < ordered.length; i += 1) {
+    for (let j = i + 1; j < ordered.length; j += 1) {
+      if (Number(ordered[i].dayOfWeek) !== Number(ordered[j].dayOfWeek)) break;
+      if (overlaps(ordered[i].startTime, ordered[i].endTime, ordered[j].startTime, ordered[j].endTime)) {
+        return { first: ordered[i], second: ordered[j] };
+      }
+    }
+  }
+  return null;
+};
+
+const blocksFingerprint = (bs) =>
+  JSON.stringify(
+    [...bs]
+      .map((b) => `${b.dayOfWeek}|${b.startTime}|${b.endTime}|${b.availabilityType}`)
+      .sort()
+  );
 
 const formatTimeLabel = (value) => {
   if (!value) return "";
@@ -308,92 +879,468 @@ const formatDate = (value) => {
   });
 };
 
-const pad = (n) => String(n).padStart(2, "0");
-
-// --- Grid Interactions ---
-const openTimeRangeDialog = (day, hour) => {
-  const existingHours = [];
-  for (const key of selectedSlots.value) {
-    const [d, h] = key.split("-").map(Number);
-    if (d === day.value) existingHours.push(h);
-  }
-  existingHours.sort((a, b) => a - b);
-
-  let startH = hour;
-  let endH = hour + 1;
-  if (existingHours.length > 0) {
-    startH = existingHours[0];
-    endH = existingHours[existingHours.length - 1] + 1;
-  }
-
-  timeRangeForm.value = {
-    dayValue: day.value,
-    dayLabel: days.find((d) => d.value === day.value)?.label || "",
-    startTime: `${pad(startH)}:00`,
-    endTime: `${pad(endH)}:00`,
-  };
-  showTimeRangeDialog.value = true;
+const formatDateTime = (value) => {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Never";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 };
 
-const applyTimeRange = () => {
-  const { dayValue, startTime, endTime } = timeRangeForm.value;
+const statusTone = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "success";
+  if (status === "failed") return "error";
+  return "warning";
+});
+
+const statusLabel = computed(() => {
+  const status = String(syncStatus.value.status || "never_synced");
+  if (status === "success") return "Synced";
+  if (status === "failed") return "Sync Failed";
+  return "Not Synced Yet";
+});
+
+const hasClassConflict = (candidate) => {
+  if (!candidate) return false;
+  const type = String(candidate.availabilityType || "available").toLowerCase();
+  if (!["available", "preferred"].includes(type)) return false;
+  return blocks.value
+    .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(candidate.dayOfWeek))
+    .some((cls) =>
+      candidate.startTime < cls.endTime && candidate.endTime > cls.startTime
+    );
+};
+
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time);
+  if (!valid.length) return { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort();
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort();
+  return {
+    slotMinTime: mins[0],
+    slotMaxTime: maxs[maxs.length - 1],
+  };
+};
+
+// --- Computed ---
+const manualBlocks = computed(() => blocks.value.filter((b) => !isClassScheduleBlock(b)));
+const hasChanges = computed(() => blocksFingerprint(manualBlocks.value) !== initialFingerprint.value);
+
+const exceptions = computed(() =>
+  existingRecords.value.filter((r) => r.specificDate && !r.isRecurring)
+);
+
+const mobileBaseWeekStart = startOfWeekMonday(new Date());
+const mobileWeekStartDate = computed(() => addDays(mobileBaseWeekStart, mobileWeekOffset.value * 7));
+const mobileWeekEndDate = computed(() => addDays(mobileWeekStartDate.value, 6));
+const mobileWeekDatesByDow = computed(() => {
+  const map = {};
+  DAY_ORDER.forEach((dow, index) => {
+    map[dow] = addDays(mobileWeekStartDate.value, index);
+  });
+  return map;
+});
+const mobileRangeLabel = computed(() => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    return `${DOW_LABELS[mobileCalendarDay.value].slice(0, 3)}, ${formatLongDate(mobileWeekDatesByDow.value[mobileCalendarDay.value])}`;
+  }
+  return formatWeekRange(mobileWeekStartDate.value, mobileWeekEndDate.value);
+});
+
+// --- Mobile: group availability blocks by day ---
+const mobileBlocksByDay = computed(() => {
+  const grouped = {};
+  for (const dow of DAY_ORDER) {
+    grouped[dow] = blocks.value
+      .filter((b) => Number(b.dayOfWeek) === dow)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+  return DAY_ORDER
+    .filter((dow) => grouped[dow].length > 0)
+    .map((dow) => ({
+      dow,
+      label: DOW_LABELS[dow],
+      date: mobileWeekDatesByDow.value[dow],
+      dateLabel: formatLongDate(mobileWeekDatesByDow.value[dow]),
+      blocks: grouped[dow],
+    }));
+});
+
+const mobileFilteredBlocks = computed(() => {
+  if (mobileDayIndex.value === -1) return mobileBlocksByDay.value;
+  return mobileBlocksByDay.value.filter((g) => g.dow === mobileDayIndex.value);
+});
+
+const previousDay = (dow) => {
+  const idx = DAY_ORDER.indexOf(Number(dow));
+  if (idx <= 0) return { dow: DAY_ORDER[DAY_ORDER.length - 1], wrapped: true };
+  return { dow: DAY_ORDER[idx - 1], wrapped: false };
+};
+
+const nextDay = (dow) => {
+  const idx = DAY_ORDER.indexOf(Number(dow));
+  if (idx === -1 || idx >= DAY_ORDER.length - 1) return { dow: DAY_ORDER[0], wrapped: true };
+  return { dow: DAY_ORDER[idx + 1], wrapped: false };
+};
+
+const goPrevRange = () => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    const result = previousDay(mobileCalendarDay.value);
+    mobileCalendarDay.value = result.dow;
+    if (result.wrapped) mobileWeekOffset.value -= 1;
+    return;
+  }
+  mobileWeekOffset.value -= 1;
+};
+
+const goNextRange = () => {
+  if (mobileViewMode.value === "calendar" && mobileCalendarMode.value === "day") {
+    const result = nextDay(mobileCalendarDay.value);
+    mobileCalendarDay.value = result.dow;
+    if (result.wrapped) mobileWeekOffset.value += 1;
+    return;
+  }
+  mobileWeekOffset.value += 1;
+};
+
+const goToCurrentWeek = () => {
+  mobileWeekOffset.value = 0;
+  mobileCalendarDay.value = new Date().getDay();
+};
+
+const selectMobileDay = (dow) => {
+  if (mobileViewMode.value === "list") {
+    mobileDayIndex.value = dow;
+    return;
+  }
+  mobileCalendarDay.value = dow;
+};
+
+const isMobileDaySelected = (dow) => {
+  if (mobileViewMode.value === "list") return mobileDayIndex.value === dow;
+  if (mobileCalendarMode.value === "day") return mobileCalendarDay.value === dow;
+  return Number(dow) === Number(new Date().getDay()) && mobileWeekOffset.value === 0;
+};
+
+// --- Calendar grid helpers ---
+const CAL_GRID_START = 7; // 7 AM
+const CAL_GRID_END = 22;  // 10 PM
+const calGridHours = computed(() => {
+  // Find earliest/latest block to auto-size the grid
+  let minHour = CAL_GRID_START;
+  let maxHour = CAL_GRID_END;
+  for (const b of blocks.value) {
+    const sh = parseInt(String(b.startTime).split(':')[0], 10);
+    const eh = parseInt(String(b.endTime).split(':')[0], 10);
+    if (sh < minHour) minHour = sh;
+    if (eh > maxHour - 1) maxHour = eh + 1;
+  }
+  const hours = [];
+  for (let h = minHour; h < maxHour; h++) hours.push(h);
+  return hours;
+});
+
+const getCalBlocksForDay = (dow) => {
+  return blocks.value
+    .filter((b) => Number(b.dayOfWeek) === dow)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+};
+
+const calcBlockStyle = (block) => {
+  const startHour = calGridHours.value[0] || CAL_GRID_START;
+  const [sh, sm] = String(block.startTime).split(':').map(Number);
+  const [eh, em] = String(block.endTime).split(':').map(Number);
+  const startMinutes = (sh - startHour) * 60 + (sm || 0);
+  const endMinutes = (eh - startHour) * 60 + (em || 0);
+  const pxPerMin = 40 / 60; // 40px per hour row
+  return {
+    top: Math.max(0, startMinutes * pxPerMin) + 'px',
+    height: Math.max(12, (endMinutes - startMinutes) * pxPerMin) + 'px',
+  };
+};
+
+const calBlockLabel = (block) => {
+  if (isClassScheduleBlock(block)) return 'Class';
+  return block.availabilityType === 'available' ? 'Avail' : 'Off';
+};
+
+const calendarEvents = computed(() =>
+  blocks.value.map((b) => {
+    const isClassBlock = b.sourceType === "class_schedule";
+    return {
+      id: b.tempId,
+      title: isClassBlock
+        ? "Class Time"
+        : b.availabilityType === "available"
+          ? "Available"
+          : "Unavailable",
+      start: `${DOW_TO_DATE[b.dayOfWeek]}T${b.startTime}`,
+      end: `${DOW_TO_DATE[b.dayOfWeek]}T${b.endTime}`,
+      backgroundColor: isClassBlock
+        ? UI_COLORS.classSchedule
+        : b.availabilityType === "available"
+          ? UI_COLORS.available
+          : UI_COLORS.unavailable,
+      borderColor: isClassBlock
+        ? UI_COLORS.classSchedule
+        : b.availabilityType === "available"
+          ? UI_COLORS.available
+          : UI_COLORS.unavailable,
+      classNames: isClassBlock ? ["class-synced-event"] : [],
+      editable: !isClassBlock,
+      startEditable: !isClassBlock,
+      durationEditable: !isClassBlock,
+      extendedProps: { block: b },
+    };
+  })
+);
+
+// --- FullCalendar callbacks ---
+const onCalendarSelect = (selectInfo) => {
+  const dateStr = selectInfo.startStr.split("T")[0];
+  const dow = new Date(`${dateStr}T12:00:00`).getDay();
+  const startTime = selectInfo.startStr.split("T")[1].slice(0, 5);
+  const endTime = selectInfo.endStr.split("T")[1].slice(0, 5);
+  createForm.value = {
+    dayOfWeek: dow,
+    startTime,
+    endTime,
+    availabilityType: gridMode.value,
+  };
+  showCreateDialog.value = true;
+  calendarRef.value?.getApi()?.unselect();
+};
+
+const confirmCreate = () => {
+  const { dayOfWeek, startTime, endTime, availabilityType } = createForm.value;
   if (!startTime || !endTime) return;
-
-  const startH = parseInt(startTime.split(":")[0], 10);
-  const startM = parseInt(startTime.split(":")[1], 10);
-  const endH = parseInt(endTime.split(":")[0], 10);
-  const endM = parseInt(endTime.split(":")[1], 10);
-
-  if (startH > endH || (startH === endH && startM >= endM)) {
+  if (startTime >= endTime) {
     notify("End time must be after start time.", "error");
     return;
   }
-
-  const targetSet = gridMode.value === 'available' ? selectedSlots : unavailableSlots;
-  const otherSet = gridMode.value === 'available' ? unavailableSlots : selectedSlots;
-
-  const updated = new Set(targetSet.value);
-  const updatedOther = new Set(otherSet.value);
-  // Clear existing slots for this day in both sets
-  for (const key of [...updated]) {
-    if (key.startsWith(`${dayValue}-`)) updated.delete(key);
+  if (hasClassConflict({ dayOfWeek, startTime, endTime, availabilityType })) {
+    notify("This block overlaps locked class time. Choose a different time.", "error");
+    return;
   }
-  for (const key of [...updatedOther]) {
-    if (key.startsWith(`${dayValue}-`)) updatedOther.delete(key);
+  if (hasManualBlockOverlap({ dayOfWeek, startTime, endTime })) {
+    notify("This block overlaps an existing availability block. Choose a non-conflicting time range.", "error");
+    return;
   }
-  // Fill slots for the range (round to full hours)
-  const effectiveStart = startH;
-  const effectiveEnd = endM > 0 ? endH + 1 : endH;
-  for (let h = effectiveStart; h < effectiveEnd && h <= 24; h++) {
-    if (h >= 6) updated.add(slotKey(dayValue, h));
-  }
-
-  targetSet.value = updated;
-  otherSet.value = updatedOther;
-  showTimeRangeDialog.value = false;
+  blocks.value = [
+    ...blocks.value,
+    { tempId: `blk-${++tempIdCounter}`, dayOfWeek, startTime, endTime, availabilityType },
+  ];
+  showCreateDialog.value = false;
 };
 
-const clearDaySlots = () => {
-  const { dayValue } = timeRangeForm.value;
-  const updatedAvail = new Set(selectedSlots.value);
-  const updatedUnavail = new Set(unavailableSlots.value);
-  for (const key of [...updatedAvail]) {
-    if (key.startsWith(`${dayValue}-`)) updatedAvail.delete(key);
+const onEventClick = (clickInfo) => {
+  const block = clickInfo.event.extendedProps.block;
+  if (isClassScheduleBlock(block)) {
+    notify("Class-synced blocks are locked. Update your course schedule and re-sync.", "info");
+    return;
   }
-  for (const key of [...updatedUnavail]) {
-    if (key.startsWith(`${dayValue}-`)) updatedUnavail.delete(key);
-  }
-  selectedSlots.value = updatedAvail;
-  unavailableSlots.value = updatedUnavail;
-  showTimeRangeDialog.value = false;
+  editForm.value = { ...block };
+  showEditDialog.value = true;
 };
+
+const confirmEdit = () => {
+  const { tempId, dayOfWeek, startTime, endTime, availabilityType } = editForm.value;
+  if (!startTime || !endTime) return;
+  if (startTime >= endTime) {
+    notify("End time must be after start time.", "error");
+    return;
+  }
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx !== -1) {
+    const updated = [...blocks.value];
+    const candidate = { tempId, dayOfWeek, startTime, endTime, availabilityType };
+    const withoutCurrent = updated.filter((b) => b.tempId !== tempId);
+    const classConflict = withoutCurrent
+      .filter((b) => isClassScheduleBlock(b) && Number(b.dayOfWeek) === Number(dayOfWeek))
+      .some((cls) => startTime < cls.endTime && endTime > cls.startTime && ["available", "preferred"].includes(String(availabilityType || "available")));
+    if (classConflict) {
+      notify("This update overlaps locked class time. Choose a different time.", "error");
+      return;
+    }
+    if (hasManualBlockOverlap({ dayOfWeek, startTime, endTime }, tempId)) {
+      notify("This update overlaps another availability block. Choose a non-conflicting time range.", "error");
+      return;
+    }
+    updated[idx] = candidate;
+    blocks.value = updated;
+  }
+  showEditDialog.value = false;
+};
+
+const deleteBlock = () => {
+  blocks.value = blocks.value.filter((b) => b.tempId !== editForm.value.tempId);
+  showEditDialog.value = false;
+};
+
+const onEventDrop = (dropInfo) => {
+  const tempId = dropInfo.event.id;
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx === -1) return;
+
+  if (isClassScheduleBlock(blocks.value[idx])) {
+    dropInfo.revert();
+    notify("Class-synced blocks cannot be moved.", "info");
+    return;
+  }
+
+  const newDateStr = dropInfo.event.startStr.split("T")[0];
+  const newDow = new Date(`${newDateStr}T12:00:00`).getDay();
+  const newStart = dropInfo.event.startStr.split("T")[1].slice(0, 5);
+  const newEnd = dropInfo.event.endStr.split("T")[1].slice(0, 5);
+
+  if (hasManualBlockOverlap({ dayOfWeek: newDow, startTime: newStart, endTime: newEnd }, tempId)) {
+    dropInfo.revert();
+    notify("This move overlaps another availability block. Choose a non-conflicting time range.", "error");
+    return;
+  }
+
+  const updated = [...blocks.value];
+  updated[idx] = { ...updated[idx], dayOfWeek: newDow, startTime: newStart, endTime: newEnd };
+  blocks.value = updated;
+};
+
+const onEventResize = (resizeInfo) => {
+  const tempId = resizeInfo.event.id;
+  const idx = blocks.value.findIndex((b) => b.tempId === tempId);
+  if (idx === -1) return;
+
+  if (isClassScheduleBlock(blocks.value[idx])) {
+    resizeInfo.revert();
+    notify("Class-synced blocks cannot be resized.", "info");
+    return;
+  }
+
+  const newEnd = resizeInfo.event.endStr.split("T")[1].slice(0, 5);
+  const current = blocks.value[idx];
+  if (
+    hasManualBlockOverlap(
+      { dayOfWeek: current.dayOfWeek, startTime: current.startTime, endTime: newEnd },
+      tempId
+    )
+  ) {
+    resizeInfo.revert();
+    notify("This resize overlaps another availability block. Choose a non-conflicting time range.", "error");
+    return;
+  }
+  const updated = [...blocks.value];
+  updated[idx] = { ...updated[idx], endTime: newEnd };
+  blocks.value = updated;
+};
+
+// --- Calendar options ---
+const calendarOptions = computed(() => ({
+  plugins: [timeGridPlugin, interactionPlugin],
+  initialView: "timeGridWeek",
+  initialDate: "2024-01-01",
+  headerToolbar: false,
+  allDaySlot: false,
+  firstDay: 1,
+  dayHeaderFormat: { weekday: "short" },
+  validRange: { start: "2024-01-01", end: "2024-01-08" },
+  slotMinTime: calendarHours.value.slotMinTime,
+  slotMaxTime: calendarHours.value.slotMaxTime,
+  slotDuration: "00:15:00",
+  slotLabelInterval: "01:00:00",
+  snapDuration: "00:15:00",
+  nowIndicator: false,
+  selectable: true,
+  selectMirror: true,
+  editable: true,
+  eventOverlap: false,
+  selectOverlap: false,
+  events: calendarEvents.value,
+  select: onCalendarSelect,
+  eventClick: onEventClick,
+  eventDrop: onEventDrop,
+  eventResize: onEventResize,
+  height: 700,
+  expandRows: true,
+  eventTimeFormat: { hour: "numeric", minute: "2-digit", meridiem: "short" },
+}));
 
 const clearAll = () => {
-  selectedSlots.value = new Set();
-  unavailableSlots.value = new Set();
+  blocks.value = blocks.value.filter((b) => isClassScheduleBlock(b));
 };
 
 // --- API ---
+const loadClassSyncStatus = async () => {
+  try {
+    const response = await availabilityService.getClassSyncStatus();
+    const data = response?.data?.data || {};
+    const normalized = {
+      status: data.status || "never_synced",
+      lastSyncedAt: data.lastSyncedAt || null,
+      termCode: data.termCode || null,
+      totalClassBlocks: Number(data.totalClassBlocks || 0),
+      updated: Number(data.updated || 0),
+      error: data.error || null,
+    };
+
+    const shouldPreserveLastSyncError =
+      syncStatus.value.status === "failed"
+      && Boolean(syncStatus.value.error)
+      && normalized.status === "never_synced"
+      && !normalized.error;
+
+    syncStatus.value = shouldPreserveLastSyncError
+      ? {
+        ...normalized,
+        status: "failed",
+        error: syncStatus.value.error,
+      }
+      : normalized;
+  } catch {
+    syncStatus.value = {
+      status: "never_synced",
+      lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
+      error: syncStatus.value.error || null,
+    };
+  } finally {
+  }
+};
+
+const loadDepartmentCalendarHours = async () => {
+  const deptContext = Utils.getStore("currentDepartmentContext") || {};
+  let departmentId = Number(deptContext.department_id || 0);
+  if (!departmentId) {
+    try {
+      const membershipsRes = await studentService.getUserDepartments();
+      const memberships = membershipsRes?.data?.data || membershipsRes?.data || [];
+      const activeMembership = memberships.find((m) => m.is_active || String(m.request_status || "").toLowerCase() === "approved");
+      departmentId = Number(activeMembership?.department_id || activeMembership?.department?.department_id || 0);
+    } catch {
+      departmentId = 0;
+    }
+  }
+
+  if (!departmentId) {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+    return;
+  }
+
+  try {
+    const response = await departmentServices.getDepartmentHours(departmentId);
+    const rows = response?.data?.data || [];
+    calendarHours.value = pickCalendarBoundsFromHours(rows);
+  } catch {
+    calendarHours.value = { slotMinTime: "05:00:00", slotMaxTime: "24:00:00" };
+  }
+};
+
 const loadAvailabilities = async () => {
   if (!userId) return;
   loading.value = true;
@@ -401,28 +1348,25 @@ const loadAvailabilities = async () => {
     const response = await availabilityService.listForUser(userId);
     const records = response.data || [];
     existingRecords.value = records;
-
-    const availSlots = new Set();
-    const unavailSlots = new Set();
-    for (const rec of records) {
-      if (rec.specificDate && !rec.isRecurring) continue;
-      if (rec.dayOfWeek == null) continue;
-      const startHour = parseInt(String(rec.startTime).split(":")[0], 10);
-      const endHour = parseInt(String(rec.endTime).split(":")[0], 10);
-      const targetSet = rec.availabilityType === 'unavailable' ? unavailSlots : availSlots;
-      for (let h = startHour; h < endHour; h++) {
-        targetSet.add(slotKey(rec.dayOfWeek, h));
-      }
-    }
-    selectedSlots.value = new Set(availSlots);
-    unavailableSlots.value = new Set(unavailSlots);
-    initialSlots.value = new Set(availSlots);
-    initialUnavailableSlots.value = new Set(unavailSlots);
+    tempIdCounter = 0;
+    const loadedBlocks = records
+      .filter((r) => r.dayOfWeek != null && !r.specificDate)
+      .map((r) => ({
+        tempId: `loaded-${++tempIdCounter}`,
+        dayOfWeek: r.dayOfWeek,
+        startTime: normalizeToHHMM(r.startTime),
+        endTime: normalizeToHHMM(r.endTime),
+        availabilityType: r.availabilityType || "available",
+        sourceType: isClassScheduleRecord(r) ? "class_schedule" : (r.sourceType || "manual"),
+        sourceRef: r.sourceRef || null,
+        isSystemManaged: Boolean(r.isSystemManaged || isClassScheduleRecord(r)),
+      }));
+    blocks.value = loadedBlocks;
+    initialFingerprint.value = blocksFingerprint(loadedBlocks.filter((b) => !isClassScheduleBlock(b)));
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to load availability.", "error");
   } finally {
     loading.value = false;
-
   }
 };
 
@@ -430,124 +1374,46 @@ const saveChanges = async () => {
   if (!userId) return;
   saving.value = true;
   try {
-
-    successMessage.value = ''
-    errorMessage.value = ''
-    
-    // Save available slots
-    const availableByDay = {}
-    availableSlots.value.forEach(slot => {
-      const [day, time] = slot.split('-')
-      if (!availableByDay[day]) {
-        availableByDay[day] = { startHour: 24, endHour: 0 }
-      }
-      
-      const hour = parseInt(time.split(':')[0])
-      availableByDay[day].startHour = Math.min(availableByDay[day].startHour, hour)
-      availableByDay[day].endHour = Math.max(availableByDay[day].endHour, hour + 1)
-    })
-    
-    // Save unavailable slots
-    const unavailableByDay = {}
-    unavailableSlots.value.forEach(slot => {
-      const [day, time] = slot.split('-')
-      if (!unavailableByDay[day]) {
-        unavailableByDay[day] = { startHour: 24, endHour: 0 }
-      }
-      
-      const hour = parseInt(time.split(':')[0])
-      unavailableByDay[day].startHour = Math.min(unavailableByDay[day].startHour, hour)
-      unavailableByDay[day].endHour = Math.max(unavailableByDay[day].endHour, hour + 1)
-    })
-    
-    const userId = getCurrentUserId()
-    
-    // Save available time blocks
-    for (const [day, timeRange] of Object.entries(availableByDay)) {
-      const availability = {
-        userId: userId,
-        dayOfWeek: parseInt(day),
-        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
-        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
-        availabilityType: 'available',
-        isRecurring: true
-      }
-      
-      await axios.post('/api/availability', availability)
-    }
-    
-    // Save unavailable time blocks
-    for (const [day, timeRange] of Object.entries(unavailableByDay)) {
-      const availability = {
-        userId: userId,
-        dayOfWeek: parseInt(day),
-        startTime: `${timeRange.startHour.toString().padStart(2, '0')}:00`,
-        endTime: `${timeRange.endHour.toString().padStart(2, '0')}:00`,
-        availabilityType: 'unavailable',
-        isRecurring: true
-      }
-      
-      await axios.post('/api/availability', availability)
-    }
-    
-    await loadExistingAvailability()
-    successMessage.value = 'Availability saved successfully!'
-    
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
-
-    const recurringRecords = existingRecords.value.filter(
-      (r) => !r.specificDate || r.isRecurring
-    );
-    for (const rec of recurringRecords) {
-      await availabilityService.remove(rec.id);
-    }
-
-    const buildRanges = (slotsSet, type) => {
-      const slotsByDay = {};
-      for (const key of slotsSet) {
-        const [day, hour] = key.split("-").map(Number);
-        if (!slotsByDay[day]) slotsByDay[day] = [];
-        slotsByDay[day].push(hour);
-      }
-      const payloads = [];
-      for (const [day, hours] of Object.entries(slotsByDay)) {
-        hours.sort((a, b) => a - b);
-        let start = hours[0];
-        let end = hours[0];
-        for (let i = 1; i < hours.length; i++) {
-          if (hours[i] === end + 1) {
-            end = hours[i];
-          } else {
-            payloads.push({ day, start, end: end + 1 });
-            start = hours[i];
-            end = hours[i];
-          }
-        }
-        payloads.push({ day, start, end: end + 1 });
-      }
-      return payloads.map(({ day, start, end }) =>
-        availabilityService.create({
-          userId,
-          dayOfWeek: parseInt(day, 10),
-          startTime: `${pad(start)}:00`,
-          endTime: `${pad(end)}:00`,
-          availabilityType: type,
-          isRecurring: true,
-        })
+    const manualOnlyBlocks = blocks.value.filter((block) => !isClassScheduleBlock(block));
+    const overlapPair = findFirstOverlapPair(manualOnlyBlocks);
+    if (overlapPair) {
+      notify(
+        `Overlapping blocks detected on ${dowLabel(overlapPair.first.dayOfWeek)}. Please resolve overlaps before saving.`,
+        "error"
       );
-    };
+      return;
+    }
+    const hasConflict = manualOnlyBlocks.some((block) => hasClassConflict(block));
+    if (hasConflict) {
+      notify("One or more manual availability blocks overlap locked class time.", "error");
+      return;
+    }
 
-    await Promise.all([
-      ...buildRanges(selectedSlots.value, 'available'),
-      ...buildRanges(unavailableSlots.value, 'unavailable'),
-    ]);
+    // Delete only manual recurring records (preserve class-synced recurring records)
+    const recurringManualRecords = existingRecords.value.filter(
+      (r) => (r.isRecurring || !r.specificDate) && !isClassScheduleRecord(r)
+    );
+    for (const rec of recurringManualRecords) {
+      try {
+        await availabilityService.remove(rec.id);
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+      }
+    }
 
+    // Re-create only manual blocks sequentially to avoid race conditions
+    for (const block of manualOnlyBlocks) {
+      await availabilityService.create({
+        userId,
+        dayOfWeek: block.dayOfWeek,
+        startTime: block.startTime,
+        endTime: block.endTime,
+        availabilityType: block.availabilityType,
+        isRecurring: true,
+      });
+    }
     notify("Availability saved successfully.");
     await loadAvailabilities();
-
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to save availability.", "error");
   } finally {
@@ -558,32 +1424,8 @@ const saveChanges = async () => {
 const saveException = async () => {
   const valid = await exceptionFormRef.value?.validate();
   if (!valid?.valid) return;
-
   savingException.value = true;
   try {
-
-    const userId = getCurrentUserId()
-    const response = await axios.get(`/api/availability/user/${userId}`)
-    existingAvailability.value = response.data
-    
-    availableSlots.value.clear()
-    unavailableSlots.value.clear()
-    
-    existingAvailability.value.forEach(avail => {
-      const startHour = parseInt(avail.startTime.split(':')[0])
-      const endHour = parseInt(avail.endTime.split(':')[0])
-      
-      for (let h = startHour; h < endHour; h++) {
-        const timeStr = h.toString().padStart(2, '0') + ':00'
-        if (avail.availabilityType === 'available') {
-          availableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
-        } else {
-          unavailableSlots.value.add(`${avail.dayOfWeek}-${timeStr}`)
-        }
-      }
-    })
-    
-
     await availabilityService.create({
       userId,
       startTime: exceptionForm.value.startTime,
@@ -596,7 +1438,6 @@ const saveException = async () => {
     showExceptionDialog.value = false;
     exceptionForm.value = { specificDate: "", startTime: "", endTime: "", availabilityType: "unavailable" };
     await loadAvailabilities();
-
   } catch (error) {
     notify(error?.response?.data?.message || "Failed to add exception.", "error");
   } finally {
@@ -614,17 +1455,87 @@ const removeException = async (exc) => {
   }
 };
 
-onMounted(loadAvailabilities);
+const syncClassSchedule = async ({ silent = false, suppressErrorToast = false } = {}) => {
+  syncingClassSchedule.value = true;
+  try {
+    const response = await availabilityService.syncClassSchedule();
+    const data = response?.data?.data || {};
 
+    syncStatus.value = {
+      status: "success",
+      lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
+      termCode: data.termCode || syncStatus.value.termCode || null,
+      totalClassBlocks: Number((data.created || 0) + (data.updated || 0) + (data.unchanged || 0)),
+      updated: Number(data.updated || 0),
+      error: null,
+    };
+
+    if (!silent) {
+      notify(
+        `Class schedule synced. Added ${data.created || 0}, updated ${data.updated || 0}, removed ${data.deleted || 0}, unchanged ${data.unchanged || 0}.`,
+        "success"
+      );
+    }
+
+    await Promise.all([loadAvailabilities(), loadClassSyncStatus()]);
+    return data;
+  } catch (error) {
+    const message = error?.response?.data?.message || "Failed to sync class schedule.";
+
+    syncStatus.value = {
+      status: "failed",
+      lastSyncedAt: syncStatus.value.lastSyncedAt || null,
+      termCode: syncStatus.value.termCode || null,
+      totalClassBlocks: Number(syncStatus.value.totalClassBlocks || 0),
+      updated: Number(syncStatus.value.updated || 0),
+      error: message,
+    };
+
+    if (!suppressErrorToast) {
+      notify(message, "error");
+    }
+
+    return null;
+  } finally {
+    syncingClassSchedule.value = false;
+  }
+};
+
+onMounted(async () => {
+  await loadDepartmentCalendarHours();
+  const autoSyncResult = await syncClassSchedule({ silent: true, suppressErrorToast: true });
+
+  if (!autoSyncResult) {
+    await Promise.all([
+      loadAvailabilities(),
+      loadClassSyncStatus(),
+    ]);
+  }
+});
 </script>
 
 <style scoped>
 .availability-container {
-  padding: 24px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --color-text-primary: #333;
+  --color-text-secondary: #666;
+  --color-text-muted: #555;
+  --color-surface: #fff;
+  --color-border-subtle: #e0e0e0;
+  --color-available: #0D9488;
+  --color-unavailable: #DC2626;
+  --color-class: #9A3412;
+  padding: var(--space-6);
 }
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   animation: slideIn 0.3s ease;
 }
 
@@ -642,224 +1553,779 @@ onMounted(loadAvailabilities);
 .page-title {
   font-size: 24px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: #666;
-  margin-top: 4px;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
 }
 
 .action-buttons {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
 }
 
-.grid-card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-  margin-bottom: 32px;
-}
-
-.availability-grid {
-  width: 100%;
-  border-collapse: collapse;
-  user-select: none;
-}
-
-.availability-grid th,
-.availability-grid td {
-  border: 1px solid #e8e8e8;
-  text-align: center;
-}
-
-.time-header {
-  width: 100px;
-  padding: 14px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  background: #fafafa;
-}
-
-.day-header {
-  padding: 14px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #fafafa;
-}
-
-.time-cell {
-  padding: 10px 8px;
-  font-size: 12px;
-  color: #666;
-  background: #fafafa;
-  white-space: nowrap;
-  width: 100px;
-}
-
-
-.time-slot.available {
-  background: #4caf50;
-}
-
-.time-slot.available:hover {
-  background: #45a049;
-}
-
-.time-slot.unavailable {
-  background: #f44336;
-}
-
-.time-slot.unavailable:hover {
-  background: #d32f2f;
-}
-
-.slot-content {
-  width: 100%;
-  height: 100%;
-  min-height: 40px;
-}
-
-.availability-actions {
+.legend-row {
   display: flex;
-  gap: 12px;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
+  gap: calc(var(--space-4) + var(--space-1));
+  margin-bottom: var(--space-4);
 }
 
-.save-btn, .clear-btn, .mark-available-btn, .mark-unavailable-btn {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
-.mark-available-btn {
-  background: #00897b;
-  color: white;
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
 }
 
-.mark-available-btn:hover:not(:disabled) {
-  background: #00796b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 137, 123, 0.3);
+.available-dot {
+  background-color: var(--color-available);
 }
 
-.mark-unavailable-btn {
-  background: white;
-  color: #333;
-  border: 2px solid #ddd;
+.unavailable-dot {
+  background-color: var(--color-unavailable);
 }
 
-.mark-unavailable-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #bbb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-.slot-cell {
-  height: 44px;
+.class-dot {
+  background-color: var(--color-class);
+}
+
+/* Calendar card */
+.calendar-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  padding: var(--space-2) 10px var(--space-3);
+  margin-bottom: calc(var(--space-6) + var(--space-2));
+  overflow: visible;
+}
+
+/* FullCalendar theme overrides */
+.calendar-card :deep(.fc) {
+  --fc-border-color: #e5e7eb;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #fafafa;
+}
+
+.calendar-card :deep(.fc .fc-event) {
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.1s ease;
-  background-color: white;
 }
 
-.slot-cell.disabled {
-  cursor: default;
-  background-color: #fafafa;
+.calendar-card :deep(.fc .fc-event-title) {
+  font-weight: 600;
 }
 
-.slot-cell:hover {
-  background-color: #e0f2f1;
-
+.calendar-card :deep(.fc .class-synced-event) {
+  opacity: 0.95;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
-.slot-cell.disabled:hover {
-  background-color: #fafafa;
+/* Selection highlight and mirror — teal for available mode, red for unavailable mode */
+.mode-available :deep(.fc .fc-highlight) {
+  background-color: rgba(13, 148, 136, 0.15);
 }
 
-.slot-cell.available {
-  background-color: #0D9488;
+.mode-available :deep(.fc .fc-event.fc-mirror) {
+  background-color: rgba(13, 148, 136, 0.75);
+  border-color: var(--color-available);
 }
 
-.save-btn:disabled, .mark-available-btn:disabled, .mark-unavailable-btn:disabled {
-  background: #e0e0e0;
-  color: #9e9e9e;
-  cursor: not-allowed;
-  opacity: 0.6;
-  border-color: #e0e0e0;
+.mode-unavailable :deep(.fc .fc-highlight) {
+  background-color: rgba(220, 38, 38, 0.12);
 }
 
-.clear-btn {
-  background: white;
-  color: #333;
-  border: 2px solid #ddd;
-}
-
-.clear-btn:hover {
-  background: #f5f5f5;
-  border-color: #bbb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  
-.slot-cell.available:hover {
-  background-color: #0f766e;
-}
-
-.slot-cell.unavailable-slot {
-  background-color: #ef5350;
-}
-
-.slot-cell.unavailable-slot:hover {
-  background-color: #c62828;
+.mode-unavailable :deep(.fc .fc-event.fc-mirror) {
+  background-color: rgba(220, 38, 38, 0.7);
+  border-color: var(--color-unavailable);
 }
 
 /* Exceptions Section */
 .exceptions-section {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  padding: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  padding: var(--space-6);
 }
 
 .exceptions-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 6px 0;
 }
 
 .exceptions-subtitle {
   font-size: 13px;
-  color: #666;
-  margin: 0 0 12px 0;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3) 0;
 }
 
 .exceptions-list {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .exception-card {
+  margin-bottom: var(--space-2);
+}
+
+/* ═══════════════════════════════════════════ */
+/* MOBILE STYLES                               */
+/* ═══════════════════════════════════════════ */
+.hours-screen {
+  background: #F7F7F8;
+  min-height: 100vh;
+  padding: 0 0 100px;
+}
+
+/* Segmented control */
+.m-segment-wrap { padding: 16px 16px 0; }
+.m-segment {
+  display: flex;
+  background: #EBEBEB;
+  border-radius: 10px;
+  padding: 3px;
+}
+.m-seg-btn {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.m-seg-btn--active {
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.m-seg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #80162B;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Loading */
+.m-loading { display: flex; justify-content: center; padding: 40px 0; }
+
+/* Tab content */
+.m-tab-content { padding: 12px 16px; }
+
+/* View toggle */
+.m-view-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.m-view-btn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1.5px solid #ddd;
+  border-radius: 20px;
+  background: #fff;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.m-view-btn--active {
+  border-color: #80162B;
+  color: #80162B;
+  background: rgba(128, 22, 43, 0.06);
+}
+
+.m-range-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.m-range-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #666;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.m-range-nav-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-range-today-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  cursor: pointer;
+}
+.m-range-today-btn--active {
+  border-color: #80162B;
+  color: #80162B;
+  background: rgba(128, 22, 43, 0.06);
+}
+
+/* Day selector pills */
+.m-day-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.m-day-selector::-webkit-scrollbar {
+  display: none;
+}
+.m-day-pill {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 14px;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  flex: 1 1 auto;
+}
+@media (max-width: 380px) {
+  .m-day-pill {
+    padding: 6px 6px;
+    min-width: 42px;
+  }
+  .m-day-pill-dow {
+    font-size: 11px;
+  }
+  .m-day-pill-date {
+    font-size: 9px;
+  }
+}
+.m-day-pill--active {
+  background: #80162B;
+  color: #fff;
+}
+.m-day-pill-dow {
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+.m-day-pill-date {
+  font-size: 10px;
+  line-height: 1.1;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+/* Sync card */
+.m-sync-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 3px solid #ddd;
+}
+.m-sync-card--success { border-left-color: #0D9488; }
+.m-sync-card--error { border-left-color: #DC2626; }
+.m-sync-card--warning { border-left-color: #F59E0B; }
+.m-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-sync-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #444;
+}
+
+/* Day groups */
+.m-day-list { }
+.m-day-group { margin-bottom: 16px; }
+.m-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
   margin-bottom: 8px;
 }
+.m-block-cards { display: flex; flex-direction: column; gap: 8px; }
+.m-block-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.m-block-card:active { background: #f5f5f5; }
+.m-block-accent {
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.m-block-card--available .m-block-accent { background: #0D9488; }
+.m-block-card--unavailable .m-block-accent { background: #DC2626; }
+.m-block-card--class .m-block-accent { background: #9A3412; }
+.m-block-card--class { cursor: default; opacity: 0.85; }
+.m-block-info { flex: 1; min-width: 0; }
+.m-block-time {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.m-block-type {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-block-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  color: #9A3412;
+  background: rgba(154, 52, 18, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.m-block-chevron { flex-shrink: 0; }
+
+/* Empty state */
+.m-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+.m-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  margin-top: 12px;
+}
+.m-empty-sub {
+  font-size: 13px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* FAB */
+.m-fab {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #80162B;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(128, 22, 43, 0.35);
+  cursor: pointer;
+  z-index: 50;
+  transition: transform 0.15s ease;
+}
+.m-fab:active { transform: scale(0.92); }
+
+/* Save bar */
+.m-save-bar {
+  position: fixed;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid #eee;
+  z-index: 60;
+}
+.m-save-btn {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: #80162B;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-save-btn:disabled { opacity: 0.6; }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
+.slide-up-enter-from { transform: translateY(100%); opacity: 0; }
+.slide-up-leave-to { transform: translateY(100%); opacity: 0; }
+
+/* Time off list */
+.m-timeoff-list { display: flex; flex-direction: column; gap: 10px; }
+.m-timeoff-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+.m-timeoff-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.m-timeoff-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #888;
+}
+.m-timeoff-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.m-timeoff-chip--off { background: rgba(220, 38, 38, 0.1); color: #DC2626; }
+.m-timeoff-chip--on { background: rgba(13, 148, 136, 0.1); color: #0D9488; }
+.m-timeoff-remove {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Bottom sheet */
+.m-bottom-sheet {
+  border-radius: 20px 20px 0 0 !important;
+  padding: 16px 20px 24px;
+}
+.m-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ddd;
+  margin: 0 auto 16px;
+}
+.m-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+}
+.m-sheet-field { margin-bottom: 16px; }
+.m-sheet-field--half { flex: 1; }
+.m-sheet-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.m-sheet-select,
+.m-sheet-input {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #1a1a1a;
+  background: #fafafa;
+  -webkit-appearance: none;
+}
+.m-sheet-select:focus,
+.m-sheet-input:focus {
+  outline: none;
+  border-color: #80162B;
+}
+.m-sheet-type-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.m-type-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.m-type-btn--active-avail {
+  border-color: #0D9488;
+  color: #0D9488;
+  background: rgba(13, 148, 136, 0.06);
+}
+.m-type-btn--active-unavail {
+  border-color: #DC2626;
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+.m-sheet-time-row { display: flex; gap: 12px; margin-bottom: 20px; }
+.m-sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+.m-sheet-cancel {
+  flex: 1;
+  padding: 13px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+}
+.m-sheet-confirm {
+  flex: 1;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: #80162B;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════ */
+/* CALENDAR GRID VIEW                          */
+/* ═══════════════════════════════════════════ */
+.m-cal {
+  margin-top: 4px;
+}
+.m-cal-legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+.m-cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+}
+.m-cal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.m-cal-dot--class { background: #DC2626; }
+.m-cal-dot--available { background: #0D9488; }
+.m-cal-dot--unavailable { background: #9CA3AF; }
+
+.m-cal-grid {
+  display: flex;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.m-cal-grid--day .m-cal-col {
+  flex: 1;
+}
+
+/* Time gutter */
+.m-cal-gutter {
+  width: 32px;
+  flex-shrink: 0;
+  border-right: 1px solid #f0f0f0;
+}
+.m-cal-gutter-header {
+  height: 40px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.m-cal-gutter-label {
+  height: 40px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #bbb;
+  transform: translateY(-5px);
+}
+
+/* Day columns */
+.m-cal-col {
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid #f5f5f5;
+}
+.m-cal-col:last-child {
+  border-right: none;
+}
+.m-cal-col-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  color: #666;
+  border-bottom: 1px solid #f0f0f0;
+  background: #FAFAFA;
+}
+.m-cal-col-dow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.m-cal-col-date {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A8A8A;
+}
+.m-cal-col--single .m-cal-col-date {
+  font-size: 10px;
+}
+.m-cal-col-body {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hour grid lines */
+.m-cal-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #f5f5f5;
+}
+
+/* Blocks on the calendar */
+.m-cal-block {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.m-cal-block:active {
+  opacity: 0.75;
+}
+.m-cal-block--class {
+  background: var(--block-class-bg);
+  border-left: 2px solid var(--block-class-fg);
+  cursor: default;
+}
+.m-cal-block--available {
+  background: var(--block-avail-bg);
+  border-left: 2px solid var(--block-avail-fg);
+}
+.m-cal-block--unavailable {
+  background: var(--block-off-bg);
+  border-left: 2px solid var(--block-off-fg);
+}
+.m-cal-block-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+}
+.m-cal-block--class .m-cal-block-label { color: var(--block-class-fg); }
+.m-cal-block--available .m-cal-block-label { color: var(--block-avail-fg); }
+.m-cal-block--unavailable .m-cal-block-label { color: var(--block-off-label); }
 </style>

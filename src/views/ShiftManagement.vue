@@ -1,10 +1,7 @@
 <template>
   <div class="schedule-container">
     <div class="greeting-banner">
-      <div class="greeting-left">
-        <h2 class="greeting-title">Manager Schedule</h2>
-        <p class="greeting-date">{{ currentGreetingDate }}</p>
-      </div>
+      <h2 class="greeting-title">Manager Schedule</h2>
       <div class="header-controls">
         <v-btn variant="outlined" class="nav-btn" @click="previousWeek">
           <v-icon>mdi-chevron-left</v-icon>
@@ -19,14 +16,9 @@
       </div>
     </div>
 
-    <p class="selected-shift-note" v-if="selectedShift">
-      Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
-    </p>
-
-    <!-- Position Color Legend -->
-    <div v-if="positions.length > 0" class="position-legend">
-      <span class="legend-label">Key:</span>
-      <div class="legend-items">
+    <div class="schedule-meta">
+      <p class="greeting-date">{{ currentGreetingDate }}</p>
+      <div v-if="positions.length > 0" class="position-legend">
         <div v-for="pos in positions" :key="pos.position_id" class="legend-item">
           <span class="legend-swatch" :style="{ backgroundColor: pos.color || '#8B1538' }"></span>
           <span class="legend-text">{{ pos.position_name }}</span>
@@ -41,6 +33,10 @@
         </div>
       </div>
     </div>
+
+    <p class="selected-shift-note" v-if="selectedShift">
+      Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
+    </p>
 
     <div class="calendar-scroll-container" v-if="!shiftsLoading">
       <div class="calendar-container fullcalendar-wrap">
@@ -1697,32 +1693,39 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 8px;
+  gap: 24px;
+  margin-bottom: 6px;
   flex: 0 0 auto;
   flex-wrap: wrap;
 }
 
-.greeting-left {
+.schedule-meta {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 10px;
+  flex: 0 0 auto;
   flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ececec;
 }
 
 .greeting-title {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
-  color: #333;
+  color: #1f2937;
   margin: 0;
   line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .greeting-date {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #64748b;
   margin: 0;
+  letter-spacing: 0.01em;
 }
 
 .calendar-scroll-container {
@@ -1851,14 +1854,13 @@ onMounted(async () => {
 .position-legend {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
-  padding: 4px 12px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  flex: 0 1 auto;
   font-size: 12px;
 }
 

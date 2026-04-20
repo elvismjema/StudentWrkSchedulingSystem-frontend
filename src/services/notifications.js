@@ -35,7 +35,10 @@ const toUiNotification = (item) => ({
   type: item.type || null,
 });
 
-const getCurrentUserId = () => Utils.getStore("user")?.userId;
+const getCurrentUserId = () => {
+  const user = Utils.getStore("user");
+  return user?.userId || user?.id || user?.user_id;
+};
 
 class NotificationService {
   static async getNotifications() {

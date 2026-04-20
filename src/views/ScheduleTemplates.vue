@@ -2,11 +2,12 @@
   <PageFrame>
     <template #header>
       <PageHeader
-        title="Schedule templates"
-        :subtitle="currentDeptName ? `Reusable weekly patterns for ${currentDeptName}` : 'Reusable weekly patterns'"
+        title="Templates/Tasks"
+        :subtitle="currentDeptName ? `Reusable shift patterns and task checklists for ${currentDeptName}` : 'Reusable shift patterns and task checklists'"
       >
         <template #actions>
           <v-btn
+            v-if="activeTab === 'templates'"
             color="primary"
             variant="elevated"
             prepend-icon="mdi-plus"
@@ -15,13 +16,40 @@
           >
             New template
           </v-btn>
+          <v-btn
+            v-else
+            color="primary"
+            variant="elevated"
+            prepend-icon="mdi-plus"
+            :disabled="!currentDeptId"
+            @click="openCreateTlDialog"
+          >
+            New Task List
+          </v-btn>
         </template>
       </PageHeader>
     </template>
 
-    <v-alert v-if="!currentDeptId" type="warning" variant="tonal" density="compact">
+    <v-alert v-if="!currentDeptId" type="warning" variant="tonal" density="compact" class="mb-4">
       No department selected. Please choose a department from the sidebar.
     </v-alert>
+
+    <!-- ── Tab navigation ───────────────────────────────────────────────── -->
+    <v-tabs v-model="activeTab" color="primary" class="mb-4">
+      <v-tab value="templates">
+        <v-icon size="18" class="mr-1">mdi-text-box-multiple-outline</v-icon>
+        Schedule Templates
+      </v-tab>
+      <v-tab value="task-lists">
+        <v-icon size="18" class="mr-1">mdi-clipboard-list-outline</v-icon>
+        Task Lists
+      </v-tab>
+    </v-tabs>
+
+    <v-window v-model="activeTab">
+
+      <!-- ═══════════════════════════════ Schedule Templates tab ═══════════════════════════════ -->
+      <v-window-item value="templates">
 
     <!-- Row-per-template list -->
     <div v-if="templates.length > 0" class="template-list" role="list">
@@ -182,6 +210,177 @@
     </div>
 
     <v-progress-linear v-if="loading" indeterminate color="primary" />
+
+      </v-window-item>
+
+      <!-- ═══════════════════════════════ Task Lists tab ═══════════════════════════════ -->
+      <v-window-item value="task-lists">
+
+        <!-- Loading -->
+        <template v-if="tlLoading">
+          <v-skeleton-loader v-for="n in 3" :key="n" type="card" class="mb-4" />
+        </template>
+
+        <!-- Error -->
+        <v-alert
+          v-else-if="tlError"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+          closable
+          @click:close="tlError = null"
+        >
+          {{ tlError }}
+        </v-alert>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="tlTaskLists.length === 0"
+          class="template-empty"
+        >
+          <v-icon size="56" class="template-empty__icon">mdi-clipboard-list-outline</v-icon>
+          <h3 class="type-h2 template-empty__title">No task lists yet</h3>
+          <p class="type-body template-empty__desc">
+            Create a task list (e.g. "Opening Checklist") and apply it to shifts so workers can check off their tasks each day.
+          </p>
+          <v-btn class="mt-3" color="primary" variant="elevated" prepend-icon="mdi-plus" @click="openCreateTlDialog">
+            Create First Task List
+          </v-btn>
+        </div>
+
+        <!-- Task list cards -->
+        <div v-else class="template-list" role="list">
+          <article
+            v-for="list in tlTaskLists"
+            :key="list.id"
+            class="template-row"
+            role="listitem"
+          >
+            <div class="template-row__main">
+              <div class="template-row__title-line">
+                <v-icon size="16" color="primary" class="mr-1">mdi-clipboard-list-outline</v-icon>
+                <h2 class="template-row__title type-h3">{{ list.name }}</h2>
+                <v-chip size="x-small" variant="tonal" color="primary">
+                  {{ list.items?.length || 0 }} item{{ (list.items?.length || 0) !== 1 ? 's' : '' }}
+                </v-chip>
+              </div>
+              <div class="template-row__meta type-meta">
+                <span v-if="list.description">{{ list.description }}</span>
+                <span v-if="list.description" class="template-row__meta-sep" aria-hidden="true">·</span>
+                <span>
+                  <v-icon size="12" class="template-row__meta-icon">mdi-format-list-checks</v-icon>
+                  {{ (list.items || []).slice(0, 3).map(i => i.title).join(', ') }}{{ (list.items?.length || 0) > 3 ? ` +${list.items.length - 3} more` : '' }}
+                </span>
+              </div>
+            </div>
+            <div class="template-row__actions">
+              <v-tooltip text="Edit task list" location="top">
+                <template #activator="{ props: ttProps }">
+                  <v-btn
+                    v-bind="ttProps"
+                    icon="mdi-pencil-outline"
+                    variant="text"
+                    density="comfortable"
+                    @click="openEditTlDialog(list)"
+                  />
+                </template>
+              </v-tooltip>
+              <v-tooltip text="Delete task list" location="top">
+                <template #activator="{ props: ttProps }">
+                  <v-btn
+                    v-bind="ttProps"
+                    icon="mdi-delete-outline"
+                    color="error"
+                    variant="text"
+                    density="comfortable"
+                    @click="promptTlDelete(list)"
+                  />
+                </template>
+              </v-tooltip>
+            </div>
+          </article>
+        </div>
+
+        <!-- Task list Create / Edit Dialog -->
+        <v-dialog v-model="tlShowDialog" max-width="600px" persistent>
+          <v-card>
+            <v-card-title class="d-flex align-center pa-5 pb-3">
+              <v-icon color="primary" class="mr-2">mdi-clipboard-list-outline</v-icon>
+              {{ tlEditingList ? 'Edit Task List' : 'New Task List' }}
+            </v-card-title>
+            <v-divider />
+            <v-card-text class="pa-5">
+              <v-text-field
+                v-model="tlForm.name"
+                label="List Name *"
+                placeholder="e.g. Opening Checklist"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="tlFormErrors.name"
+                class="mb-3"
+              />
+              <v-textarea
+                v-model="tlForm.description"
+                label="Description (optional)"
+                variant="outlined"
+                density="comfortable"
+                rows="2"
+                auto-grow
+                class="mb-4"
+              />
+              <div class="d-flex align-center justify-space-between mb-2">
+                <span class="text-subtitle-2 font-weight-medium">Tasks</span>
+                <v-btn size="small" variant="outlined" prepend-icon="mdi-plus" @click="addTlItem">Add Task</v-btn>
+              </div>
+              <div v-if="tlForm.items.length === 0" class="text-body-2 text-medium-emphasis text-center py-4">
+                No tasks added yet
+              </div>
+              <div
+                v-for="(item, idx) in tlForm.items"
+                :key="idx"
+                class="d-flex align-center gap-2 mb-2"
+              >
+                <span class="text-caption text-medium-emphasis" style="min-width:20px">{{ idx + 1 }}.</span>
+                <v-text-field
+                  v-model="item.title"
+                  :label="`Task ${idx + 1}`"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="flex-grow-1"
+                />
+                <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="removeTlItem(idx)" />
+              </div>
+            </v-card-text>
+            <v-card-actions class="px-5 pb-5">
+              <v-spacer />
+              <v-btn variant="text" @click="closeTlDialog">Cancel</v-btn>
+              <v-btn color="primary" variant="elevated" :loading="tlSaving" @click="saveTlList">
+                {{ tlEditingList ? 'Save Changes' : 'Create List' }}
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <!-- Task list Delete Confirm Dialog -->
+        <v-dialog v-model="tlShowDeleteDialog" max-width="420px">
+          <v-card>
+            <v-card-title class="text-h6 pa-4">Delete Task List</v-card-title>
+            <v-card-text class="pa-4 pt-0">
+              Are you sure you want to delete <strong>{{ tlDeletingList?.name }}</strong>?
+              This cannot be undone. Any shifts using this list will lose their task list assignment.
+            </v-card-text>
+            <v-card-actions class="pa-4 pt-0">
+              <v-spacer />
+              <v-btn variant="text" @click="tlShowDeleteDialog = false">Cancel</v-btn>
+              <v-btn color="error" variant="flat" :loading="tlDeleting" @click="confirmTlDelete">Delete</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+      </v-window-item>
+
+    </v-window>
 
     <!-- ─────────────────────────────────────────────────────────────────────
          CREATE / EDIT DIALOG (calendar-based shift editor)
@@ -543,6 +742,7 @@ import apiClient from '../services/services.js'
 import Utils from '../config/utils.js'
 import { TZ } from '../utils/tz.js'
 import UserRoleServices from '../services/userRoleServices.js'
+import taskListService from '../services/taskListService.js'
 import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 import PageFrame from '../components/PageFrame.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -554,7 +754,8 @@ const currentDeptId = ref(_deptCtxInit.department_id || null)
 const currentDeptName = ref(_deptCtxInit.department_name || '')
 const currentUser = Utils.getStore('user') || {}
 
-// ─── State ───────────────────────────────────────────────────────────────────
+const activeTab = ref('templates')
+ ───────────────────────────────────────────────────────────────────
 const loading = ref(false)
 const saving = ref(false)
 const duplicating = ref(false)
@@ -1080,6 +1281,119 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color }
 }
 
+// ─── Task Lists state & functions ─────────────────────────────────────────────
+const tlTaskLists = ref([])
+const tlLoading = ref(false)
+const tlError = ref(null)
+const tlShowDialog = ref(false)
+const tlEditingList = ref(null)
+const tlSaving = ref(false)
+const tlFormErrors = ref({})
+const tlForm = ref(emptyTlForm())
+const tlShowDeleteDialog = ref(false)
+const tlDeletingList = ref(null)
+const tlDeleting = ref(false)
+
+function emptyTlForm() {
+  return { name: '', description: '', items: [] }
+}
+
+async function loadTaskLists() {
+  tlLoading.value = true
+  tlError.value = null
+  try {
+    const res = await taskListService.listTaskLists(
+      currentDeptId.value ? { department_id: currentDeptId.value } : {}
+    )
+    tlTaskLists.value = res.data || []
+  } catch (e) {
+    tlError.value = e.response?.data?.message || e.message || 'Failed to load task lists'
+  } finally {
+    tlLoading.value = false
+  }
+}
+
+function openCreateTlDialog() {
+  tlEditingList.value = null
+  tlForm.value = emptyTlForm()
+  tlFormErrors.value = {}
+  tlShowDialog.value = true
+}
+
+function openEditTlDialog(list) {
+  tlEditingList.value = list
+  tlForm.value = {
+    name: list.name,
+    description: list.description || '',
+    items: (list.items || []).map((item) => ({ title: item.title })),
+  }
+  tlFormErrors.value = {}
+  tlShowDialog.value = true
+}
+
+function closeTlDialog() {
+  tlShowDialog.value = false
+  tlEditingList.value = null
+}
+
+function addTlItem() {
+  tlForm.value.items.push({ title: '' })
+}
+
+function removeTlItem(idx) {
+  tlForm.value.items.splice(idx, 1)
+}
+
+async function saveTlList() {
+  tlFormErrors.value = {}
+  if (!tlForm.value.name?.trim()) {
+    tlFormErrors.value.name = 'List name is required'
+    return
+  }
+  tlSaving.value = true
+  try {
+    const payload = {
+      name: tlForm.value.name.trim(),
+      description: tlForm.value.description || null,
+      department_id: currentDeptId.value,
+      items: tlForm.value.items.filter((i) => i.title?.trim()),
+    }
+    if (tlEditingList.value) {
+      await taskListService.updateTaskList(tlEditingList.value.id, payload)
+      showSnackbar('Task list updated')
+    } else {
+      await taskListService.createTaskList(payload)
+      showSnackbar('Task list created')
+    }
+    closeTlDialog()
+    await loadTaskLists()
+  } catch (e) {
+    showSnackbar(e.response?.data?.message || 'Could not save task list', 'error')
+  } finally {
+    tlSaving.value = false
+  }
+}
+
+function promptTlDelete(list) {
+  tlDeletingList.value = list
+  tlShowDeleteDialog.value = true
+}
+
+async function confirmTlDelete() {
+  tlDeleting.value = true
+  try {
+    await taskListService.deleteTaskList(tlDeletingList.value.id)
+    showSnackbar('Task list deleted')
+    tlShowDeleteDialog.value = false
+    tlDeletingList.value = null
+    await loadTaskLists()
+  } catch (e) {
+    showSnackbar(e.response?.data?.message || 'Could not delete task list', 'error')
+  } finally {
+    tlDeleting.value = false
+  }
+}
+
 // ─── Sidebar context listener ────────────────────────────────────────────────
 // If ManagerSidebar resolves the department context after this page has already
 // mounted, pick it up via the custom event instead of showing "No department".
@@ -1090,6 +1404,7 @@ const onDeptContextReady = (e) => {
     currentDeptName.value = ctx.department_name || ''
     loadTemplates()
     loadDeptData()
+    loadTaskLists()
   }
 }
 
@@ -1135,6 +1450,7 @@ onMounted(async () => {
   }
   loadTemplates()
   loadDeptData()
+  loadTaskLists()
 })
 
 onBeforeUnmount(() => {

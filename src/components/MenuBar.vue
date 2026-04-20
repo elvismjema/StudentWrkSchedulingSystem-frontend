@@ -25,6 +25,7 @@ const logout = () => {
   AuthServices.logoutUser(user.value)
     .then((response) => {
       
+      Utils.removeItem("currentDepartmentContext");
       Utils.removeItem("user");
       router.push({ name: "login" });
     })

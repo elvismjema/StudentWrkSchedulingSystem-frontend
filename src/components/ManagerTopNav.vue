@@ -112,6 +112,7 @@ const menuItems = computed(() => {
 
 const handleSignOut = () => {
   menuOpen.value = false;
+  Utils.removeItem("currentDepartmentContext");
   Utils.removeItem("user");
   router.push("/login");
 };

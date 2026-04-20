@@ -146,6 +146,7 @@ const goToTasks = () => {
 
 const handleSignOut = () => {
   menuOpen.value = false
+  Utils.removeItem('currentDepartmentContext')
   Utils.removeItem('user')
   router.push('/login')
 }

@@ -185,29 +185,34 @@ const isActiveRoute = (item) => {
 };
 
 onMounted(async () => {
-  // Load department name
+  // Load department name. Stored context is only a temporary display fallback;
+  // the backend membership list is the source of truth after login/reassignment.
   const context = Utils.getStore('currentDepartmentContext');
   if (context?.department_name) {
     resolvedDepartmentName.value = context.department_name;
-  } else {
-    const userId = user.value?.userId || user.value?.id;
-    if (userId) {
-      try {
-        const response = await UserRoleServices.getUserDepartments(userId);
-        const memberships = response?.data || [];
-        const active = memberships.find((m) => m.is_active) || memberships[0];
-        if (active?.department?.department_name) {
-          resolvedDepartmentName.value = active.department.department_name;
-          Utils.setStore('currentDepartmentContext', {
-            department_id: active.department_id,
-            department_name: active.department.department_name,
-            role_name: active.role?.role_name || 'Student',
-            role_id: active.role_id,
-          });
-        }
-      } catch {
-        // fallback to defaults
+  }
+
+  const userId = Utils.getCurrentUserId();
+  if (userId) {
+    try {
+      const response = await UserRoleServices.getUserDepartments(userId);
+      const memberships = response?.data || [];
+      const active = memberships.find((m) => m.is_active) || memberships[0];
+      if (active?.department?.department_name) {
+        resolvedDepartmentName.value = active.department.department_name;
+        Utils.setStore('currentDepartmentContext', {
+          user_id: userId,
+          department_id: active.department_id,
+          department_name: active.department.department_name,
+          role_name: active.role?.role_name || 'Student',
+          role_id: active.role_id,
+        });
+      } else {
+        Utils.removeItem('currentDepartmentContext');
+        resolvedDepartmentName.value = '';
       }
+    } catch {
+      // fallback to defaults
     }
   }
 
@@ -215,6 +220,7 @@ onMounted(async () => {
 
 const handleSignOut = () => {
   menuOpen.value = false;
+  Utils.removeItem('currentDepartmentContext');
   Utils.removeItem('user');
   router.push('/login');
 };

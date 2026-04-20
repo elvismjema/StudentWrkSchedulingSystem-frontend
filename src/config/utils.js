@@ -12,6 +12,12 @@ export default class Utils {
     if (!name) return;
     return JSON.parse(window.localStorage.getItem(name));
   };
+
+  static getCurrentUserId = () => {
+    const user = Utils.getStore("user");
+    return user?.userId || user?.id || user?.user_id;
+  };
+
   // remove item
   static removeItem = (name) => {
     if (!name) return;

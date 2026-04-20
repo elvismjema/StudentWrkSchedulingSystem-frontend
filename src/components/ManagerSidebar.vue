@@ -20,18 +20,27 @@
     <v-divider />
 
     <v-list nav class="nav-list">
-      <v-list-item
+      <v-tooltip
         v-for="item in navItems"
         :key="item.title"
-        :to="item.route"
-        class="nav-item"
-        active-class="active-nav-item"
+        :text="item.title"
+        :disabled="!rail"
+        location="end"
       >
-        <template #prepend>
-          <v-icon :icon="item.icon" size="20" />
+        <template #activator="{ props: tooltipProps }">
+          <v-list-item
+            v-bind="tooltipProps"
+            :to="item.route"
+            class="nav-item"
+            active-class="active-nav-item"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="20" />
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
         </template>
-        <v-list-item-title>{{ item.title }}</v-list-item-title>
-      </v-list-item>
+      </v-tooltip>
 
       <!-- Admin-only section -->
       <template v-if="isAdmin">
@@ -39,63 +48,45 @@
         <div v-if="!rail" class="section-label">
           Admin
         </div>
-        <v-list-item
+        <v-tooltip
           v-for="item in adminNavItems"
           :key="item.title"
-          :to="item.route"
-          class="nav-item"
-          active-class="active-nav-item"
+          :text="item.title"
+          :disabled="!rail"
+          location="end"
         >
-          <template #prepend>
-            <v-icon :icon="item.icon" size="20" />
+          <template #activator="{ props: tooltipProps }">
+            <v-list-item
+              v-bind="tooltipProps"
+              :to="item.route"
+              class="nav-item"
+              active-class="active-nav-item"
+            >
+              <template #prepend>
+                <v-icon :icon="item.icon" size="20" />
+              </template>
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+            </v-list-item>
           </template>
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
-        </v-list-item>
+        </v-tooltip>
       </template>
     </v-list>
 
-    <template #append>
-      <v-divider />
-      <div class="user-section">
-        <v-list-item class="user-item">
-          <template #prepend>
-            <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">{{ displayInitial }}</span>
-            </v-avatar>
-          </template>
-          <div v-if="!rail" class="user-info">
-            <div class="user-name">{{ displayName }}</div>
-            <div class="user-role">{{ displayRole }}</div>
-          </div>
-        </v-list-item>
-      </div>
-    </template>
   </v-navigation-drawer>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import Utils from "../config/utils";
+import UserRoleServices from "../services/userRoleServices";
 
 const drawer = ref(true);
 const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
-
-const displayName = computed(() => {
-  const first = user.value?.fName || "";
-  const last = user.value?.lName || "";
-  const fullName = `${first} ${last}`.trim();
-  return fullName || "User";
-});
-
-const displayRole = computed(() => {
-  const role = (user.value?.role || "").toLowerCase();
-  if (role === "admin") return "Admin";
-  if (role === "manager") return "Manager";
-  return "Student";
-});
+const resolvedDepartmentName = ref("");
 
 const displayDepartment = computed(() => {
+  if (resolvedDepartmentName.value) return resolvedDepartmentName.value;
   const context = Utils.getStore("currentDepartmentContext");
   if (context?.department_name) return context.department_name;
   const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name;
@@ -103,12 +94,6 @@ const displayDepartment = computed(() => {
 });
 
 const bannerTitle = computed(() => displayDepartment.value);
-
-const displayInitial = computed(() => {
-  const first = user.value?.fName?.[0] || "";
-  const last = user.value?.lName?.[0] || "";
-  return `${first}${last}`.toUpperCase() || "U";
-});
 
 const isAdmin = computed(() => {
   return (user.value?.role || "").toLowerCase() === "admin";
@@ -118,10 +103,9 @@ const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
   { title: "Templates & Tasks", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
-  { title: "Availability", icon: "mdi-eye-outline", route: "/manager/availability" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
-  { title: "Time & Attendance", icon: "mdi-clock-outline", route: "/manager/time-attendance" },
-  { title: "Workers", icon: "mdi-account-group-outline", route: "/manager/workers" }
+  { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-pay" },
+  { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" },
 ];
 
 const adminNavItems = [
@@ -129,17 +113,63 @@ const adminNavItems = [
   { title: "Manage Departments", icon: "mdi-office-building-cog", route: "/manager/admin/departments" },
 ];
 
+const toggleRail = () => {
+  rail.value = !rail.value;
+};
+
+// Initialise department context on mount so every manager view has a valid
+// department_id in localStorage.  Skipped when already present.
+onMounted(async () => {
+  const existing = Utils.getStore("currentDepartmentContext");
+  if (existing?.department_name) {
+    resolvedDepartmentName.value = existing.department_name;
+  }
+
+  const userId = Utils.getCurrentUserId();
+  if (!userId) return;
+
+  try {
+    const response = await UserRoleServices.getUserDepartments(userId);
+    const memberships = response?.data || [];
+    // Prefer an active manager-level membership, fall back to any active one.
+    const managerMembership = memberships.find(
+      (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+    );
+    const membership =
+      managerMembership ||
+      memberships.find((m) => m.is_active) ||
+      memberships[0];
+    if (!membership) {
+      Utils.removeItem("currentDepartmentContext");
+      resolvedDepartmentName.value = "";
+      return;
+    }
+
+    const ctx = {
+      user_id: userId,
+      department_id: membership.department_id,
+      department_name: membership.department?.department_name,
+      role_name: membership.role?.role_name || "Manager",
+      role_id: membership.role_id,
+    };
+    resolvedDepartmentName.value = ctx.department_name || "";
+    Utils.setStore("currentDepartmentContext", ctx);
+    // Notify other components (e.g. ScheduleTemplates) on the same tab
+    window.dispatchEvent(new CustomEvent("departmentContextReady", { detail: ctx }));
+  } catch {
+    // Non-fatal: context will just remain unset.
+  }
+});
+
 defineExpose({
   rail,
-  toggleRail: () => {
-    rail.value = !rail.value;
-  }
+  toggleRail,
 });
 </script>
 
 <style scoped>
 .manager-sidebar {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--border-1);
 }
 
 .logo-section {
@@ -149,12 +179,12 @@ defineExpose({
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
 .oc-logo {
-  background-color: #8B1538;
-  color: white;
+  background-color: var(--brand-primary);
+  color: var(--surface-0);
   width: 40px;
   height: 40px;
   display: flex;
@@ -166,35 +196,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.brand-title {
-  font-size: 19px;
-  font-weight: 700;
-  color: #1f2328;
-}
-
-.brand-subtitle {
-  font-size: 14px;
-  color: #667085;
-}
-
-.manager-nav {
-  padding: 8px 12px;
-}
-
-.manager-nav-item {
-  border-radius: 12px;
-  min-height: 66px;
-}
-
-.manager-active-nav-item {
-  background: #f0f6ff;
-  color: #0969da;
-}
-
-.manager-user-wrap {
-  padding: 8px 12px;
-}
-
 .logo-text {
   flex: 1;
 }
@@ -202,13 +203,13 @@ defineExpose({
 .main-title {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.2;
 }
 
 .sub-title {
   font-size: 11px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   margin-top: 2px;
 }
@@ -218,8 +219,8 @@ defineExpose({
 }
 
 .nav-item {
-  margin: 2px 8px;
-  border-radius: 8px;
+  margin: 2px var(--space-1);
+  border-radius: var(--radius-sm);
   transition: all 0.2s ease;
 }
 
@@ -232,34 +233,57 @@ defineExpose({
 }
 
 .nav-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface-2);
 }
 
 .active-nav-item {
-  background-color: #f8e6ea !important;
-  color: #8B1538 !important;
+  background-color: var(--brand-primary-lt) !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-icon {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
 }
 
 .active-nav-item .v-list-item-title {
-  color: #8B1538 !important;
+  color: var(--brand-primary) !important;
   font-weight: 500;
 }
 
 .section-divider {
-  margin: 8px 12px;
+  margin: var(--space-1) var(--space-2);
 }
 
 .section-label {
-  padding: 0 16px 6px;
+  padding: 0 var(--space-3) 6px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8B1538;
+  color: var(--brand-primary);
+}
+
+.rail-toggle-wrap {
+  padding: var(--space-1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rail-toggle-btn {
+  color: var(--text-2);
+  text-transform: none;
+  font-size: 13px;
+  letter-spacing: normal;
+  min-width: 0;
+}
+
+.rail-toggle-btn:hover {
+  color: var(--brand-primary);
+  background-color: var(--surface-2);
+}
+
+.rail-toggle-label {
+  margin-left: 6px;
 }
 
 .user-section {
@@ -267,22 +291,22 @@ defineExpose({
 }
 
 .user-item {
-  border-radius: 8px;
-  margin: 0 8px;
+  border-radius: var(--radius-sm);
+  margin: 0 var(--space-1);
 }
 
 .user-avatar {
-  background-color: #8B1538;
+  background-color: var(--brand-primary);
 }
 
 .user-initial {
-  color: white;
+  color: var(--surface-0);
   font-weight: 500;
   font-size: 13px;
 }
 
 .user-name {
-  color: #333;
+  color: var(--text-1);
   font-size: 13px;
   font-weight: 600;
 }
@@ -293,7 +317,7 @@ defineExpose({
 }
 
 .user-role {
-  color: #666;
+  color: var(--text-2);
   font-size: 11px;
   margin-top: 2px;
 }
@@ -312,5 +336,9 @@ defineExpose({
 
 .v-navigation-drawer--rail .user-item {
   margin: 0 4px;
+}
+
+.v-navigation-drawer--rail .rail-toggle-wrap {
+  justify-content: center;
 }
 </style>

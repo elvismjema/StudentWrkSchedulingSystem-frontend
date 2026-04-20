@@ -73,26 +73,26 @@
               variant="outlined"
               color="primary"
               prepend-icon="mdi-account-switch"
-              aria-label="Find cover for this shift"
+              aria-label="Request cover for this shift"
               @click.stop="$emit('find-cover', shift)"
             >
-              Find Cover
+              Request Cover
             </v-btn>
             <v-btn
               v-if="canTrade"
               size="small"
               variant="outlined"
               prepend-icon="mdi-swap-horizontal"
-              aria-label="Trade this shift"
+              aria-label="Swap this shift"
               @click.stop="$emit('trade', shift)"
             >
-              Trade
+              Swap
             </v-btn>
             <v-btn
               v-if="canClockIn"
               size="small"
               variant="flat"
-              color="success"
+              color="primary"
               prepend-icon="mdi-login"
               aria-label="Clock in for this shift"
               @click.stop="$emit('clock-in', shift)"
@@ -119,6 +119,8 @@
 
 <script setup>
 import { computed } from 'vue';
+import { buildDateTime } from '../../utils/shiftDateTime.js';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   shift: { type: Object, required: true },
@@ -151,19 +153,21 @@ const departmentColor = computed(() => {
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const formattedTime = computed(() => {
-  const start = formatTime(props.shift.start_time || props.shift.startTime || props.shift.shift_start);
-  const end = formatTime(props.shift.end_time || props.shift.endTime || props.shift.shift_end);
-  return start + ' – ' + end;
+  const s = props.shift;
+  const startDT = buildDateTime(s, 'start_time') || buildDateTime(s, 'startTime') || s.start_time || s.startTime || s.shift_start;
+  const endDT = buildDateTime(s, 'end_time') || buildDateTime(s, 'endTime') || s.end_time || s.endTime || s.shift_end;
+  return formatTime(startDT) + ' – ' + formatTime(endDT);
 });
 
 const statusLabel = computed(() => {
   if (props.isOpenShift) return 'Open';
   if (props.shift.status === 'pending_acknowledgement') return 'Unacknowledged';
-  if (props.shift.swap_requested) return 'Cover Requested';
+  if (props.shift.swap_requested) return 'Cover Request';
   return null;
 });
 

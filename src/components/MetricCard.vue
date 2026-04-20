@@ -20,7 +20,7 @@ defineProps({
 
 <style scoped>
 .metric-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
 }
 </style>
 

@@ -1,189 +1,159 @@
 <template>
-  <div class="profile-page">
-    <div class="profile-hero">
-      <div>
-        <h1 class="page-title">Profile</h1>
-        <p class="page-subtitle">Manage your profile and preferences</p>
+  <div class="profile-page pa-4">
+    <h1 class="page-title">Profile</h1>
+    <p class="page-subtitle">Your account at a glance.</p>
+
+    <!-- Identity card (read-only header + inline edit for personal info) -->
+    <v-card elevation="0" rounded="lg" border class="profile-card mt-4">
+      <div class="identity-row">
+        <v-avatar size="72" class="identity-avatar">
+          <span class="identity-initials">{{ displayInitials }}</span>
+        </v-avatar>
+        <div class="identity-text">
+          <div class="identity-name">{{ displayName }}</div>
+          <div v-if="form.email" class="identity-email">{{ form.email }}</div>
+          <div v-if="roleLabel" class="identity-role">{{ roleLabel }}</div>
+        </div>
       </div>
 
-      <v-btn
-        class="save-button"
-        color="#8B1538"
-        size="large"
-        prepend-icon="mdi-content-save-outline"
-        @click="saveProfile"
-      >
-        Save Changes
-      </v-btn>
-    </div>
+      <v-divider class="my-4" />
 
-    <div class="profile-layout">
-      <v-card class="profile-card primary-card" elevation="0">
-        <div class="section-header">
-          <h2>Profile</h2>
-          <p>Your personal information</p>
-        </div>
-
-        <div class="avatar-row">
-          <div class="avatar-shell">
-            <v-avatar size="104" class="profile-avatar">
-              <span class="profile-initials">{{ displayInitials }}</span>
-            </v-avatar>
-            <v-btn
-              class="camera-button"
-              icon="mdi-camera-outline"
-              size="40"
-              variant="flat"
-              aria-label="Profile photo placeholder"
-            />
-          </div>
-        </div>
-
-        <v-divider class="section-divider" />
-
-        <div class="form-grid">
-          <div>
-            <label class="field-label" for="full-name">Full Name</label>
-            <v-text-field
-              id="full-name"
-              v-model="profile.fullName"
-              variant="outlined"
-              hide-details
-              bg-color="white"
-            />
-          </div>
-
-          <div>
-            <label class="field-label" for="email">Email</label>
-            <v-text-field
-              id="email"
-              v-model="profile.email"
-              variant="outlined"
-              hide-details
-              bg-color="white"
-            />
-          </div>
-        </div>
-
-        <div class="single-field">
-          <label class="field-label" for="phone">Phone Number</label>
-          <v-text-field
-            id="phone"
-            v-model="profile.phone"
-            variant="outlined"
-            hide-details
-            bg-color="white"
-            placeholder="405-555-0123"
-          />
-        </div>
-      </v-card>
-
-      <div class="profile-side-column">
-        <v-card class="profile-card compact-card" elevation="0">
-          <div class="section-header">
-            <h2>Department & Positions</h2>
-            <p>Your work assignments</p>
-          </div>
-
-          <v-progress-linear v-if="loadingDepts" indeterminate color="#8B1538" class="mb-4" />
-
-          <div v-if="!loadingDepts && memberships.length" class="membership-list">
-            <div
-              v-for="m in memberships"
-              :key="m.ud_id"
-              class="membership-item"
-            >
-              <div class="membership-header">
-                <span class="membership-dept">{{ m.department?.department_name || 'Department' }}</span>
-                <v-chip
-                  size="x-small"
-                  :color="m.request_status === 'approved' ? 'success' : m.request_status === 'pending' ? 'warning' : 'error'"
-                  variant="flat"
-                >
-                  {{ m.request_status === 'approved' ? 'Active' : m.request_status === 'pending' ? 'Pending' : 'Rejected' }}
-                </v-chip>
-              </div>
-              <div class="membership-meta">
-                <span v-if="m.role" class="membership-role">{{ m.role.role_name }}</span>
-                <span v-else class="membership-role text-grey">No role assigned</span>
-                <span v-if="m.position" class="membership-position"> · {{ m.position.position_name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-else-if="!loadingDepts" class="text-grey" style="font-size: 0.95rem;">
-            Not assigned to any department yet.
-          </div>
-
-          <p class="assignment-note">
-            Contact your manager to update your department or positions.
-          </p>
-        </v-card>
-
-        <v-card class="profile-card compact-card" elevation="0">
-          <div class="section-header">
-            <h2>Notifications</h2>
-            <p>How you want to be notified</p>
-          </div>
-
-          <div class="preference-row">
-            <div>
-              <div class="preference-title">Email Notifications</div>
-              <div class="preference-subtitle">Receive schedule updates via email</div>
-            </div>
-            <v-switch
-              v-model="preferences.emailNotifications"
-              color="#8B1538"
-              hide-details
-              inset
-            />
-          </div>
-
-          <v-divider />
-
-          <div class="preference-row">
-            <div>
-              <div class="preference-title">SMS Text Messages</div>
-              <div class="preference-subtitle">Get urgent reminders via text</div>
-            </div>
-            <v-switch
-              v-model="preferences.smsNotifications"
-              color="#8B1538"
-              hide-details
-              inset
-            />
-          </div>
-
-          <v-divider />
-
-          <div class="reminder-row">
-            <div>
-              <div class="preference-title">Shift Reminder Time</div>
-              <div class="preference-subtitle">Get notified before your shift starts</div>
-            </div>
-
-            <div class="reminder-input">
-              <v-text-field
-                v-model="preferences.shiftReminderMinutes"
-                variant="outlined"
-                hide-details
-                type="number"
-                min="0"
-                bg-color="white"
-              />
-              <span>minutes before</span>
-            </div>
-          </div>
-        </v-card>
+      <div class="card-label-row">
+        <span class="card-label">Personal info</span>
+        <v-btn
+          v-if="!editing"
+          variant="text"
+          color="#811429"
+          size="small"
+          density="comfortable"
+          @click="startEdit"
+        >
+          <v-icon start size="16">mdi-pencil</v-icon>
+          Edit
+        </v-btn>
       </div>
-    </div>
 
-    <v-snackbar
-      v-model="saveNoticeOpen"
-      timeout="2200"
-      color="#1f6f43"
-    >
-      Profile changes saved locally.
+      <!-- Read-only display -->
+      <div v-if="!editing" class="info-grid mt-3">
+        <div class="info-row">
+          <span class="info-label">Name</span>
+          <span class="info-value">{{ displayName || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-value">{{ form.email || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Phone</span>
+          <span class="info-value">{{ form.phone || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Preferred hours / week</span>
+          <span class="info-value">{{ form.preferredHours || 0 }}</span>
+        </div>
+      </div>
+
+      <!-- Inline edit form -->
+      <div v-else class="mt-3">
+        <v-row dense>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.fName"
+              label="First name"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.lName"
+              label="Last name"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12">
+            <v-text-field
+              v-model="form.email"
+              label="Email"
+              type="email"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.phone"
+              label="Phone"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model.number="form.preferredHours"
+              label="Preferred hours / week"
+              type="number"
+              min="0"
+              max="40"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex justify-end ga-2 mt-3">
+          <v-btn variant="text" :disabled="saving" @click="cancelEdit">
+            Cancel
+          </v-btn>
+          <v-btn
+            color="#811429"
+            variant="flat"
+            :loading="saving"
+            @click="saveProfile"
+          >
+            Save
+          </v-btn>
+        </div>
+      </div>
+    </v-card>
+
+    <!-- Work assignment -->
+    <v-card elevation="0" rounded="lg" border class="profile-card mt-3">
+      <div class="card-label">Work assignment</div>
+
+      <v-progress-linear
+        v-if="loadingDepts"
+        indeterminate
+        color="#811429"
+        class="mt-3"
+        height="2"
+      />
+
+      <template v-else-if="primaryAssignment">
+        <div class="assignment-row mt-3">
+          <v-icon size="20" color="#811429" class="assignment-icon">mdi-office-building-outline</v-icon>
+          <span class="assignment-value">{{ primaryAssignment.department }}</span>
+        </div>
+        <div v-if="primaryAssignment.position" class="assignment-row mt-2">
+          <v-icon size="20" color="#811429" class="assignment-icon">mdi-briefcase-outline</v-icon>
+          <span class="assignment-value">{{ primaryAssignment.position }}</span>
+        </div>
+      </template>
+
+      <div v-else class="assignment-empty mt-3">
+        Not assigned yet — contact your manager.
+      </div>
+    </v-card>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
+      {{ snackbar.text }}
     </v-snackbar>
   </div>
 </template>
@@ -192,28 +162,61 @@
 import { computed, reactive, ref, onMounted } from "vue";
 import Utils from "../config/utils";
 import apiClient from "../services/services.js";
+import studentService from "../services/studentService.js";
 
 const storedUser = Utils.getStore("user") || {};
-const storedProfile = Utils.getStore("studentProfile") || {};
-const storedPreferences = Utils.getStore("studentProfilePreferences") || {};
 
-const buildFullName = (user) => `${user?.fName || ""} ${user?.lName || ""}`.trim();
-
-const profile = reactive({
-  fullName: storedProfile.fullName || buildFullName(storedUser) || "User",
-  email: storedProfile.email || storedUser.email || "",
-  phone: storedProfile.phone || "",
+// Editable form state — initialized from the locally cached user, then
+// re-synced after every successful save. The save endpoint is the same
+// one Settings used to call, so behavior is identical to what the user
+// already trusted.
+const form = reactive({
+  fName: storedUser.fName || "",
+  lName: storedUser.lName || "",
+  email: storedUser.email || "",
+  phone: storedUser.phone || "",
+  preferredHours: storedUser.preferredHours || 20,
 });
 
-const preferences = reactive({
-  emailNotifications: storedPreferences.emailNotifications ?? true,
-  smsNotifications: storedPreferences.smsNotifications ?? false,
-  shiftReminderMinutes: storedPreferences.shiftReminderMinutes ?? 30,
+const editing = ref(false);
+const saving = ref(false);
+const snackbar = ref({ show: false, text: "", color: "success" });
+
+const displayName = computed(() => {
+  const full = `${form.fName || ""} ${form.lName || ""}`.trim();
+  return full || form.email || "Student";
 });
 
-const saveNoticeOpen = ref(false);
+const roleLabel = computed(() => {
+  const r = storedUser.role || storedUser.userRole;
+  if (!r) return "";
+  const s = String(r).toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+});
+
+const displayInitials = computed(() => {
+  const parts = displayName.value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+});
+
 const loadingDepts = ref(false);
 const memberships = ref([]);
+
+// One department for now (per product decision). Pick the active assignment
+// if present, otherwise the first row, so we always show something stable.
+const primaryAssignment = computed(() => {
+  if (!memberships.value.length) return null;
+  const active = memberships.value.find(
+    (m) => (m.request_status || "").toLowerCase() === "approved"
+  );
+  const m = active || memberships.value[0];
+  return {
+    department: m.department?.department_name || "Department",
+    position: m.position?.position_name || "",
+  };
+});
 
 const fetchMemberships = async () => {
   const userId = storedUser?.id;
@@ -229,314 +232,200 @@ const fetchMemberships = async () => {
   }
 };
 
-onMounted(fetchMemberships);
-
-const displayInitials = computed(() => {
-  const parts = profile.fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "U";
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-});
-
-
-const saveProfile = () => {
-  const nameParts = profile.fullName.trim().split(/\s+/).filter(Boolean);
-  const nextUser = {
-    ...storedUser,
-    fName: nameParts[0] || storedUser.fName || "",
-    lName: nameParts.slice(1).join(" ") || storedUser.lName || "",
-    email: profile.email,
-  };
-
-  Utils.setStore("user", nextUser);
-  Utils.setStore("studentProfile", {
-    fullName: profile.fullName,
-    email: profile.email,
-    phone: profile.phone,
-    departments: storedProfile.departments || storedUser.departments || [],
-    positions: storedProfile.positions || storedUser.positions || [],
-  });
-  Utils.setStore("studentProfilePreferences", {
-    emailNotifications: preferences.emailNotifications,
-    smsNotifications: preferences.smsNotifications,
-    shiftReminderMinutes: Number(preferences.shiftReminderMinutes) || 0,
-  });
-
-  saveNoticeOpen.value = true;
+const startEdit = () => {
+  // Re-seed from the latest cached user in case another tab updated it.
+  const u = Utils.getStore("user") || {};
+  form.fName = u.fName || "";
+  form.lName = u.lName || "";
+  form.email = u.email || "";
+  form.phone = u.phone || "";
+  form.preferredHours = u.preferredHours || 20;
+  editing.value = true;
 };
+
+const cancelEdit = () => {
+  const u = Utils.getStore("user") || {};
+  form.fName = u.fName || "";
+  form.lName = u.lName || "";
+  form.email = u.email || "";
+  form.phone = u.phone || "";
+  form.preferredHours = u.preferredHours || 20;
+  editing.value = false;
+};
+
+const showSnackbar = (text, color = "success") => {
+  snackbar.value = { show: true, text, color };
+};
+
+const saveProfile = async () => {
+  saving.value = true;
+  try {
+    await studentService.updateProfile({
+      fName: form.fName,
+      lName: form.lName,
+      email: form.email,
+      phone: form.phone,
+      preferredHours: form.preferredHours,
+    });
+
+    // Mirror the change into the locally cached user so the avatar menu,
+    // header initials, and any other component reading from localStorage
+    // see the new values without requiring a reload.
+    const u = Utils.getStore("user") || {};
+    u.fName = form.fName;
+    u.lName = form.lName;
+    u.email = form.email;
+    u.phone = form.phone;
+    u.preferredHours = form.preferredHours;
+    Utils.setStore("user", u);
+
+    editing.value = false;
+    showSnackbar("Profile updated.", "success");
+  } catch (err) {
+    showSnackbar(
+      err?.response?.data?.message || "Failed to update profile.",
+      "error"
+    );
+  } finally {
+    saving.value = false;
+  }
+};
+
+onMounted(fetchMemberships);
 </script>
 
 <style scoped>
 .profile-page {
-  max-width: 1240px;
+  width: 100%;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: 100%;
-  overflow: auto;
-}
-
-.profile-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
-  gap: 20px;
-  align-items: start;
-}
-
-.profile-side-column {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.profile-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .page-title {
-  font-size: 2.35rem;
-  line-height: 1.08;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #24242b;
+  line-height: 1.2;
 }
 
 .page-subtitle {
-  margin-top: 6px;
-  font-size: 1rem;
+  margin-top: 4px;
+  font-size: 0.9rem;
   color: #6d7586;
-}
-
-.save-button {
-  border-radius: 12px;
-  min-width: 188px;
-  height: 60px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-transform: none;
-  box-shadow: none;
 }
 
 .profile-card {
-  padding: 32px 36px;
-  border: 1px solid #d9dce4;
-  border-radius: 16px;
   background: #ffffff;
+  border-color: #e5e7eb !important;
+  padding: 18px 18px;
 }
 
-.primary-card {
-  min-height: 100%;
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.compact-card {
-  padding: 26px 30px;
+.identity-avatar {
+  background: #811429;
+  flex-shrink: 0;
 }
 
-.section-header h2 {
-  font-size: 1.22rem;
+.identity-initials {
+  color: #ffffff;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.identity-text {
+  min-width: 0;
+}
+
+.identity-name {
+  font-size: 1.05rem;
   font-weight: 700;
   color: #24242b;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
-.section-header p {
-  margin-top: 8px;
+.identity-email {
+  margin-top: 2px;
+  font-size: 0.85rem;
   color: #6d7586;
-  font-size: 0.95rem;
+  word-break: break-word;
 }
 
-.avatar-row {
-  padding: 28px 0 20px;
+.identity-role {
+  margin-top: 4px;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #811429;
 }
 
-.avatar-shell {
-  position: relative;
-  width: fit-content;
+.card-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.profile-avatar {
-  background: #8b1538;
-}
-
-.profile-initials {
-  color: #fff;
-  font-size: 2.5rem;
-  font-weight: 500;
-}
-
-.camera-button {
-  position: absolute;
-  right: -8px;
-  bottom: -8px;
-  background: #f2f2f4;
-  color: #2d2d35;
-  box-shadow: none;
-}
-
-.section-divider {
-  margin-bottom: 24px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-}
-
-.single-field {
-  margin-top: 22px;
-}
-
-.field-label {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 0.95rem;
+.card-label {
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #24242b;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #6d7586;
 }
 
-.assignment-stack {
+.info-grid {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
+}
+
+.info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.info-label {
+  color: #6d7586;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #24242b;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-word;
+}
+
+.assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assignment-icon {
+  flex-shrink: 0;
 }
 
 .assignment-value {
-  min-height: 24px;
-  color: #2d2d35;
-  font-size: 0.98rem;
-}
-
-.membership-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.membership-item {
-  padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fafafa;
-}
-
-.membership-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.membership-dept {
-  font-weight: 600;
   font-size: 0.95rem;
   color: #24242b;
-}
-
-.membership-meta {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  color: #6d7586;
-}
-
-.membership-role {
   font-weight: 500;
 }
 
-.assignment-note {
-  margin-top: 28px;
+.assignment-empty {
+  font-size: 0.9rem;
   color: #6d7586;
-  font-size: 0.95rem;
-}
-
-.preference-row,
-.reminder-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 24px 0;
-}
-
-.preference-title {
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: #24242b;
-}
-
-.preference-subtitle {
-  margin-top: 6px;
-  color: #6d7586;
-  font-size: 0.95rem;
-}
-
-.reminder-row {
-  align-items: flex-start;
-}
-
-.reminder-input {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 240px;
-}
-
-.reminder-input :deep(.v-input) {
-  max-width: 96px;
-}
-
-.profile-page :deep(.v-field) {
-  min-height: 50px;
-  border-radius: 12px;
-}
-
-.profile-page :deep(.v-field__input) {
-  font-size: 0.95rem;
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-
-@media (max-width: 960px) {
-  .profile-page {
-    padding: 18px;
-  }
-
-  .profile-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .profile-side-column {
-    gap: 18px;
-  }
-
-  .profile-hero,
-  .preference-row,
-  .reminder-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .save-button {
-    width: 100%;
-    min-width: 0;
-    height: 54px;
-  }
-
-  .profile-card {
-    padding: 24px 18px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .reminder-input {
-    min-width: 0;
-  }
 }
 </style>

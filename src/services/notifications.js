@@ -1,5 +1,5 @@
 import apiClient from "./services.js";
-import Utils from "../config/utils.js";
+import { formatDateTime } from "../utils/tz.js";
 
 const iconForType = (type = "", title = "") => {
   switch (type) {
@@ -25,7 +25,7 @@ const toUiNotification = (item) => ({
   id: item.id,
   title: item.title,
   description: item.message,
-  timestamp: new Date(item.createdAt || item.updatedAt || Date.now()).toLocaleString(),
+  timestamp: formatDateTime(new Date(item.createdAt || item.updatedAt || Date.now())),
   unread: !item.isRead,
   icon: iconForType(item.type, item.title),
   // US1 AC3, US3 AC3 – deep-link path stored on the notification record
@@ -35,14 +35,9 @@ const toUiNotification = (item) => ({
   type: item.type || null,
 });
 
-const getCurrentUserId = () => Utils.getStore("user")?.userId;
-
 class NotificationService {
   static async getNotifications() {
-    const userId = getCurrentUserId();
-    const response = await apiClient.get("/notifications", {
-      params: userId ? { userId } : {},
-    });
+    const response = await apiClient.get("/notifications");
     const payload = response?.data?.data || [];
     return payload.map(toUiNotification);
   }
@@ -59,9 +54,46 @@ class NotificationService {
     return true;
   }
 
+  static async deleteNotification(notificationId) {
+    await apiClient.delete(`/notifications/${notificationId}`);
+    return true;
+  }
+
+  static async clearAllNotifications() {
+    await apiClient.delete(`/notifications`);
+    return true;
+  }
+
   static async markAsRead(notificationId) {
     await apiClient.patch(`/notifications/${notificationId}/read`, {});
     return true;
+  }
+
+  /**
+   * Per-category notification preferences for the authenticated user.
+   * Backed by users.notification_preferences (TEXT, JSON-encoded). The push
+   * dispatcher reads this exact column to suppress per-category pushes, so
+   * these calls are the source of truth — not localStorage.
+   *
+   * Known keys: shiftReminders, scheduleChanges, swapRequests, openShifts,
+   * timeOff. Unknown keys are silently dropped server-side.
+   */
+  static async getMyNotificationPreferences() {
+    const { data } = await apiClient.get("/users/me/notification-preferences");
+    return data?.preferences || {};
+  }
+
+  /**
+   * Partial update is supported — the backend merges incoming over stored,
+   * so callers can send only the keys they actually changed without
+   * resetting the rest. Returns the full merged map after save.
+   */
+  static async updateMyNotificationPreferences(preferences) {
+    const { data } = await apiClient.put(
+      "/users/me/notification-preferences",
+      { preferences },
+    );
+    return data?.preferences || {};
   }
 
   /**

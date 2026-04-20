@@ -12,6 +12,12 @@ export default class Utils {
     if (!name) return;
     return JSON.parse(window.localStorage.getItem(name));
   };
+
+  static getCurrentUserId = () => {
+    const user = Utils.getStore("user");
+    return user?.userId || user?.id || user?.user_id;
+  };
+
   // remove item
   static removeItem = (name) => {
     if (!name) return;
@@ -22,5 +28,19 @@ export default class Utils {
     return value && !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,64}$/i.test(value)
       ? false
       : true;
+  };
+
+  static resolveAppUrl = (target = "") => {
+    if (!target) {
+      return import.meta.env.BASE_URL || "/";
+    }
+
+    if (/^(https?:)?\/\//i.test(target)) {
+      return target;
+    }
+
+    const baseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+    const normalizedTarget = target.startsWith("/") ? target.slice(1) : target;
+    return new URL(normalizedTarget, baseUrl).toString();
   };
 }

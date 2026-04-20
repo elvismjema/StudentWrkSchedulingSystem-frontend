@@ -82,6 +82,15 @@
               <v-btn
                 icon
                 size="small"
+                @click="openWorkerDetailsDialog(item)"
+                color="secondary"
+              >
+                <v-icon>mdi-card-account-details-outline</v-icon>
+              </v-btn>
+
+              <v-btn
+                icon
+                size="small"
                 @click="openAssignRoleDialog(item)"
                 color="primary"
               >
@@ -103,6 +112,60 @@
         </v-data-table>
       </v-card-text>
     </v-card>
+
+    <v-dialog v-model="workerDetailsDialog" max-width="1100px">
+      <v-card>
+        <v-card-text class="pa-8">
+          <div class="worker-dialog-header">
+            <v-avatar size="72" color="primary">
+              <span class="text-h5 text-white">{{ selectedWorkerInitials }}</span>
+            </v-avatar>
+            <div>
+              <div class="worker-dialog-name">
+                {{ selectedWorker?.fName }} {{ selectedWorker?.lName }}
+              </div>
+              <div class="worker-dialog-email">{{ selectedWorker?.email }}</div>
+            </div>
+          </div>
+
+          <v-tabs v-model="workerDetailsTab" color="text-1" class="mt-6">
+            <v-tab value="details">Worker Details</v-tab>
+            <v-tab value="class">Class Schedule</v-tab>
+          </v-tabs>
+
+          <v-window v-model="workerDetailsTab" class="mt-5">
+            <v-window-item value="details">
+              <v-divider class="mb-5" />
+              <h3 class="text-h5 font-weight-bold mb-4">Weekly Availability</h3>
+
+              <v-progress-linear v-if="loadingWorkerAvailability" indeterminate color="primary" class="mb-4" />
+
+              <div v-else class="weekly-lines">
+                <div
+                  v-for="day in weekDays"
+                  :key="`day-${day.value}`"
+                  class="weekly-line-item"
+                >
+                  <span class="weekly-line-day">{{ day.label }}:</span>
+                  <span class="weekly-line-value">{{ dailyAvailabilityLines[day.value] || "—" }}</span>
+                </div>
+              </div>
+            </v-window-item>
+
+            <v-window-item value="class">
+              <v-divider class="mb-5" />
+              <div class="text-body-1 text-medium-emphasis">
+                Class schedule is not configured yet for this worker.
+              </div>
+            </v-window-item>
+          </v-window>
+        </v-card-text>
+
+        <v-card-actions class="pa-6 pt-0 justify-end">
+          <v-btn variant="text" @click="closeWorkerDetailsDialog">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Assign Role Dialog -->
     <v-dialog v-model="assignRoleDialog" max-width="600px">
@@ -265,6 +328,7 @@ import { ref, computed, onMounted } from 'vue';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
 import apiClient from '../services/services.js';
+import availabilityService from '../services/availabilityService.js';
 
 // State
 const loading = ref(false);
@@ -288,6 +352,11 @@ const roleFormData = ref({
   role_id: null,
   position_id: null
 });
+const workerDetailsDialog = ref(false);
+const workerDetailsTab = ref("details");
+const selectedWorker = ref(null);
+const loadingWorkerAvailability = ref(false);
+const groupedAvailability = ref({});
 const deactivating = ref(false);
 const deactivateDialog = ref(false);
 const futureShiftDialog = ref(false);
@@ -307,9 +376,38 @@ const headers = [
   { title: 'Actions', key: 'actions', sortable: false, align: 'center' }
 ];
 
+const weekDays = [
+  { label: "Mon", value: 1 },
+  { label: "Tue", value: 2 },
+  { label: "Wed", value: 3 },
+  { label: "Thu", value: 4 },
+  { label: "Fri", value: 5 },
+  { label: "Sat", value: 6 },
+  { label: "Sun", value: 0 },
+];
+
 // Computed
 const filteredUsers = computed(() => {
   return users.value;
+});
+
+const selectedWorkerInitials = computed(() => {
+  const first = selectedWorker.value?.fName?.[0] || "";
+  const last = selectedWorker.value?.lName?.[0] || "";
+  return `${first}${last}`.toUpperCase() || "SW";
+});
+
+const dailyAvailabilityLines = computed(() => {
+  return weekDays.reduce((acc, day) => {
+    const grouped = groupedAvailability.value?.[day.value] || { available: [], unavailable: [] };
+    const parts = [];
+
+    grouped.available.forEach((slot) => parts.push(`${slot} (Available)`));
+    grouped.unavailable.forEach((slot) => parts.push(`${slot} (Unavailable)`));
+
+    acc[day.value] = parts.length ? parts.join(", ") : "—";
+    return acc;
+  }, {});
 });
 
 // Methods
@@ -331,6 +429,44 @@ const isStudentUser = (user) => {
 
 const canDeactivateUser = (user) => {
   return user?.is_active !== false && isStudentUser(user);
+};
+
+const formatTime = (value) => {
+  if (!value) return "";
+  const [hStr, mStr] = String(value).split(":");
+  const hour = Number(hStr || 0);
+  const minute = String(mStr || "00").padStart(2, "0");
+  const period = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute} ${period}`;
+};
+
+const toDayAvailabilityMap = (records) => {
+  const base = weekDays.reduce((acc, day) => {
+    acc[day.value] = { available: [], unavailable: [] };
+    return acc;
+  }, {});
+
+  (records || [])
+    .filter((entry) => entry?.isRecurring && entry?.dayOfWeek !== null && entry?.dayOfWeek !== undefined)
+    .forEach((entry) => {
+      const day = Number(entry.dayOfWeek);
+      if (!base[day]) return;
+      const range = `${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}`;
+      const type = String(entry.availabilityType || "").toLowerCase();
+      if (type === "unavailable" || type === "time_off") {
+        base[day].unavailable.push(range);
+      } else {
+        base[day].available.push(range);
+      }
+    });
+
+  Object.keys(base).forEach((day) => {
+    base[day].available.sort();
+    base[day].unavailable.sort();
+  });
+
+  return base;
 };
 
 const loadUsers = async () => {
@@ -382,6 +518,30 @@ const openAssignRoleDialog = (user) => {
     position_id: null
   };
   assignRoleDialog.value = true;
+};
+
+const openWorkerDetailsDialog = async (user) => {
+  selectedWorker.value = user;
+  workerDetailsTab.value = "details";
+  groupedAvailability.value = toDayAvailabilityMap([]);
+  workerDetailsDialog.value = true;
+  loadingWorkerAvailability.value = true;
+
+  try {
+    const response = await availabilityService.listForUser(user.id);
+    groupedAvailability.value = toDayAvailabilityMap(response?.data || []);
+  } catch (err) {
+    groupedAvailability.value = toDayAvailabilityMap([]);
+    error.value = 'Failed to load worker availability: ' + (err.response?.data?.message || err.message);
+  } finally {
+    loadingWorkerAvailability.value = false;
+  }
+};
+
+const closeWorkerDetailsDialog = () => {
+  workerDetailsDialog.value = false;
+  selectedWorker.value = null;
+  groupedAvailability.value = {};
 };
 
 const closeAssignRoleDialog = () => {
@@ -506,11 +666,82 @@ onMounted(() => {
 .user-management-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .management-card {
   border-radius: 14px;
   padding: 24px;
+}
+
+.worker-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.worker-dialog-name {
+  font-size: 48px;
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.worker-dialog-email {
+  margin-top: 6px;
+  font-size: 20px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.weekly-lines {
+  border: 1px solid var(--border-1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.weekly-line-item {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-1);
+  background: #fff;
+}
+
+.weekly-line-item:last-child {
+  border-bottom: 0;
+}
+
+.weekly-line-day {
+  min-width: 58px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.weekly-line-value {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+@media (max-width: 1280px) {
+  .weekly-line-item {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+@media (max-width: 840px) {
+  .worker-dialog-name {
+    font-size: 32px;
+  }
+
+  .worker-dialog-email {
+    font-size: 16px;
+  }
+
+  .weekly-line-day {
+    min-width: 0;
+  }
 }
 </style>

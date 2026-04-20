@@ -3,7 +3,19 @@ import Utils from "../config/utils.js";
 import AuthServices from "./authServices.js";
 import Router from "../router.js";
 
-let baseurl = import.meta.env.VITE_API_BASE;
+const envBaseUrl = import.meta.env.VITE_API_BASE;
+const isBrowser = typeof window !== "undefined";
+const isNonLocalHost =
+  isBrowser &&
+  window.location.hostname !== "localhost" &&
+  window.location.hostname !== "127.0.0.1";
+
+let baseurl = envBaseUrl;
+// Guard against accidental production builds that still point to localhost API.
+if (isNonLocalHost && /localhost|127\.0\.0\.1/.test(String(envBaseUrl || ""))) {
+  baseurl = "/workerscheduling-t2";
+}
+
 if (!baseurl) {
   if (import.meta.env.DEV) {
     baseurl = "http://localhost/workerscheduling-t2";
@@ -54,6 +66,7 @@ const apiClient = axios.create({
       AuthServices.logoutUser(Utils.getStore("user"))
         .then((response) => {
           console.log(response);
+          Utils.removeItem("currentDepartmentContext");
           Utils.removeItem("user");
           Router.push({ name: "login" });
         })

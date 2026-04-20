@@ -44,19 +44,6 @@
 
     <template #append>
       <v-divider />
-      <div class="user-section">
-        <v-list-item class="user-item">
-          <template #prepend>
-            <v-avatar size="32" class="user-avatar">
-              <span class="user-initial">{{ displayInitial }}</span>
-            </v-avatar>
-          </template>
-          <div v-if="!rail" class="user-info">
-            <div class="user-name">{{ displayName }}</div>
-            <div class="user-role">{{ displayRole }}</div>
-          </div>
-        </v-list-item>
-      </div>
     </template>
   </v-navigation-drawer>
 </template>

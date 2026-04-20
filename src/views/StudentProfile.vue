@@ -3,7 +3,7 @@
     <h1 class="page-title">Profile</h1>
     <p class="page-subtitle">Your account at a glance.</p>
 
-    <!-- Identity card -->
+    <!-- Identity card (read-only header + inline edit for personal info) -->
     <v-card elevation="0" rounded="lg" border class="profile-card mt-4">
       <div class="identity-row">
         <v-avatar size="72" class="identity-avatar">
@@ -11,8 +11,114 @@
         </v-avatar>
         <div class="identity-text">
           <div class="identity-name">{{ displayName }}</div>
-          <div v-if="email" class="identity-email">{{ email }}</div>
+          <div v-if="form.email" class="identity-email">{{ form.email }}</div>
           <div v-if="roleLabel" class="identity-role">{{ roleLabel }}</div>
+        </div>
+      </div>
+
+      <v-divider class="my-4" />
+
+      <div class="card-label-row">
+        <span class="card-label">Personal info</span>
+        <v-btn
+          v-if="!editing"
+          variant="text"
+          color="#811429"
+          size="small"
+          density="comfortable"
+          @click="startEdit"
+        >
+          <v-icon start size="16">mdi-pencil</v-icon>
+          Edit
+        </v-btn>
+      </div>
+
+      <!-- Read-only display -->
+      <div v-if="!editing" class="info-grid mt-3">
+        <div class="info-row">
+          <span class="info-label">Name</span>
+          <span class="info-value">{{ displayName || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-value">{{ form.email || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Phone</span>
+          <span class="info-value">{{ form.phone || "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Preferred hours / week</span>
+          <span class="info-value">{{ form.preferredHours || 0 }}</span>
+        </div>
+      </div>
+
+      <!-- Inline edit form -->
+      <div v-else class="mt-3">
+        <v-row dense>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.fName"
+              label="First name"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.lName"
+              label="Last name"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12">
+            <v-text-field
+              v-model="form.email"
+              label="Email"
+              type="email"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.phone"
+              label="Phone"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model.number="form.preferredHours"
+              label="Preferred hours / week"
+              type="number"
+              min="0"
+              max="40"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex justify-end ga-2 mt-3">
+          <v-btn variant="text" :disabled="saving" @click="cancelEdit">
+            Cancel
+          </v-btn>
+          <v-btn
+            color="#811429"
+            variant="flat"
+            :loading="saving"
+            @click="saveProfile"
+          >
+            Save
+          </v-btn>
         </div>
       </div>
     </v-card>
@@ -45,51 +151,41 @@
       </div>
     </v-card>
 
-    <!-- Quick links -->
-    <v-card elevation="0" rounded="lg" border class="profile-card mt-3 pa-0">
-      <v-list class="profile-links" density="comfortable">
-        <v-list-item
-          link
-          @click="$router.push({ name: 'student-settings' })"
-        >
-          <template #prepend>
-            <v-icon size="22" color="#811429">mdi-bell-cog-outline</v-icon>
-          </template>
-          <v-list-item-title class="link-title">Notifications & preferences</v-list-item-title>
-          <template #append>
-            <v-icon size="18" color="grey">mdi-chevron-right</v-icon>
-          </template>
-        </v-list-item>
-
-        <v-divider />
-
-        <v-list-item link class="signout-row" @click="handleSignOut">
-          <template #prepend>
-            <v-icon size="22" color="error">mdi-logout</v-icon>
-          </template>
-          <v-list-item-title class="link-title signout-text">Sign out</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-card>
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
+      {{ snackbar.text }}
+    </v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed, reactive, ref, onMounted } from "vue";
 import Utils from "../config/utils";
 import apiClient from "../services/services.js";
-import AuthServices from "../services/authServices.js";
+import studentService from "../services/studentService.js";
 
-const router = useRouter();
 const storedUser = Utils.getStore("user") || {};
 
-const displayName = computed(() => {
-  const full = `${storedUser.fName || ""} ${storedUser.lName || ""}`.trim();
-  return full || storedUser.email || "Student";
+// Editable form state — initialized from the locally cached user, then
+// re-synced after every successful save. The save endpoint is the same
+// one Settings used to call, so behavior is identical to what the user
+// already trusted.
+const form = reactive({
+  fName: storedUser.fName || "",
+  lName: storedUser.lName || "",
+  email: storedUser.email || "",
+  phone: storedUser.phone || "",
+  preferredHours: storedUser.preferredHours || 20,
 });
 
-const email = computed(() => storedUser.email || "");
+const editing = ref(false);
+const saving = ref(false);
+const snackbar = ref({ show: false, text: "", color: "success" });
+
+const displayName = computed(() => {
+  const full = `${form.fName || ""} ${form.lName || ""}`.trim();
+  return full || form.email || "Student";
+});
 
 const roleLabel = computed(() => {
   const r = storedUser.role || storedUser.userRole;
@@ -136,15 +232,63 @@ const fetchMemberships = async () => {
   }
 };
 
-const handleSignOut = async () => {
+const startEdit = () => {
+  // Re-seed from the latest cached user in case another tab updated it.
+  const u = Utils.getStore("user") || {};
+  form.fName = u.fName || "";
+  form.lName = u.lName || "";
+  form.email = u.email || "";
+  form.phone = u.phone || "";
+  form.preferredHours = u.preferredHours || 20;
+  editing.value = true;
+};
+
+const cancelEdit = () => {
+  const u = Utils.getStore("user") || {};
+  form.fName = u.fName || "";
+  form.lName = u.lName || "";
+  form.email = u.email || "";
+  form.phone = u.phone || "";
+  form.preferredHours = u.preferredHours || 20;
+  editing.value = false;
+};
+
+const showSnackbar = (text, color = "success") => {
+  snackbar.value = { show: true, text, color };
+};
+
+const saveProfile = async () => {
+  saving.value = true;
   try {
-    await AuthServices.logoutUser(storedUser);
-  } catch (_) {
-    // best-effort — local cleanup runs regardless
+    await studentService.updateProfile({
+      fName: form.fName,
+      lName: form.lName,
+      email: form.email,
+      phone: form.phone,
+      preferredHours: form.preferredHours,
+    });
+
+    // Mirror the change into the locally cached user so the avatar menu,
+    // header initials, and any other component reading from localStorage
+    // see the new values without requiring a reload.
+    const u = Utils.getStore("user") || {};
+    u.fName = form.fName;
+    u.lName = form.lName;
+    u.email = form.email;
+    u.phone = form.phone;
+    u.preferredHours = form.preferredHours;
+    Utils.setStore("user", u);
+
+    editing.value = false;
+    showSnackbar("Profile updated.", "success");
+  } catch (err) {
+    showSnackbar(
+      err?.response?.data?.message || "Failed to update profile.",
+      "error"
+    );
+  } finally {
+    saving.value = false;
   }
-  Utils.removeItem("currentDepartmentContext");
-  Utils.removeItem("user");
-  router.push("/login");
 };
 
 onMounted(fetchMemberships);
@@ -223,12 +367,45 @@ onMounted(fetchMemberships);
   color: #811429;
 }
 
+.card-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .card-label {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: #6d7586;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.info-label {
+  color: #6d7586;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #24242b;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-word;
 }
 
 .assignment-row {
@@ -250,20 +427,5 @@ onMounted(fetchMemberships);
 .assignment-empty {
   font-size: 0.9rem;
   color: #6d7586;
-}
-
-.profile-links :deep(.v-list-item) {
-  min-height: 52px;
-  padding-inline: 18px;
-}
-
-.link-title {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #24242b;
-}
-
-.signout-text {
-  color: #b3261e;
 }
 </style>

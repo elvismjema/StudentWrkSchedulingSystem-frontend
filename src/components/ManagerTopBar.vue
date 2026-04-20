@@ -19,7 +19,7 @@
 
     <div class="top-actions">
       <v-chip
-        v-if="departmentName"
+        v-if="departmentName && !isAdmin"
         size="small"
         variant="flat"
         color="brandPrimaryLt"

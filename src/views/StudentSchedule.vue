@@ -12,8 +12,12 @@
           <v-icon size="20">mdi-chevron-left</v-icon>
         </button>
         <div class="week-center">
-          <div class="week-range-label">{{ weekRangeLabel }}</div>
-          <button class="today-pill" @click="goToToday">Today</button>
+          <div class="week-range-label">{{ mobileWeekRangeLabel }}</div>
+          <button
+            class="today-pill"
+            :class="{ 'today-pill--active': mobileWeekOffset === 0 }"
+            @click="goToToday"
+          >Today</button>
         </div>
         <button class="week-nav-btn" aria-label="Next week" @click="nextWeek">
           <v-icon size="20">mdi-chevron-right</v-icon>
@@ -356,18 +360,13 @@ const mobileShiftGroups = computed(() => {
     });
   }
 
-  // Filter to current mobile week window based on calendarRef dates
-  // (use allShifts date range; fall back to current week)
-  const todayStr = new Date().toLocaleDateString('en-CA');
-  const weekStart = (() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-    return d.toLocaleDateString('en-CA');
-  })();
+  // Filter to the currently-selected mobile week window (Mon–Sun)
+  const weekStartStr = toIsoDate(mobileWeekStartDate.value);
+  const weekEndStr = toIsoDate(mobileWeekEndDate.value);
 
-  // Build sorted groups array
+  // Build sorted groups array, scoped to the selected week
   return Array.from(dayMap.entries())
+    .filter(([date]) => date >= weekStartStr && date <= weekEndStr)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, items]) => ({
       date,
@@ -432,27 +431,68 @@ function onMobileShiftTap(item) {
   });
 }
 
-// Mobile week navigation (mirrors FullCalendar API but works on a separate ref)
-const mobileWeekOffset = ref(0); // weeks from today
+// ── Mobile week navigation (authoritative on mobile) ──────────────────────
+// On mobile, FullCalendar isn't rendered, so calendarRef is null. Drive the
+// visible week off `mobileWeekOffset` and derive the label + shift window
+// from it. On desktop, defer to FullCalendar's API (datesSet populates the
+// label via onDatesSet).
+const mobileWeekOffset = ref(0); // weeks from today (negative = past)
 
-watch(mobileWeekOffset, () => {
-  // When on mobile, keep the FullCalendar in sync even though it's hidden
-  const api = getCalendarApi();
-  if (api) {
-    api.today();
-    if (mobileWeekOffset.value > 0) {
-      for (let i = 0; i < mobileWeekOffset.value; i++) api.next();
-    } else if (mobileWeekOffset.value < 0) {
-      for (let i = 0; i > mobileWeekOffset.value; i--) api.prev();
-    }
-  }
-});
+// Local helpers — keep the component self-contained.
+function toIsoDate(d) {
+  // Local YYYY-MM-DD (avoid UTC shift from toISOString)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function startOfWeekMonday(dateInput = new Date()) {
+  const d = new Date(dateInput);
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay(); // 0=Sun .. 6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+function addDays(dateInput, days) {
+  const d = new Date(dateInput);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function formatWeekRange(start, end) {
+  const opts = { month: 'long', day: 'numeric' };
+  const startStr = start.toLocaleDateString('en-US', opts);
+  const endStr = end.toLocaleDateString('en-US', { ...opts, year: 'numeric' });
+  return `${startStr} \u2013 ${endStr}`;
+}
+
+const mobileBaseWeekStart = startOfWeekMonday(new Date());
+const mobileWeekStartDate = computed(() =>
+  addDays(mobileBaseWeekStart, mobileWeekOffset.value * 7)
+);
+const mobileWeekEndDate = computed(() =>
+  addDays(mobileWeekStartDate.value, 6)
+);
+const mobileWeekRangeLabel = computed(() =>
+  formatWeekRange(mobileWeekStartDate.value, mobileWeekEndDate.value)
+);
 
 // ── Calendar navigation helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Mobile: update mobileWeekOffset (drives label + shift window directly).
+// Desktop: call FullCalendar API; onDatesSet populates weekRangeLabel.
 function getCalendarApi() { return calendarRef.value?.getApi(); }
-function prevWeek() { getCalendarApi()?.prev(); }
-function nextWeek() { getCalendarApi()?.next(); }
-function goToToday() { getCalendarApi()?.today(); }
+function prevWeek() {
+  if (mobile.value) { mobileWeekOffset.value -= 1; return; }
+  getCalendarApi()?.prev();
+}
+function nextWeek() {
+  if (mobile.value) { mobileWeekOffset.value += 1; return; }
+  getCalendarApi()?.next();
+}
+function goToToday() {
+  if (mobile.value) { mobileWeekOffset.value = 0; return; }
+  getCalendarApi()?.today();
+}
 
 // â”€â”€ Normalize HH:MM from DB value â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normTime(t) {
@@ -845,6 +885,11 @@ onMounted(loadShifts);
   padding: 3px 10px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.today-pill--active {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* Segment control */

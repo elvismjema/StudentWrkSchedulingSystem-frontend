@@ -81,6 +81,8 @@
           <div
             v-if="nextShift"
             class="shift-hero-card"
+            :style="nextShift?.task_list_id ? 'cursor:pointer' : ''"
+            @click="openTaskModal(nextShift)"
           >
             <div class="shift-hero-body">
               <div class="shift-hero-date" aria-hidden="true">
@@ -98,10 +100,16 @@
                   <v-icon size="13" class="mr-1">mdi-badge-account-outline</v-icon>
                   {{ nextShiftPosition }}
                 </div>
-                <button class="shift-hero-cta" @click="openSwapDialog(nextShift)">
-                  <v-icon size="15" class="mr-1">mdi-account-switch</v-icon>
-                  Request Cover
-                </button>
+                <div class="shift-hero-actions">
+                  <button v-if="nextShift?.task_list_id" class="shift-hero-cta" @click.stop="openTaskModal(nextShift)">
+                    <v-icon size="15" class="mr-1">mdi-clipboard-check-outline</v-icon>
+                    View Tasks
+                  </button>
+                  <button class="shift-hero-cta" @click.stop="openSwapDialog(nextShift)">
+                    <v-icon size="15" class="mr-1">mdi-account-switch</v-icon>
+                    Request Cover
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -410,6 +418,7 @@
       <template #actions><v-btn variant="text" @click="snackbar.show = false">Close</v-btn></template>
     </v-snackbar>
 
+    <ShiftTaskModal v-model="showTaskModal" :shift="taskModalShift" />
   </PullToRefresh>
 </template>
 
@@ -429,6 +438,7 @@ import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
 import PullToRefresh from "../components/mobile/PullToRefresh.vue";
 import OffScheduleClockDialog from "../components/student/OffScheduleClockDialog.vue";
+import ShiftTaskModal from "../components/ShiftTaskModal.vue";
 import { evaluateClockAction } from "../composables/useClockWindow.js";
 
 const { mobile } = useDisplay();
@@ -471,6 +481,32 @@ const clockStatus = reactive({
 // Swap dialog
 const swapDialogOpen = ref(false);
 const swapShift = ref(null);
+
+// Task modal
+const showTaskModal = ref(false);
+const taskModalShift = ref(null);
+
+function openTaskModal(shift) {
+  if (!shift?.task_list_id) return;
+  taskModalShift.value = shift;
+  showTaskModal.value = true;
+}
+
+const activeShift = computed(() => {
+  const now = new Date();
+  const todayStr = localDateStr(now);
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const toMins = (t) => {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+  return (upcomingShifts.value || []).find((s) => {
+    const d = s.shift_date || shiftDateStr(s);
+    if (d !== todayStr) return false;
+    return toMins(s.start_time) - 15 <= nowMins && nowMins <= toMins(s.end_time) + 15;
+  }) || null;
+});
 
 // Snackbar
 const snackbar = reactive({ show: false, text: "", color: "success" });

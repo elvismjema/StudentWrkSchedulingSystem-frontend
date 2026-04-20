@@ -234,6 +234,11 @@ const router = createRouter({
           name: "manager-settings",
           component: () => import("./views/DepartmentSettings.vue"),
         },
+        {
+          path: "task-lists",
+          name: "manager-task-lists",
+          component: () => import("./views/TaskListsSettings.vue"),
+        },
         // ─── Admin-only routes ──────────────────────────────────────────────
         {
           path: "workers",

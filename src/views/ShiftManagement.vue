@@ -195,10 +195,36 @@
                   <div class="d-flex justify-space-between align-center">
                     <div>
                       <div class="font-weight-medium">Recurring Shift</div>
-                      <div class="text-caption text-grey">Repeat this shift on the same day each week</div>
+                      <div class="text-caption text-grey">This shift repeats on a schedule</div>
                     </div>
                     <v-switch v-model="newShift.recurring" hide-details color="primary" density="compact" />
                   </div>
+                  <v-expand-transition>
+                    <div v-if="newShift.recurring" class="mt-3">
+                      <div class="text-caption text-medium-emphasis mb-1">Repeat frequency</div>
+                      <v-btn-toggle
+                        v-model="newShift.recurrence_frequency"
+                        mandatory
+                        density="compact"
+                        color="primary"
+                        class="mb-3 w-100"
+                        divided
+                        rounded="lg"
+                      >
+                        <v-btn value="weekly" class="flex-grow-1">Every Week</v-btn>
+                        <v-btn value="daily" class="flex-grow-1">Every Day</v-btn>
+                      </v-btn-toggle>
+                      <v-text-field
+                        v-model="newShift.repeat_until"
+                        type="date"
+                        label="Repeat Until (optional)"
+                        variant="outlined"
+                        density="comfortable"
+                        :min="newShift.shift_date || undefined"
+                        hide-details
+                      />
+                    </div>
+                  </v-expand-transition>
                 </v-card>
               </v-col>
 
@@ -251,30 +277,33 @@
                 />
               </v-col>
 
-              <!-- Tasks -->
+              <!-- Task List -->
               <v-col cols="12">
                 <div class="tasks-section">
-                  <div class="tasks-header">
-                    <h4 class="tasks-title">Tasks</h4>
-                    <v-btn size="small" variant="outlined" prepend-icon="mdi-plus" @click="addNewTask">
-                      + ADD TASK
-                    </v-btn>
+                  <h4 class="tasks-title mb-2">Task List</h4>
+                  <v-select
+                    v-model="newShift.task_list_id"
+                    :items="taskListSelectItems"
+                    label="Apply Task List (optional)"
+                    variant="outlined"
+                    density="comfortable"
+                    clearable
+                    prepend-inner-icon="mdi-clipboard-list-outline"
+                    hide-details
+                    class="mb-2"
+                  />
+                  <div v-if="selectedNewTaskList && selectedNewTaskList.items?.length" class="mt-1">
+                    <div
+                      v-for="item in selectedNewTaskList.items"
+                      :key="item.id"
+                      class="d-flex align-center gap-1 py-1"
+                    >
+                      <v-icon size="14" color="grey-lighten-1">mdi-checkbox-blank-circle-outline</v-icon>
+                      <span class="text-body-2 ml-1">{{ item.title }}</span>
+                    </div>
                   </div>
-                  <div v-if="newShift.tasks.length === 0" class="empty-tasks text-center py-3">
-                    No tasks added yet. Click "+ ADD TASK" to create checkpoint tasks.
-                  </div>
-                  <div v-for="(task, ti) in newShift.tasks" :key="ti" class="task-item-row">
-                    <v-text-field
-                      v-model="task.task_name"
-                      :label="`Task ${ti + 1}`"
-                      variant="outlined"
-                      hide-details
-                      density="compact"
-                      class="flex-grow-1"
-                    />
-                    <v-btn icon variant="text" color="error" @click="removeNewTask(ti)">
-                      <v-icon>mdi-delete</v-icon>
-                    </v-btn>
+                  <div v-else-if="!newShift.task_list_id" class="text-caption text-medium-emphasis mt-1">
+                    Select a task list to attach a checklist workers must complete each shift
                   </div>
                 </div>
               </v-col>
@@ -374,22 +403,35 @@
                   <div class="d-flex justify-space-between align-center">
                     <div>
                       <div class="font-weight-medium">Recurring Shift</div>
-                      <div class="text-caption text-grey">Repeat this shift on the same day each week</div>
+                      <div class="text-caption text-grey">This shift repeats on a schedule</div>
                     </div>
                     <v-switch v-model="editShift.recurring" hide-details color="primary" density="compact" />
                   </div>
                   <v-expand-transition>
-                    <v-text-field
-                      v-if="editShift.recurring"
-                      v-model="editShift.repeat_until"
-                      type="date"
-                      label="Repeat Until"
-                      variant="outlined"
-                      density="comfortable"
-                      class="mt-3"
-                      :min="editShift.shift_date || undefined"
-                      :rules="[v => !!v || 'Repeat until is required for recurring shifts']"
-                    />
+                    <div v-if="editShift.recurring" class="mt-3">
+                      <div class="text-caption text-medium-emphasis mb-1">Repeat frequency</div>
+                      <v-btn-toggle
+                        v-model="editShift.recurrence_frequency"
+                        mandatory
+                        density="compact"
+                        color="primary"
+                        class="mb-3 w-100"
+                        divided
+                        rounded="lg"
+                      >
+                        <v-btn value="weekly" class="flex-grow-1">Every Week</v-btn>
+                        <v-btn value="daily" class="flex-grow-1">Every Day</v-btn>
+                      </v-btn-toggle>
+                      <v-text-field
+                        v-model="editShift.repeat_until"
+                        type="date"
+                        label="Repeat Until"
+                        variant="outlined"
+                        density="comfortable"
+                        :min="editShift.shift_date || undefined"
+                        :rules="[v => !!v || 'Repeat until is required for recurring shifts']"
+                      />
+                    </div>
                   </v-expand-transition>
                 </v-card>
               </v-col>
@@ -419,27 +461,39 @@
               </v-col>
               <v-col cols="12">
                 <div class="tasks-section">
-                  <div class="tasks-header">
-                    <h4 class="tasks-title">Tasks</h4>
-                    <v-btn size="small" variant="outlined" prepend-icon="mdi-plus" @click="addEditTask">
-                      Add Task
-                    </v-btn>
+                  <h4 class="tasks-title mb-2">Task List</h4>
+                  <v-select
+                    v-model="editShift.task_list_id"
+                    :items="taskListSelectItems"
+                    label="Apply Task List (optional)"
+                    variant="outlined"
+                    density="comfortable"
+                    clearable
+                    prepend-inner-icon="mdi-clipboard-list-outline"
+                    hide-details
+                    class="mb-3"
+                  />
+                  <div v-if="editShiftTaskList && editShiftTaskList.items?.length">
+                    <div class="text-caption text-medium-emphasis mb-2">Task checklist status for this shift:</div>
+                    <div
+                      v-for="item in editShiftTaskList.items"
+                      :key="item.id"
+                      class="d-flex align-center gap-2 py-1"
+                    >
+                      <v-icon
+                        size="18"
+                        :color="isTaskCompleted(item.id) ? 'success' : 'grey-lighten-1'"
+                      >
+                        {{ isTaskCompleted(item.id) ? 'mdi-checkbox-marked-circle' : 'mdi-checkbox-blank-circle-outline' }}
+                      </v-icon>
+                      <span class="text-body-2 flex-grow-1">{{ item.title }}</span>
+                      <span v-if="isTaskCompleted(item.id)" class="text-caption text-success">
+                        &#10003; {{ getTaskCompletedBy(item.id) }}
+                      </span>
+                    </div>
                   </div>
-
-                  <div v-if="editShift.tasks.length === 0" class="empty-tasks">
-                    No tasks added.
-                  </div>
-
-                  <div v-for="(task, index) in editShift.tasks" :key="task.id" class="task-item-row">
-                    <v-text-field
-                      v-model="task.text"
-                      :label="`Task ${index + 1}`"
-                      variant="outlined"
-                      hide-details
-                    />
-                    <v-btn icon variant="text" color="error" @click="removeEditTask(index)">
-                      <v-icon>mdi-delete</v-icon>
-                    </v-btn>
+                  <div v-else-if="!editShift.task_list_id" class="text-caption text-medium-emphasis">
+                    No task list assigned
                   </div>
                 </div>
               </v-col>
@@ -500,8 +554,11 @@ import FullCalendar from '@fullcalendar/vue3'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import ShiftAssignmentForm from '../components/ShiftAssignmentForm.vue'
+import ShiftTaskModal from '../components/ShiftTaskModal.vue'
 import shiftService from '../services/shiftService.js'
 import apiClient from '../services/services.js'
+import taskListService from '../services/taskListService.js'
+import shiftTaskCompletionService from '../services/shiftTaskCompletionService.js'
 import departmentServices from '../services/departmentServices.js'
 import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
@@ -546,6 +603,8 @@ const createFormRef = ref(null)
 const createFormValid = ref(false)
 const editFormRef = ref(null)
 const editFormValid = ref(false)
+const taskLists = ref([])
+const editShiftCompletions = ref([])
 const newShift = ref({
   department_id: currentDeptId,
   position_id: null,
@@ -556,6 +615,9 @@ const newShift = ref({
   post_as_open: false,
   workers_needed: 1,
   recurring: false,
+  recurrence_frequency: 'weekly',
+  repeat_until: '',
+  task_list_id: null,
   tasks: [],
   is_published: true
 })
@@ -570,7 +632,9 @@ const editShift = ref({
   assigned_user_id: null,
   post_as_open: false,
   recurring: false,
+  recurrence_frequency: 'weekly',
   repeat_until: '',
+  task_list_id: null,
   is_published: false,
   tasks: [],
 })
@@ -646,6 +710,30 @@ const currentGreetingDate = computed(() => {
 const filteredShifts = computed(() => {
   return shifts.value
 })
+
+// ── Task list computed helpers ────────────────────────────────────────────────
+const taskListSelectItems = computed(() =>
+  taskLists.value.map((l) => ({ title: l.name, value: l.id }))
+)
+
+const selectedNewTaskList = computed(() =>
+  taskLists.value.find((l) => l.id === newShift.value.task_list_id) || null
+)
+
+const editShiftTaskList = computed(() =>
+  taskLists.value.find((l) => l.id === editShift.value.task_list_id) || null
+)
+
+const isTaskCompleted = (taskListItemId) =>
+  editShiftCompletions.value.some((c) => c.task_list_item_id === taskListItemId)
+
+const getTaskCompletedBy = (taskListItemId) => {
+  const c = editShiftCompletions.value.find((c) => c.task_list_item_id === taskListItemId)
+  if (!c) return ''
+  const u = c.completedByUser
+  if (u) return `${u.fName || ''} ${u.lName || ''}`.trim()
+  return 'Done'
+}
 
 const hexToRgba = (hex, alpha) => {
   const cleaned = (hex || '#8B1538').replace('#', '')
@@ -1018,10 +1106,24 @@ const selectShift = async (shift) => {
     assigned_user_id: normalizeUserId(shift.assigned_user_id),
     post_as_open: String(shift.trade_status || '').toLowerCase() === 'open',
     recurring: !!shift.is_recurring,
+    recurrence_frequency: shift.recurrence_pattern || 'weekly',
     repeat_until: normalizeDateInput(shift.recurrence_end_date),
+    task_list_id: shift.task_list_id || null,
     is_published: !!shift.is_published,
     tasks: existingTasks,
   }
+
+  // Load task completions for this shift
+  editShiftCompletions.value = []
+  if (shift.shift_id && shift.task_list_id) {
+    try {
+      const compRes = await shiftTaskCompletionService.getShiftCompletions(shift.shift_id)
+      editShiftCompletions.value = compRes.data || []
+    } catch (e) {
+      console.error('Failed to load shift task completions', e)
+    }
+  }
+
   showEditDialog.value = true
 }
 
@@ -1075,6 +1177,9 @@ const openCreateDialog = (isoDate = '', startTime = '', endTime = '') => {
     post_as_open: false,
     workers_needed: 1,
     recurring: false,
+    recurrence_frequency: 'weekly',
+    repeat_until: '',
+    task_list_id: null,
     tasks: [],
     is_published: true,
   }
@@ -1312,6 +1417,16 @@ const loadShifts = async () => {
   }
 }
 
+const loadTaskLists = async () => {
+  try {
+    const params = currentDeptId ? { department_id: currentDeptId } : {}
+    const response = await taskListService.listTaskLists(params)
+    taskLists.value = response.data || []
+  } catch (e) {
+    console.error('Failed to load task lists:', e)
+  }
+}
+
 const loadDepartmentWorkers = async () => {
   if (!currentDeptId) return
   try {
@@ -1388,8 +1503,10 @@ const createShift = async () => {
       assigned_user_id: newShift.value.post_as_open ? null : (newShift.value.assigned_user_id || null),
       is_published: true,
       is_recurring: newShift.value.recurring,
-      recurrence_pattern: newShift.value.recurring ? 'weekly' : null,
+      recurrence_pattern: newShift.value.recurring ? newShift.value.recurrence_frequency : null,
       recurrence_start_date: newShift.value.recurring ? newShift.value.shift_date : null,
+      recurrence_end_date: newShift.value.recurring ? (newShift.value.repeat_until || null) : null,
+      task_list_id: newShift.value.task_list_id || null,
       workers_needed: newShift.value.post_as_open ? Number(newShift.value.workers_needed) : null,
       trade_status: newShift.value.post_as_open ? 'open' : null,
     }
@@ -1453,9 +1570,10 @@ const saveShiftEdits = async () => {
       assigned_user_id: editShift.value.post_as_open ? null : (editShift.value.assigned_user_id || null),
       trade_status: editShift.value.post_as_open ? 'open' : null,
       is_recurring: editShift.value.recurring,
-      recurrence_pattern: editShift.value.recurring ? 'weekly' : null,
+      recurrence_pattern: editShift.value.recurring ? editShift.value.recurrence_frequency : null,
       recurrence_start_date: editShift.value.recurring ? editShift.value.shift_date : null,
       recurrence_end_date: editShift.value.recurring ? editShift.value.repeat_until : null,
+      task_list_id: editShift.value.task_list_id || null,
       is_published: editShift.value.is_published,
     })
     const warningMessage = response?.data?.warning_message || ''
@@ -1560,7 +1678,8 @@ onMounted(async () => {
     loadDepartmentCalendarHours(),
     loadShifts(),
     loadPositions(),
-    loadDepartmentWorkers()
+    loadDepartmentWorkers(),
+    loadTaskLists()
   ])
 
   await updateCalendarSize()

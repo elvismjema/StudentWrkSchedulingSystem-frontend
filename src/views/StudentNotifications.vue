@@ -17,7 +17,7 @@
         class="mark-all-btn"
         @click="handleMarkAllRead"
       >
-        Mark All Read
+        Mark all as read
       </v-btn>
     </div>
 
@@ -64,9 +64,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
+import Utils from '../config/utils'
+import { resolveNotificationLink, isExternalNotificationLink } from '../utils/notificationLinks'
 
 const router = useRouter()
 const notifications = ref([])
+const currentRole = String(Utils.getStore('user')?.role || '').toLowerCase()
 
 const unreadCount = computed(() => {
   return notifications.value.filter(n => n.unread).length
@@ -91,13 +94,16 @@ const handleNotificationClick = async (notification) => {
     notification.unread = false
   }
 
-  if (notification.link) {
-    // Use Vue Router for client-side navigation if the link is an internal path
+  const targetLink = resolveNotificationLink(notification, currentRole)
+  if (targetLink) {
     try {
-      await router.push(notification.link)
+      if (isExternalNotificationLink(targetLink)) {
+        window.location.href = targetLink
+      } else {
+        await router.push(targetLink)
+      }
     } catch {
-      // Fallback to full page navigation for any router mismatch
-      window.location.href = notification.link
+      window.location.href = Utils.resolveAppUrl(targetLink)
     }
   }
 }
@@ -121,8 +127,8 @@ onMounted(() => {
 <style scoped>
 .notifications-container {
   padding: 24px;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .notifications-header {
@@ -144,7 +150,7 @@ onMounted(() => {
 .header-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .unread-count {
@@ -162,19 +168,22 @@ onMounted(() => {
 .notifications-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .notification-card {
   display: flex;
   align-items: flex-start;
-  padding: 20px;
+  padding: 24px;
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .notification-card:hover {
@@ -214,6 +223,9 @@ onMounted(() => {
   color: #333;
   line-height: 1.3;
   margin-bottom: 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-description {
@@ -221,12 +233,17 @@ onMounted(() => {
   color: #666;
   line-height: 1.4;
   margin-bottom: 8px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-time {
   font-size: 13px;
   color: #999;
   line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .notification-indicator {

@@ -21,18 +21,156 @@
           <span class="text-h6 font-weight-medium">{{ departmentName }}</span>
         </div>
 
+        <!-- Error Alert -->
+        <v-alert v-if="error" type="error" dismissible @click:close="error = null" class="mb-4">
+          {{ error }}
+        </v-alert>
+
+        <!-- Department name header -->
+        <div v-if="selectedDepartmentId && departmentName" class="mb-4 d-flex align-center">
+          <v-icon class="mr-2" color="primary">mdi-office-building-outline</v-icon>
+          <span class="text-h6 font-weight-medium">{{ departmentName }}</span>
+        </div>
+
         <!-- Success Alert -->
         <v-alert v-if="successMessage" type="success" closable @click:close="successMessage = null" class="mb-4">
           {{ successMessage }}
         </v-alert>
 
-        <!-- Error Alert -->
-        <v-alert v-if="error" type="error" closable @click:close="error = null" class="mb-4">
-          {{ error }}
-        </v-alert>
+        <v-divider class="mb-6"></v-divider>
 
-        <!-- Department Hours -->
-        <div v-if="selectedDepartmentId && !loading">
+        <!-- Department Settings Form -->
+        <v-form v-if="selectedDepartmentId" ref="settingsForm" v-model="formValid">
+          <h3 class="text-h5 mb-4">General Settings</h3>
+
+          <!-- Department Name -->
+          <v-text-field
+            v-model="departmentSettings.department_name"
+            label="Department Name"
+            outlined
+            dense
+            :rules="[rules.required]"
+            class="mb-3"
+          ></v-text-field>
+
+          <!-- Description -->
+          <v-textarea
+            v-model="departmentSettings.description"
+            label="Description"
+            outlined
+            dense
+            rows="3"
+            class="mb-3"
+          ></v-textarea>
+
+          <h3 class="text-h5 mb-4 mt-6">Scheduling Policies</h3>
+
+          <!-- Buffer Time Between Classes -->
+          <v-text-field
+            v-model.number="departmentSettings.buffer_time_minutes"
+            label="Buffer Time Between Classes (minutes)"
+            outlined
+            dense
+            type="number"
+            min="0"
+            :rules="[rules.required, rules.nonNegative]"
+            hint="Minimum time gap required between scheduled shifts/classes"
+            persistent-hint
+            class="mb-4"
+          ></v-text-field>
+
+          <!-- Break Hours Required -->
+          <v-text-field
+            v-model.number="departmentSettings.break_hours_required"
+            label="Break Hours Required"
+            outlined
+            dense
+            type="number"
+            min="0"
+            :rules="[rules.nonNegative]"
+            hint="Minimum break hours required for employees"
+            persistent-hint
+            class="mb-4"
+          ></v-text-field>
+
+          <!-- Open During Breaks -->
+          <v-switch
+            v-model="departmentSettings.open_during_breaks"
+            label="Open During Academic Breaks"
+            color="primary"
+            class="mb-4"
+          ></v-switch>
+
+          <h3 class="text-h5 mb-4 mt-6">Staffing Requirements</h3>
+
+          <!-- Minimum Staff Required -->
+          <v-text-field
+            v-model.number="departmentSettings.min_staff_required"
+            label="Minimum Staff Required"
+            outlined
+            dense
+            type="number"
+            min="1"
+            :rules="[rules.required, rules.positive]"
+            class="mb-4"
+          ></v-text-field>
+
+          <h3 class="text-h5 mb-4 mt-6">Time Tracking Settings</h3>
+
+          <!-- Late Threshold -->
+          <v-text-field
+            v-model.number="departmentSettings.late_threshold_minutes"
+            label="Late Threshold (minutes)"
+            outlined
+            dense
+            type="number"
+            min="0"
+            :rules="[rules.nonNegative]"
+            hint="Grace period before marking an employee as late"
+            persistent-hint
+            class="mb-4"
+          ></v-text-field>
+
+          <!-- Early Threshold -->
+          <v-text-field
+            v-model.number="departmentSettings.early_threshold_minutes"
+            label="Early Clock-Out Threshold (minutes)"
+            outlined
+            dense
+            type="number"
+            min="0"
+            :rules="[rules.nonNegative]"
+            hint="Grace period for early clock-outs"
+            persistent-hint
+            class="mb-4"
+          ></v-text-field>
+
+          <!-- Notify on Time Discrepancy -->
+          <v-switch
+            v-model="departmentSettings.notify_on_time_discrepancy"
+            label="Notify on Time Discrepancy"
+            color="primary"
+            class="mb-4"
+          ></v-switch>
+
+          <!-- Save Button -->
+          <v-btn
+            color="primary"
+            size="large"
+            @click="saveDepartmentSettings"
+            :loading="saving"
+            :disabled="!formValid"
+            class="mt-4"
+          >
+            <v-icon left>mdi-content-save</v-icon>
+            Save Settings
+          </v-btn>
+        </v-form>
+
+        <!-- Department Hours Section -->
+        <div v-if="selectedDepartmentId" class="mt-8">
+          <v-divider class="mb-6"></v-divider>
+          <h3 class="text-h5 mb-2">Department Hours</h3>
           <p class="text-body-2 text-medium-emphasis mb-4">
             Set the open and close hours for each day of the week. The Schedule and Calendar views will
             display only the range from the earliest open time to the latest close time across all open days.
@@ -46,7 +184,7 @@
             >
               <v-expansion-panel-title>
                 <div class="d-flex align-center justify-space-between w-100">
-                  <div class="d-flex align-center">
+                  <div class="d-flex align-center gap-2">
                     <v-chip
                       v-if="dayHours.is_closed"
                       color="error"
@@ -130,6 +268,18 @@ const hoursPanel = ref(null);
 
 const selectedDepartmentId = ref(null);
 const departmentName = ref('');
+const departmentSettings = ref({
+  department_name: '',
+  description: '',
+  buffer_time_minutes: 0,
+  break_hours_required: 0,
+  open_during_breaks: false,
+  min_staff_required: 1,
+  late_threshold_minutes: 5,
+  early_threshold_minutes: 5,
+  notify_on_time_discrepancy: true
+});
+
 const departmentHours = ref([]);
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -149,56 +299,73 @@ const formatTimeDisplay = (timeStr) => {
   return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-// Build the 7-day skeleton with defaults
-const buildDefaultHours = () =>
-  DAYS.map((_, index) => ({
+// Format HH:MM time string to 12-hour display (e.g. "06:00" -> "6:00 AM")
+const formatTimeDisplay = (timeStr) => {
+  if (!timeStr) return 'Not Set';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return 'Not Set';
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+// Default open/close times
+const DEFAULT_OPEN  = '06:00';
+const DEFAULT_CLOSE = '19:00';
+
+// Initialize department hours for all days (defaults: 6 AM – 7 PM, open)
+const initializeDepartmentHours = () => {
+  departmentHours.value = daysOfWeek.map((day, index) => ({
     day_of_week: index,
     open_time: DEFAULT_OPEN,
     close_time: DEFAULT_CLOSE,
     department_id: selectedDepartmentId.value,
     is_default: true,
     is_closed: false,
-    hours_id: null,
-    _saving: false,
+    hours_id: null
   }));
 
-// ── Data loading ───────────────────────────────────────────────────────────────
-const loadDepartmentHours = async () => {
-  if (!selectedDepartmentId.value) return;
-
-  // Always start with defaults so the UI is usable even if the fetch fails
-  departmentHours.value = buildDefaultHours();
-
-  try {
-    const res = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
-    const saved = res?.data?.data || [];
-
-    // Merge saved rows into the default skeleton
-    saved.forEach((row) => {
-      const idx = departmentHours.value.findIndex((h) => h.day_of_week === row.day_of_week);
-      if (idx !== -1) {
-        departmentHours.value[idx] = {
-          ...departmentHours.value[idx],
-          ...row,
-          open_time:  row.open_time  || (row.is_closed ? null : DEFAULT_OPEN),
-          close_time: row.close_time || (row.is_closed ? null : DEFAULT_CLOSE),
-          is_closed:  row.is_closed ?? false,
-          _saving: false,
-        };
-      }
-    });
-  } catch {
-    // Table may not exist yet or no rows saved — defaults are already in place,
-    // so just silently continue. The manager can save hours normally.
-  }
+// Resolve the manager's department and load data
+const resolveAndLoad = async (deptId, deptNameValue) => {
+  selectedDepartmentId.value = deptId;
+  departmentName.value = deptNameValue || '';
+  await loadDepartmentData();
 };
 
 const loadDepartmentName = async () => {
   if (!selectedDepartmentId.value || departmentName.value) return;
   try {
-    const res = await DepartmentServices.getDepartment(selectedDepartmentId.value);
-    if (res?.data?.data?.department_name) {
-      departmentName.value = res.data.data.department_name;
+    loading.value = true;
+    error.value = null;
+    
+    // Load department settings
+    const deptResponse = await DepartmentServices.getDepartment(selectedDepartmentId.value);
+    if (deptResponse.data.success) {
+      departmentSettings.value = { ...deptResponse.data.data };
+      // Keep departmentName in sync with the authoritative value from the DB
+      if (deptResponse.data.data.department_name) {
+        departmentName.value = deptResponse.data.data.department_name;
+      }
+    }
+    
+    // Load department hours
+    const hoursResponse = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
+    initializeDepartmentHours();
+    if (hoursResponse.data.success && hoursResponse.data.data.length > 0) {
+      // Merge saved hours into the default structure
+      hoursResponse.data.data.forEach(hours => {
+        const index = departmentHours.value.findIndex(h => h.day_of_week === hours.day_of_week);
+        if (index !== -1) {
+          departmentHours.value[index] = {
+            ...departmentHours.value[index],
+            ...hours,
+            // Restore default times if the day was previously saved as closed (nulls)
+            open_time: hours.open_time || (hours.is_closed ? null : DEFAULT_OPEN),
+            close_time: hours.close_time || (hours.is_closed ? null : DEFAULT_CLOSE),
+            is_closed: hours.is_closed ?? false,
+          };
+        }
+      });
     }
   } catch {
     // Non-fatal
@@ -232,7 +399,20 @@ const saveDepartmentHours = async (dayHours) => {
   };
 
   try {
-    let res;
+    savingHours.value = true;
+    error.value = null;
+    successMessage.value = null;
+    
+    const hoursData = {
+      department_id: selectedDepartmentId.value,
+      day_of_week: dayHours.day_of_week,
+      open_time: dayHours.is_closed ? null : dayHours.open_time,
+      close_time: dayHours.is_closed ? null : dayHours.close_time,
+      is_default: true,
+      is_closed: dayHours.is_closed ?? false
+    };
+    
+    let response;
     if (dayHours.hours_id) {
       res = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, payload);
     } else {
@@ -252,7 +432,9 @@ const saveDepartmentHours = async (dayHours) => {
   }
 };
 
-// ── Department context resolution ──────────────────────────────────────────────
+// ── Department context resolution (same pattern as ScheduleTemplates) ─────────
+// Listen for the event dispatched by ManagerSidebar when it finishes resolving
+// the manager's department (handles the race where the sidebar resolves after mount).
 const onDeptContextReady = (e) => {
   const ctx = e.detail;
   if (ctx?.department_id && !selectedDepartmentId.value) {
@@ -263,35 +445,39 @@ const onDeptContextReady = (e) => {
 onMounted(async () => {
   window.addEventListener('departmentContextReady', onDeptContextReady);
 
-  // 1. Try localStorage context first (set by ManagerSidebar on every page load)
+  // 1. Try the stored context first (fastest, no network call needed).
   const ctx = Utils.getStore('currentDepartmentContext');
   if (ctx?.department_id) {
     await resolveAndLoad(ctx.department_id, ctx.department_name);
     return;
   }
 
-  // 2. Fall back to fetching memberships directly
-  const user = Utils.getStore('user') || {};
-  const userId = user.userId || user.id || user.user_id;
+  // 2. Fall back to fetching the user's department membership directly.
+  const currentUser = Utils.getStore('user') || {};
+  const userId = currentUser.userId || currentUser.id || currentUser.user_id;
   if (!userId) return;
 
-  loading.value = true;
   try {
-    const res = await UserRoleServices.getUserDepartments(userId);
-    const memberships = res?.data || [];
-    const mgr = memberships.find((m) => m.is_active && (m.role?.permission_level || 0) >= 50);
-    const membership = mgr || memberships.find((m) => m.is_active) || memberships[0];
-
+    loading.value = true;
+    const response = await UserRoleServices.getUserDepartments(userId);
+    const memberships = response?.data || [];
+    const managerMembership = memberships.find(
+      (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+    );
+    const membership =
+      managerMembership ||
+      memberships.find((m) => m.is_active) ||
+      memberships[0];
     if (membership) {
       const deptId = membership.department_id;
-      const name   = membership.department?.department_name || '';
+      const deptNameValue = membership.department?.department_name || '';
       Utils.setStore('currentDepartmentContext', {
-        department_id:   deptId,
-        department_name: name,
-        role_name:       membership.role?.role_name || 'Manager',
-        role_id:         membership.role_id,
+        department_id: deptId,
+        department_name: deptNameValue,
+        role_name: membership.role?.role_name || 'Manager',
+        role_id: membership.role_id,
       });
-      await resolveAndLoad(deptId, name);
+      await resolveAndLoad(deptId, deptNameValue);
     }
   } catch (err) {
     error.value = 'Failed to resolve your department: ' + (err.response?.data?.message || err.message);
@@ -315,6 +501,11 @@ onBeforeUnmount(() => {
 .hours-card {
   border-radius: 14px;
   padding: 24px;
+}
+
+h3 {
+  color: var(--text-1);
+  font-weight: 600;
 }
 
 .w-100 {

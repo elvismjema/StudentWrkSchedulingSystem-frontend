@@ -1,106 +1,83 @@
-# Tutorial Frontend in Vue 3
+# SWS — Student Work Scheduling System (Frontend)
 
-This application allows users to create and maintain a list of tutorials that can have multiple lessons within. Please visit https://github.com/OC-ComputerScience/tutorial-backend for the backend repository.
+SWS is the Student Work Scheduling System for Oklahoma Christian University. Managers create shifts, build recurring schedule templates, and review time-off and swap requests; student workers clock in and out, submit availability, request shift swaps, and track their hours — all in one place. The system produces time-and-attendance records that feed into payroll-ready reports, and it supports three distinct roles: **student**, **manager**, and **admin**.
 
-This frontend is actively developed from its own repository branches.
+## Stack
 
-#### Please note:
+- **Vue 3** — component framework
+- **Vuetify 3** — Material Design component library (maroon-anchored brand theme)
+- **Vite** — build tool and dev server
+- **Vuex 4** — global state management
+- **Vue Router 4** — client-side routing with role-based guards
+- **FullCalendar 6** — interactive schedule and shift-calendar views
+- **Cypress 12** — end-to-end testing
+- **Axios** — HTTP client for API calls
+- **PWA** (vite-plugin-pwa) — installable progressive web app support
 
-- This project utilizes **Google Authentication** to allow users to log in.
-- You will need to provide a **Client ID and Client Secret from Google** for this project to run locally.
-- You will need to provide a **Refresh Token** generated through the **Google Developers OAuth 2.0 Playground** for Cypress testing to work.
+## Getting Started
 
-## Project Setup
+```sh
+# 1. Clone the repo
+git clone https://github.com/OC-ComputerScience/sws-frontend.git
+cd sws-frontend
 
-1. Clone the project into your **XAMPP/xamppfiles/htdocs** directory.
-
-```
-git clone https://github.com/OC-ComputerScience/tutorial-frontend-vue3.git
-```
-
-2. Install the project.
-
-```
+# 2. Install dependencies
 npm install
-```
-3. Install cross-env to allow correct use of .env files.
 
-```
-npm install cross-env
-```
-4. Make sure **Apache** is running.
+# 3. Configure environment
+cp .env.example .env   # then edit .env with your local values
+# Required variables include Google OAuth credentials and the API base URL.
+# See CONTRIBUTING.md for the full variable list.
 
-   - We recommend using XAMPP to serve this project.
-   - In XAMPP, make sure that **Apache** is running.
+# 4. Install git hooks (required once per clone)
+bash scripts/setup-hooks.sh
 
-5. In order to make the Google authentication work, have a project registered with the **Google Developer console**.
-
-   - https://console.developers.google.com/
-   - Enable **Google+ API** and **Google Analytics API**.
-   - Enable an **OAuth consent screen**.
-   - Create an **OAuth client ID**.
-   - Save your **Client ID** and **Client Secret** in a safe place.
-
-6. In order to make the **Cypress testing** work, get a **Refresh Token** for your Google application through the **Google Developers OAuth 2.0 Playground**.
-
-   - https://developers.google.com/oauthplayground/
-   - Click the gear button on the right.
-   - Check **Use your own OAuth credentials**.
-   - Configure the Playground to use your Google project's **client ID** and **client secret**.
-   - On the left, find Google OAuth2 API v2 and check all three items.
-     - https://www.googleapis.com/auth/userinfo.email
-     - https://www.googleapis.com/auth/userinfo.profile
-     - openid
-   - Click **Authorize APIs**.
-   - Click **Exchange authorization code for tokens**.
-   - Save the generated **Refresh token** in a safe place.
-
-7. Add a local **.env** file and make sure the **client ID** and **client secret** are the values you have registered with Google and that the **refresh token** is the value you generated through the OAuth 2.0 Playground.
-
-   - VITE_APP_CLIENT_ID = '**your-google-client-id**'
-   - VITE_APP_CLIENT_SECRET = '**your-google-client-secret**'
-   - VITE_APP_REFRESH_TOKEN = '**your-google-refresh-token**'
-   - VITE_APP_CLIENT_URL = 'http://localhost:8081'
-   - VITE_APP_API_URL = 'https://accounts.google.com/gsi/client'
-
-8. Compile and run the project locally.
-
-```
+# 5. Start the dev server
 npm run dev
 ```
 
-9. Test your project.
-   - Note that your frontend and backend must be running for testing to be successful.
+To run end-to-end tests:
 
-```
-npm run test
-```
-
-10. Test your project and watch the tests run with Cypress.
-
-```
-npm run test:open
+```sh
+npm run test          # headless Cypress run
+npm run test:open     # interactive Cypress UI
 ```
 
-11. If you are wanting to serve your project for production:
-    - You will need to have a **.htaccess** file.
-    - It should be in your **public** folder.
-    - Visual Studio Code will auto format it to where the file will not be read correctly, so add the following rule to your **settings.json** in Visual Studio Code.
+To build for production:
 
-```
-"files.associations": {
-    "**/*.htaccess": "plaintext"
-},
-```
-
-12. (Optional) Compile the project for production.
-
-```
+```sh
 npm run build
 ```
 
-13. (Optional) Lint and fix the project files.
+## Branch & PR Workflow
+
+All work happens on feature branches cut from `dev` (`feat/short-description`, `fix/short-description`, `docs/short-description`, etc.). Direct pushes to `dev` and `main` are blocked by the pre-push hook installed via `scripts/setup-hooks.sh`; GitHub branch protection enforces the same rule remotely. Open pull requests against `dev`; completed sprints are merged from `dev` into `main` as stable releases. Commit messages follow conventional-commits style (`type(scope): description`). The commit-msg hook rejects any commit that contains AI attribution lines (`Co-Authored-By: Claude`, `Generated with ChatGPT`, etc.) — see `AGENTS.md` for the full policy.
+
+## Directory Overview
 
 ```
-npm run lint
+src/
+├── views/          # Page-level Vue components (StudentDashboard, ManagerApprovals, Admin*, …)
+├── components/     # Shared UI components
+├── router.js       # Vue Router config with role-based auth guards
+├── store/          # Vuex store modules
+├── plugins/        # Vuetify theme and plugin registration
+├── services/       # Axios service modules (one per API resource)
+├── config/         # App-wide config, utils, mobile navigation definitions
+└── styles/         # Global SCSS / CSS
 ```
+
+Top-level routes:
+
+| Path | Role | Description |
+|------|------|-------------|
+| `/` or `/login` | All | Google OAuth login |
+| `/student/*` | Student | Dashboard, schedule, clock, availability, tasks, notifications, profile |
+| `/manager/*` | Manager / Admin | Shifts, schedule templates, approvals, time-pay, reports, worker management |
+| `/admin/*` | Admin | Users, departments, system settings, reports |
+
+## Related
+
+- **Backend:** [sws-backend](https://github.com/OC-ComputerScience/sws-backend)
+- **Contributor guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
+- **AI agent policy:** [AGENTS.md](AGENTS.md)

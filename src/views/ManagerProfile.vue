@@ -8,7 +8,7 @@
 
       <v-btn
         class="save-button"
-        color="#8B1538"
+        color="primary"
         size="large"
         prepend-icon="mdi-content-save-outline"
         @click="saveProfile"
@@ -85,7 +85,7 @@
           <p>Your work assignments</p>
           </div>
 
-          <v-progress-linear v-if="loadingDepts" indeterminate color="#8B1538" class="mb-4" />
+          <v-progress-linear v-if="loadingDepts" indeterminate color="primary" class="mb-4" />
 
           <div v-if="!loadingDepts && memberships.length" class="membership-list">
             <div
@@ -120,6 +120,33 @@
 
         <v-card class="profile-card compact-card" elevation="0">
           <div class="section-header">
+            <h2>Documents</h2>
+            <p>Upload a document for your manager profile</p>
+          </div>
+
+          <div class="upload-row">
+            <v-file-input
+              v-model="profileDocument"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-file-upload-outline"
+              label="Select document"
+              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              show-size
+              hide-details
+              bg-color="white"
+            />
+            <v-btn color="primary" variant="outlined" @click="uploadDocument" :disabled="!profileDocument">
+              Upload
+            </v-btn>
+          </div>
+          <p v-if="uploadedDocumentName" class="upload-note">
+            Uploaded: {{ uploadedDocumentName }}
+          </p>
+        </v-card>
+
+        <v-card class="profile-card compact-card" elevation="0">
+          <div class="section-header">
             <h2>Notifications</h2>
             <p>How you want to be notified</p>
           </div>
@@ -131,7 +158,7 @@
             </div>
             <v-switch
               v-model="preferences.emailNotifications"
-              color="#8B1538"
+              color="primary"
               hide-details
               inset
             />
@@ -146,7 +173,7 @@
             </div>
             <v-switch
               v-model="preferences.smsNotifications"
-              color="#8B1538"
+              color="primary"
               hide-details
               inset
             />
@@ -179,7 +206,7 @@
     <v-snackbar
       v-model="saveNoticeOpen"
       timeout="2200"
-      color="#1f6f43"
+      color="success"
     >
       Profile changes saved locally.
     </v-snackbar>
@@ -212,6 +239,8 @@ const preferences = reactive({
 const saveNoticeOpen = ref(false);
 const loadingDepts = ref(false);
 const memberships = ref([]);
+const profileDocument = ref(null);
+const uploadedDocumentName = ref(storedProfile.uploadedDocumentName || "");
 
 const fetchMemberships = async () => {
   const userId = storedUser?.id;
@@ -251,6 +280,7 @@ const saveProfile = () => {
     fullName: profile.fullName,
     email: profile.email,
     phone: profile.phone,
+    uploadedDocumentName: uploadedDocumentName.value || null,
     departments: storedProfile.departments || storedUser.departments || [],
     positions: storedProfile.positions || storedUser.positions || [],
   });
@@ -260,6 +290,13 @@ const saveProfile = () => {
     shiftReminderMinutes: Number(preferences.shiftReminderMinutes) || 0,
   });
 
+  saveNoticeOpen.value = true;
+};
+
+const uploadDocument = () => {
+  if (!profileDocument.value) return;
+  const file = Array.isArray(profileDocument.value) ? profileDocument.value[0] : profileDocument.value;
+  uploadedDocumentName.value = file?.name || "";
   saveNoticeOpen.value = true;
 };
 </script>
@@ -300,13 +337,13 @@ const saveProfile = () => {
   font-size: 2.35rem;
   line-height: 1.08;
   font-weight: 700;
-  color: #24242b;
+  color: var(--text-1);
 }
 
 .page-subtitle {
   margin-top: 6px;
   font-size: 1rem;
-  color: #6d7586;
+  color: var(--text-2);
 }
 
 .save-button {
@@ -321,9 +358,9 @@ const saveProfile = () => {
 
 .profile-card {
   padding: 32px 36px;
-  border: 1px solid #d9dce4;
+  border: 1px solid var(--border-1);
   border-radius: 16px;
-  background: #ffffff;
+  background: #fff;
 }
 
 .primary-card {
@@ -337,12 +374,12 @@ const saveProfile = () => {
 .section-header h2 {
   font-size: 1.22rem;
   font-weight: 700;
-  color: #24242b;
+  color: var(--text-1);
 }
 
 .section-header p {
   margin-top: 8px;
-  color: #6d7586;
+  color: var(--text-2);
   font-size: 0.95rem;
 }
 
@@ -356,7 +393,7 @@ const saveProfile = () => {
 }
 
 .profile-avatar {
-  background: #8b1538;
+  background: var(--brand-primary);
 }
 
 .profile-initials {
@@ -369,8 +406,8 @@ const saveProfile = () => {
   position: absolute;
   right: -8px;
   bottom: -8px;
-  background: #f2f2f4;
-  color: #2d2d35;
+  background: var(--surface-2);
+  color: var(--text-1);
   box-shadow: none;
 }
 
@@ -393,7 +430,7 @@ const saveProfile = () => {
   margin-bottom: 10px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #24242b;
+  color: var(--text-1);
 }
 
 .assignment-stack {
@@ -404,7 +441,7 @@ const saveProfile = () => {
 
 .assignment-value {
   min-height: 24px;
-  color: #2d2d35;
+  color: var(--text-1);
   font-size: 0.98rem;
 }
 
@@ -417,9 +454,9 @@ const saveProfile = () => {
 
 .membership-item {
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-1);
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--surface-1);
 }
 
 .membership-header {
@@ -432,13 +469,13 @@ const saveProfile = () => {
 .membership-dept {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #24242b;
+  color: var(--text-1);
 }
 
 .membership-meta {
   margin-top: 4px;
   font-size: 0.85rem;
-  color: #6d7586;
+  color: var(--text-2);
 }
 
 .membership-role {
@@ -447,7 +484,7 @@ const saveProfile = () => {
 
 .assignment-note {
   margin-top: 28px;
-  color: #6d7586;
+  color: var(--text-2);
   font-size: 0.95rem;
 }
 
@@ -463,12 +500,12 @@ const saveProfile = () => {
 .preference-title {
   font-size: 0.98rem;
   font-weight: 700;
-  color: #24242b;
+  color: var(--text-1);
 }
 
 .preference-subtitle {
   margin-top: 6px;
-  color: #6d7586;
+  color: var(--text-2);
   font-size: 0.95rem;
 }
 
@@ -496,6 +533,19 @@ const saveProfile = () => {
   font-size: 0.95rem;
   padding-top: 12px;
   padding-bottom: 12px;
+}
+
+.upload-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.upload-note {
+  margin-top: 12px;
+  color: var(--text-2);
+  font-size: 0.9rem;
 }
 
 @media (max-width: 960px) {
@@ -535,6 +585,11 @@ const saveProfile = () => {
 
   .reminder-input {
     min-width: 0;
+  }
+
+  .upload-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

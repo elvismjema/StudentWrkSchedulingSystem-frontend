@@ -70,6 +70,33 @@ class NotificationService {
   }
 
   /**
+   * Per-category notification preferences for the authenticated user.
+   * Backed by users.notification_preferences (TEXT, JSON-encoded). The push
+   * dispatcher reads this exact column to suppress per-category pushes, so
+   * these calls are the source of truth — not localStorage.
+   *
+   * Known keys: shiftReminders, scheduleChanges, swapRequests, openShifts,
+   * timeOff. Unknown keys are silently dropped server-side.
+   */
+  static async getMyNotificationPreferences() {
+    const { data } = await apiClient.get("/users/me/notification-preferences");
+    return data?.preferences || {};
+  }
+
+  /**
+   * Partial update is supported — the backend merges incoming over stored,
+   * so callers can send only the keys they actually changed without
+   * resetting the rest. Returns the full merged map after save.
+   */
+  static async updateMyNotificationPreferences(preferences) {
+    const { data } = await apiClient.put(
+      "/users/me/notification-preferences",
+      { preferences },
+    );
+    return data?.preferences || {};
+  }
+
+  /**
    * Bulk-publish multiple shifts in one request.
    * Triggers consolidated notifications per student and per manager (gap alerts).
    * US1 AC4, US3 AC4

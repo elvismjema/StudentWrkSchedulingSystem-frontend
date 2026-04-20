@@ -239,6 +239,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import studentService from '../services/studentService.js';
+import NotificationService from '../services/notifications.js';
 import {
   isPushSupported,
   getCurrentSubscription,
@@ -325,18 +326,34 @@ const saveProfile = async () => {
   }
 };
 
+// Persist toggles via the dedicated endpoint so the dispatcher actually
+// honors them. Backend writes to users.notification_preferences — the
+// exact column sendWebPushNotification reads to suppress per-category
+// pushes. The localStorage write the old code did was a no-op for actual
+// delivery, so we drop it entirely on success and only fall back to a
+// local cache if the network/server is down (so the UI doesn't lose the
+// pending toggle state across an offline reload).
 const saveNotifPrefs = async () => {
   savingNotifPrefs.value = true;
   try {
-    // TODO: Use PUT /api/students/:studentId/notification-preferences when available on backend
-    // Falling back to updateProfile for now; also persist to localStorage as backup
-    await studentService.updateProfile({ notificationPreferences: { ...notifPrefs } });
+    const saved = await NotificationService.updateMyNotificationPreferences({
+      ...notifPrefs,
+    });
+    // Server returns the merged source of truth. Reflect any normalization
+    // (e.g. unknown keys dropped) back into the UI state.
+    Object.assign(notifPrefs, saved);
+    Utils.removeItem?.('notificationPreferences');
+    showSnackbar('Notification preferences saved.', 'success');
+  } catch (err) {
+    // Offline / server error — keep the user's intent in localStorage so a
+    // reload doesn't wipe what they just toggled, and tell them honestly
+    // that it didn't persist server-side.
     Utils.setStore('notificationPreferences', { ...notifPrefs });
-    showSnackbar('Notification preferences saved!', 'success');
-  } catch {
-    // Backend endpoint may not exist — save to localStorage as fallback
-    Utils.setStore('notificationPreferences', { ...notifPrefs });
-    showSnackbar('Preferences saved locally.', 'info');
+    showSnackbar(
+      err?.response?.data?.message ||
+        'Could not reach the server. Changes saved locally and will not affect notifications until you save again.',
+      'warning',
+    );
   } finally {
     savingNotifPrefs.value = false;
   }
@@ -357,11 +374,19 @@ const showSnackbar = (text, color = 'success') => {
 };
 
 onMounted(async () => {
-  // Load notification preferences from profile or localStorage
-  const u = Utils.getStore('user');
-  const savedPrefs = u?.notificationPreferences || Utils.getStore('notificationPreferences');
-  if (savedPrefs) {
-    Object.assign(notifPrefs, savedPrefs);
+  // Load notification preferences from the server — this is the source of
+  // truth that sendWebPushNotification consults. Fall back to a local
+  // cache only if the request fails (e.g. user is offline) so the UI
+  // still reflects the last-known intent instead of resetting to all-true.
+  try {
+    const serverPrefs = await NotificationService.getMyNotificationPreferences();
+    if (serverPrefs && Object.keys(serverPrefs).length > 0) {
+      Object.assign(notifPrefs, serverPrefs);
+    }
+  } catch {
+    const u = Utils.getStore('user');
+    const cached = u?.notificationPreferences || Utils.getStore('notificationPreferences');
+    if (cached) Object.assign(notifPrefs, cached);
   }
 
   // Check push subscription state

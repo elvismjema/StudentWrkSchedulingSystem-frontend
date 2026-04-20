@@ -38,6 +38,10 @@
           <span class="legend-swatch legend-swatch-unfilled"></span>
           <span class="legend-text">Unfilled</span>
         </div>
+        <div class="legend-item">
+          <span class="legend-swatch legend-swatch-unacknowledged"></span>
+          <span class="legend-text">Unacknowledged</span>
+        </div>
       </div>
     </div>
 
@@ -664,8 +668,17 @@ const calendarEvents = computed(() => {
       const title = shift.position?.position_name || 'Shift'
       const department = shift.department?.department_name || 'Department'
       const isUnfilled = !shift.assigned_user_id
+      const isUnacknowledged = !isUnfilled && !(
+        (shift.acknowledgements || []).some(
+          (a) => Number(a.userId) === Number(shift.assigned_user_id) && a.acknowledged === true
+        )
+      )
       const posColor = shift.position?.color || '#8B1538'
-      const bgColor = isUnfilled ? hexToRgba(posColor, 0.45) : posColor
+      const bgColor = isUnfilled
+        ? hexToRgba(posColor, 0.45)
+        : isUnacknowledged
+          ? hexToRgba(posColor, 0.65)
+          : posColor
       const borderClr = selectedShift.value?.shift_id === shift.shift_id ? '#00c853' : posColor
       return {
         id: String(shift.shift_id),
@@ -678,11 +691,13 @@ const calendarEvents = computed(() => {
         classNames: [
           ...(selectedShift.value?.shift_id === shift.shift_id ? ['fc-shift-selected'] : []),
           ...(isUnfilled ? ['fc-shift-unfilled'] : []),
+          ...(isUnacknowledged ? ['fc-shift-unacknowledged'] : []),
         ],
         extendedProps: {
           shift,
           department,
           isUnfilled,
+          isUnacknowledged,
           posColor,
         },
       }
@@ -726,6 +741,7 @@ const calendarOptions = computed(() => ({
   eventContent: (arg) => {
     const shift = arg.event.extendedProps?.shift
     const isUnfilled = arg.event.extendedProps?.isUnfilled
+    const isUnacknowledged = arg.event.extendedProps?.isUnacknowledged
     const positionName = shift?.position?.position_name || arg.event.title || 'Shift'
     const worker = shift?.assignedUser
     const workerName = worker
@@ -755,6 +771,13 @@ const calendarOptions = computed(() => ({
       workerEl.className = 'fc-event-custom-worker'
       workerEl.textContent = workerName
       container.appendChild(workerEl)
+    }
+
+    if (isUnacknowledged) {
+      const unackEl = document.createElement('div')
+      unackEl.className = 'fc-event-custom-unacknowledged'
+      unackEl.textContent = '⚠ UNACKNOWLEDGED'
+      container.appendChild(unackEl)
     }
 
     return { domNodes: [container] }
@@ -1750,6 +1773,11 @@ onMounted(async () => {
   border-style: dashed;
 }
 
+.fullcalendar-wrap :deep(.fc .fc-event.fc-shift-unacknowledged) {
+  border-style: dashed;
+  border-color: #b45309;
+}
+
 .fullcalendar-wrap :deep(.fc .fc-event.fc-shift-selected) {
   border-color: #00c853;
   box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.25);
@@ -1793,6 +1821,15 @@ onMounted(async () => {
   font-weight: 700;
   color: #b45309;
   white-space: nowrap;
+}
+
+.fullcalendar-wrap :deep(.fc-event-custom-unacknowledged) {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-highlight) {
@@ -1849,6 +1886,11 @@ onMounted(async () => {
 .legend-swatch-unfilled {
   background-color: rgba(139, 21, 56, 0.35);
   border: 2px dashed #8B1538;
+}
+
+.legend-swatch-unacknowledged {
+  background-color: rgba(139, 21, 56, 0.65);
+  border: 2px dashed #b45309;
 }
 
 .legend-text {

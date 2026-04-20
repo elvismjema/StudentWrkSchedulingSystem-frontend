@@ -527,7 +527,7 @@ const filters = ref({
   position_id: null,
   shift_date: null
 })
-const calendarHours = ref({ slotMinTime: '05:00:00', slotMaxTime: '24:00:00' })
+const calendarHours = ref({ slotMinTime: '06:00:00', slotMaxTime: '20:00:00' })
 const departmentHoursByDay = ref({})
 
 const showCreateDialog = ref(false)
@@ -721,8 +721,7 @@ const calendarOptions = computed(() => ({
   datesSet: onCalendarDatesSet,
   eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
   dayHeaderFormat: { weekday: 'short' },
-  height: 760,
-  contentHeight: 700,
+  height: '100%',
   expandRows: true,
   eventContent: (arg) => {
     const shift = arg.event.extendedProps?.shift
@@ -850,7 +849,7 @@ const normalizeUserId = (value) => {
 
 const pickCalendarBoundsFromHours = (hoursRows = []) => {
   const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time)
-  if (!valid.length) return { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+  if (!valid.length) return { slotMinTime: '06:00:00', slotMaxTime: '20:00:00' }
   const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort()
   const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort()
   return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] }
@@ -1708,15 +1707,19 @@ onMounted(async () => {
 
 .fullcalendar-wrap {
   padding: 8px 10px 12px;
-  min-height: 760px;
+  height: calc(100vh - 240px);
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
 }
 
 .fullcalendar-wrap :deep(.fc) {
   --fc-border-color: #e5e7eb;
   --fc-page-bg-color: #ffffff;
   --fc-neutral-bg-color: #fafafa;
-  --fc-today-bg-color: #f8e6ea;
-  height: 740px;
+  --fc-today-bg-color: transparent;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event) {

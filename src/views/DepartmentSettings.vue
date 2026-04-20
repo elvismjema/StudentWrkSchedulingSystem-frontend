@@ -299,19 +299,7 @@ const formatTimeDisplay = (timeStr) => {
   return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-// Format HH:MM time string to 12-hour display (e.g. "06:00" -> "6:00 AM")
-const formatTimeDisplay = (timeStr) => {
-  if (!timeStr) return 'Not Set';
-  const [h, m] = timeStr.split(':').map(Number);
-  if (Number.isNaN(h)) return 'Not Set';
-  const period = h < 12 ? 'AM' : 'PM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
-};
 
-// Default open/close times
-const DEFAULT_OPEN  = '06:00';
-const DEFAULT_CLOSE = '19:00';
 
 // Initialize department hours for all days (defaults: 6 AM – 7 PM, open)
 const initializeDepartmentHours = () => {

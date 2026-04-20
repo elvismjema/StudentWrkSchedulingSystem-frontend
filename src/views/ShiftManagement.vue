@@ -952,8 +952,8 @@ const normalizeUserId = (value) => {
 }
 
 const pickCalendarBoundsFromHours = (hoursRows = []) => {
-  const valid = hoursRows.filter((row) => row?.open_time && row?.close_time && row.open_time < row.close_time)
-  if (!valid.length) return { slotMinTime: '06:00:00', slotMaxTime: '20:00:00' }
+  const valid = hoursRows.filter((row) => !row?.is_closed && row?.open_time && row?.close_time && row.open_time < row.close_time)
+  if (!valid.length) return { slotMinTime: '06:00:00', slotMaxTime: '19:00:00' }
   const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort()
   const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort()
   return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] }
@@ -974,9 +974,16 @@ const getDepartmentHoursForDate = (dateValue) => {
 
 const validateShiftWithinDepartmentHours = ({ shift_date, start_time, end_time }) => {
   const dayHours = getDepartmentHoursForDate(shift_date)
-  if (!dayHours || !dayHours.open_time || !dayHours.close_time) {
+  if (!dayHours || (!dayHours.open_time && !dayHours.close_time && !dayHours.is_closed)) {
     // Relaxed mode: allow shift operations when department hours are not configured.
     return { valid: true, message: '' }
+  }
+
+  if (dayHours.is_closed) {
+    return {
+      valid: false,
+      message: `The department is closed on ${new Date(`${shift_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}. Cannot schedule shifts on closed days.`
+    }
   }
 
   const shiftStart = toMinutes(start_time)
@@ -1396,7 +1403,7 @@ const openAddToSchedule = () => {
 
 const loadDepartmentCalendarHours = async () => {
   if (!currentDeptId) {
-    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    calendarHours.value = { slotMinTime: '06:00:00', slotMaxTime: '19:00:00' }
     departmentHoursByDay.value = {}
     return
   }
@@ -1411,7 +1418,7 @@ const loadDepartmentCalendarHours = async () => {
       return acc
     }, {})
   } catch {
-    calendarHours.value = { slotMinTime: '05:00:00', slotMaxTime: '24:00:00' }
+    calendarHours.value = { slotMinTime: '06:00:00', slotMaxTime: '19:00:00' }
     departmentHoursByDay.value = {}
   }
 }

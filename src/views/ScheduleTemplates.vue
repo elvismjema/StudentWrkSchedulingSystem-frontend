@@ -472,6 +472,7 @@
               :positions="positions"
               :workers="deptWorkers"
               :conflicts="editorConflicts"
+              :departmentHours="departmentHours"
             />
           </v-form>
         </v-card-text>
@@ -747,6 +748,7 @@ import TemplateCalendarEditor from '../components/TemplateCalendarEditor.vue'
 import PageFrame from '../components/PageFrame.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AvailabilityGrid from '../components/AvailabilityGrid.vue'
+import departmentServices from '../services/departmentServices.js'
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 const _deptCtxInit = Utils.getStore('currentDepartmentContext') || {}
@@ -765,6 +767,7 @@ const applyConflictsLoading = ref(false)
 const templates = ref([])
 const positions = ref([])
 const deptWorkers = ref([])
+const departmentHours = ref([])
 
 // Per-template cached editor conflicts map: { [template_id]: [conflict, ...] }
 const templateConflictsMap = ref({})
@@ -1087,6 +1090,15 @@ const loadDeptData = async () => {
   } catch (err) {
     console.error('Error loading department workers:', err)
     deptWorkers.value = []
+  }
+
+  // ── Department Hours ──────────────────────────────────────────────────────
+  try {
+    const hoursRes = await departmentServices.getDepartmentHours(currentDeptId.value)
+    departmentHours.value = hoursRes?.data?.data || []
+  } catch (err) {
+    console.error('Error loading department hours:', err)
+    departmentHours.value = []
   }
 }
 

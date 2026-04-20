@@ -210,19 +210,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
 // ─── Props / emits ────────────────────────────────────────────────────────────
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] },
-  positions:  { type: Array, default: () => [] },
-  workers:    { type: Array, default: () => [] },
-  conflicts:  { type: Array, default: () => [] },
+  modelValue:      { type: Array,  default: () => [] },
+  positions:       { type: Array,  default: () => [] },
+  workers:         { type: Array,  default: () => [] },
+  conflicts:       { type: Array,  default: () => [] },
+  departmentHours: { type: Array,  default: () => [] },
 })
 const emit = defineEmits(['update:modelValue'])
+
+// ─── Department-hours calendar bounds ────────────────────────────────────────
+// Mirrors the same logic used in ShiftManagement.vue.
+const pickCalendarBoundsFromHours = (hoursRows = []) => {
+  const valid = hoursRows.filter(
+    (row) => !row?.is_closed && row?.open_time && row?.close_time && row.open_time < row.close_time
+  )
+  if (!valid.length) return { slotMinTime: '06:00:00', slotMaxTime: '19:00:00' }
+  const mins = valid.map((row) => `${String(row.open_time).slice(0, 5)}:00`).sort()
+  const maxs = valid.map((row) => `${String(row.close_time).slice(0, 5)}:00`).sort()
+  return { slotMinTime: mins[0], slotMaxTime: maxs[maxs.length - 1] }
+}
 
 // ─── Reference week mapping ───────────────────────────────────────────────────
 // Template uses a fixed Mon 2024-01-01 → Sun 2024-01-07 reference week.
@@ -324,30 +337,35 @@ const padTime = (date) =>
   `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 
 // ─── Calendar options ─────────────────────────────────────────────────────────
-const calendarOptions = {
-  plugins:  [timeGridPlugin, interactionPlugin],
-  initialView: 'timeGridWeek',
-  initialDate: '2024-01-01',
-  firstDay: 1,                     // week starts Monday
-  headerToolbar: false,            // no navigation buttons
-  allDaySlot: false,
-  selectable: true,
-  selectMirror: true,
-  editable: true,
-  eventResizableFromStart: true,
-  snapDuration: '00:15:00',        // 15-minute drag snapping
-  slotDuration: '01:00:00',        // hourly time slots
-  slotLabelInterval: '01:00:00',
-  scrollTime: '07:00:00',          // scroll to 7 am on open
-  height: 560,
-  expandRows: true,
-  // Show day names without date numbers
-  dayHeaderContent: (args) => DAY_NAMES[args.date.getDay()],
-  select:       handleSelect,
-  eventClick:   handleEventClick,
-  eventDrop:    handleEventDrop,
-  eventResize:  handleEventResize,
-}
+const calendarOptions = computed(() => {
+  const { slotMinTime, slotMaxTime } = pickCalendarBoundsFromHours(props.departmentHours)
+  return {
+    plugins:  [timeGridPlugin, interactionPlugin],
+    initialView: 'timeGridWeek',
+    initialDate: '2024-01-01',
+    firstDay: 1,                     // week starts Monday
+    headerToolbar: false,            // no navigation buttons
+    allDaySlot: false,
+    selectable: true,
+    selectMirror: true,
+    editable: true,
+    eventResizableFromStart: true,
+    snapDuration: '00:15:00',        // 15-minute drag snapping
+    slotDuration: '01:00:00',        // hourly time slots
+    slotLabelInterval: '01:00:00',
+    slotMinTime,                     // driven by department hours
+    slotMaxTime,                     // driven by department hours
+    scrollTime: slotMinTime,         // scroll to open time on load
+    height: 560,
+    expandRows: true,
+    // Show day names without date numbers
+    dayHeaderContent: (args) => DAY_NAMES[args.date.getDay()],
+    select:       handleSelect,
+    eventClick:   handleEventClick,
+    eventDrop:    handleEventDrop,
+    eventResize:  handleEventResize,
+  }
+})
 
 // ─── Mount: seed events from modelValue ───────────────────────────────────────
 onMounted(() => {

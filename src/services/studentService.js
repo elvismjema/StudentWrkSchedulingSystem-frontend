@@ -11,6 +11,27 @@ const getUserId = () => {
   return user?.userId || user?.id;
 };
 
+const normalizeClockRecord = (record) => {
+  if (!record) return null;
+
+  const id = record.clock_id || record.id || record.clockRecordId;
+  const clockIn = record.clock_in || record.clock_in_time || record.clockInTime || record.createdAt;
+  const clockOut = record.clock_out || record.clock_out_time || record.clockOutTime || null;
+
+  if (!id || clockOut) return null;
+
+  return {
+    ...record,
+    id,
+    clock_id: id,
+    clock_in: clockIn,
+    clock_in_time: clockIn,
+    clock_out: clockOut,
+    clock_out_time: clockOut,
+    on_break: Boolean(record.on_break || record.onBreak),
+  };
+};
+
 export default {
   // ─── Dashboard (aggregated) ──────────────────────────────────────
   getDashboard() {
@@ -98,7 +119,11 @@ export default {
 
   // ─── Clock In/Out ────────────────────────────────────────────────
   clockIn(payload) {
-    return apiClient.post("/clock-records/clock-in", payload);
+    const data = {
+      ...payload,
+      shiftId: payload?.shiftId || payload?.shift_id,
+    };
+    return apiClient.post("/clock-records/clock-in", data);
   },
 
   clockOut(recordId) {
@@ -114,7 +139,13 @@ export default {
   },
 
   getOpenClockRecord() {
-    return apiClient.get("/clock-records/me/open");
+    return apiClient.get("/clock-records/me/open").then((response) => ({
+      ...response,
+      data: {
+        ...(response?.data || {}),
+        data: normalizeClockRecord(response?.data?.data || response?.data),
+      },
+    }));
   },
 
   getClockRecords() {

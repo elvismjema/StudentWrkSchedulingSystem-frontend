@@ -348,11 +348,11 @@ const fetchClockStatus = async () => {
   try {
     const res = await studentService.getOpenClockRecord();
     const record = res?.data?.data || res?.data;
-    if (record && record.id && !record.clock_out_time && !record.clockOutTime) {
+    if (record) {
       clockedIn.value = true;
       currentRecordId.value = record.id;
-      clockInTime.value = record.clock_in_time || record.clockInTime || record.createdAt;
-      onBreak.value = !!record.on_break || !!record.onBreak;
+      clockInTime.value = record.clock_in_time;
+      onBreak.value = !!record.on_break;
     } else {
       clockedIn.value = false;
       currentRecordId.value = null;

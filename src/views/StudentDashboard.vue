@@ -496,12 +496,22 @@ async function loadFromIndividualEndpoints() {
   // Clock status
   if (clockRes.status === "fulfilled") {
     const record = clockRes.value?.data?.data || clockRes.value?.data;
-    if (record && !record.clock_out_time) {
+    if (record) {
       clockStatus.isClockedIn = true;
       clockStatus.clockInTime = record.clock_in_time;
       clockStatus.clockRecordId = record.id;
       clockStatus.onBreak = record.on_break || false;
+    } else {
+      clockStatus.isClockedIn = false;
+      clockStatus.clockInTime = null;
+      clockStatus.clockRecordId = null;
+      clockStatus.onBreak = false;
     }
+  } else {
+    clockStatus.isClockedIn = false;
+    clockStatus.clockInTime = null;
+    clockStatus.clockRecordId = null;
+    clockStatus.onBreak = false;
   }
 
   // Open shifts

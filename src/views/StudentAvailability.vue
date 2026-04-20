@@ -43,13 +43,28 @@
         </div>
       </div>
 
-      <!-- View toggle: List / Calendar -->
+      <!-- Unified view toggle: List / Week / Day -->
       <div class="m-view-toggle">
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'list' }" @click="mobileViewMode = 'list'">
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'list' }"
+          @click="mobileViewMode = 'list'"
+        >
           <v-icon icon="mdi-format-list-bulleted" size="14" class="mr-1" />List
         </button>
-        <button class="m-view-btn" :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' }" @click="mobileViewMode = 'calendar'">
-          <v-icon icon="mdi-calendar-month" size="14" class="mr-1" />Calendar
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' && mobileCalendarMode === 'week' }"
+          @click="mobileViewMode = 'calendar'; mobileCalendarMode = 'week'"
+        >
+          <v-icon icon="mdi-calendar-week" size="14" class="mr-1" />Week
+        </button>
+        <button
+          class="m-view-btn"
+          :class="{ 'm-view-btn--active': mobileViewMode === 'calendar' && mobileCalendarMode === 'day' }"
+          @click="mobileViewMode = 'calendar'; mobileCalendarMode = 'day'"
+        >
+          <v-icon icon="mdi-calendar-today" size="14" class="mr-1" />Day
         </button>
       </div>
 
@@ -101,23 +116,6 @@
 
       <!-- ═══ CALENDAR VIEW ═══ -->
       <div v-if="mobileViewMode === 'calendar'" class="m-cal">
-        <div class="m-cal-mode-toggle">
-          <button
-            class="m-cal-mode-btn"
-            :class="{ 'm-cal-mode-btn--active': mobileCalendarMode === 'week' }"
-            @click="mobileCalendarMode = 'week'"
-          >
-            Week
-          </button>
-          <button
-            class="m-cal-mode-btn"
-            :class="{ 'm-cal-mode-btn--active': mobileCalendarMode === 'day' }"
-            @click="mobileCalendarMode = 'day'"
-          >
-            Day
-          </button>
-        </div>
-
         <!-- Legend -->
         <div class="m-cal-legend">
           <span class="m-cal-legend-item"><span class="m-cal-dot m-cal-dot--class"></span>Class</span>
@@ -1748,14 +1746,19 @@ onMounted(async () => {
 /* View toggle */
 .m-view-toggle {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
 }
 .m-view-btn {
-  padding: 6px 16px;
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
   border: 1.5px solid #ddd;
   border-radius: 20px;
   background: #fff;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   color: #666;
@@ -2174,28 +2177,6 @@ onMounted(async () => {
 /* ═══════════════════════════════════════════ */
 .m-cal {
   margin-top: 4px;
-}
-.m-cal-mode-toggle {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: 18px;
-  background: #EEEFF1;
-  margin-bottom: 10px;
-}
-.m-cal-mode-btn {
-  border: none;
-  background: transparent;
-  color: #666;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 5px 14px;
-  border-radius: 14px;
-  cursor: pointer;
-}
-.m-cal-mode-btn--active {
-  background: #fff;
-  color: #80162B;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 .m-cal-legend {
   display: flex;

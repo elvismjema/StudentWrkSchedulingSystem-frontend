@@ -71,7 +71,12 @@
         </button>
       </div>
 
-      <div class="m-day-selector">
+      <!-- Day pills: only shown when they add navigation value (List view or Day calendar).
+           In Week calendar mode they duplicate the grid column headers, so we hide them. -->
+      <div
+        v-if="mobileViewMode === 'list' || (mobileViewMode === 'calendar' && mobileCalendarMode === 'day')"
+        class="m-day-selector"
+      >
         <button
           v-if="mobileViewMode === 'list'"
           class="m-day-pill"
@@ -1817,6 +1822,10 @@ onMounted(async () => {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.m-day-selector::-webkit-scrollbar {
+  display: none;
 }
 .m-day-pill {
   padding: 6px 10px;
@@ -1832,7 +1841,20 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 56px;
+  min-width: 48px;
+  flex: 1 1 auto;
+}
+@media (max-width: 380px) {
+  .m-day-pill {
+    padding: 6px 6px;
+    min-width: 42px;
+  }
+  .m-day-pill-dow {
+    font-size: 11px;
+  }
+  .m-day-pill-date {
+    font-size: 9px;
+  }
 }
 .m-day-pill--active {
   background: #80162B;

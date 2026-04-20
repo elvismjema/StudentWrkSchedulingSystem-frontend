@@ -303,51 +303,44 @@ const formatTimeDisplay = (timeStr) => {
 
 // Initialize department hours for all days (defaults: 6 AM – 7 PM, open)
 const initializeDepartmentHours = () => {
-  departmentHours.value = daysOfWeek.map((day, index) => ({
+  departmentHours.value = Array.from({ length: 7 }, (_, index) => ({
     day_of_week: index,
     open_time: DEFAULT_OPEN,
     close_time: DEFAULT_CLOSE,
     department_id: selectedDepartmentId.value,
     is_default: true,
     is_closed: false,
-    hours_id: null
+    hours_id: null,
   }));
-
-// Resolve the manager's department and load data
-const resolveAndLoad = async (deptId, deptNameValue) => {
-  selectedDepartmentId.value = deptId;
-  departmentName.value = deptNameValue || '';
-  await loadDepartmentData();
 };
 
 const loadDepartmentName = async () => {
   if (!selectedDepartmentId.value || departmentName.value) return;
   try {
-    loading.value = true;
-    error.value = null;
-    
-    // Load department settings
     const deptResponse = await DepartmentServices.getDepartment(selectedDepartmentId.value);
     if (deptResponse.data.success) {
       departmentSettings.value = { ...deptResponse.data.data };
-      // Keep departmentName in sync with the authoritative value from the DB
       if (deptResponse.data.data.department_name) {
         departmentName.value = deptResponse.data.data.department_name;
       }
     }
-    
-    // Load department hours
-    const hoursResponse = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
+  } catch {
+    // Non-fatal
+  }
+};
+
+const loadDepartmentHours = async () => {
+  if (!selectedDepartmentId.value) return;
+  try {
     initializeDepartmentHours();
+    const hoursResponse = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
     if (hoursResponse.data.success && hoursResponse.data.data.length > 0) {
-      // Merge saved hours into the default structure
       hoursResponse.data.data.forEach(hours => {
         const index = departmentHours.value.findIndex(h => h.day_of_week === hours.day_of_week);
         if (index !== -1) {
           departmentHours.value[index] = {
             ...departmentHours.value[index],
             ...hours,
-            // Restore default times if the day was previously saved as closed (nulls)
             open_time: hours.open_time || (hours.is_closed ? null : DEFAULT_OPEN),
             close_time: hours.close_time || (hours.is_closed ? null : DEFAULT_CLOSE),
             is_closed: hours.is_closed ?? false,
@@ -387,25 +380,9 @@ const saveDepartmentHours = async (dayHours) => {
   };
 
   try {
-    savingHours.value = true;
-    error.value = null;
-    successMessage.value = null;
-    
-    const hoursData = {
-      department_id: selectedDepartmentId.value,
-      day_of_week: dayHours.day_of_week,
-      open_time: dayHours.is_closed ? null : dayHours.open_time,
-      close_time: dayHours.is_closed ? null : dayHours.close_time,
-      is_default: true,
-      is_closed: dayHours.is_closed ?? false
-    };
-    
-    let response;
-    if (dayHours.hours_id) {
-      res = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, payload);
-    } else {
-      res = await DepartmentServices.createDepartmentHours(payload);
-    }
+    const res = dayHours.hours_id
+      ? await DepartmentServices.updateDepartmentHours(dayHours.hours_id, payload)
+      : await DepartmentServices.createDepartmentHours(payload);
 
     if (res?.data?.success) {
       successMessage.value = `${getDayName(dayHours.day_of_week)} hours saved.`;

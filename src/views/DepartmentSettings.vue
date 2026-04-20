@@ -166,7 +166,12 @@
         <!-- Department Hours Section -->
         <div v-if="selectedDepartmentId" class="mt-8">
           <v-divider class="mb-6"></v-divider>
-          <h3 class="text-h5 mb-4">Department Hours</h3>
+          <h3 class="text-h5 mb-2">Department Hours</h3>
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            Set the open and close hours for each day of the week. The Schedule and Calendar views will
+            display only the range from the earliest open time to the latest close time across all open days.
+            Default hours are 6:00 AM – 7:00 PM.
+          </p>
 
           <v-expansion-panels v-model="hoursPanel" class="mb-4">
             <v-expansion-panel
@@ -175,14 +180,36 @@
             >
               <v-expansion-panel-title>
                 <div class="d-flex align-center justify-space-between w-100">
-                  <span>{{ getDayName(dayHours.day_of_week) }}</span>
-                  <span class="text-caption mr-4">
-                    {{ dayHours.open_time || 'Not Set' }} - {{ dayHours.close_time || 'Not Set' }}
+                  <div class="d-flex align-center gap-2">
+                    <v-chip
+                      v-if="dayHours.is_closed"
+                      color="error"
+                      size="x-small"
+                      variant="tonal"
+                      class="mr-2"
+                    >Closed</v-chip>
+                    <span :class="{ 'text-medium-emphasis': dayHours.is_closed }">
+                      {{ getDayName(dayHours.day_of_week) }}
+                    </span>
+                  </div>
+                  <span class="text-caption mr-4" v-if="!dayHours.is_closed">
+                    {{ formatTimeDisplay(dayHours.open_time) }} – {{ formatTimeDisplay(dayHours.close_time) }}
                   </span>
+                  <span class="text-caption mr-4 text-medium-emphasis" v-else>Closed all day</span>
                 </div>
               </v-expansion-panel-title>
               <v-expansion-panel-text>
-                <v-row>
+                <!-- Closed toggle -->
+                <v-switch
+                  v-model="dayHours.is_closed"
+                  label="Mark as Closed (department is not open this day)"
+                  color="error"
+                  density="compact"
+                  class="mb-3"
+                ></v-switch>
+
+                <!-- Open/Close times (hidden when closed) -->
+                <v-row v-if="!dayHours.is_closed">
                   <v-col cols="12" md="6">
                     <v-text-field
                       v-model="dayHours.open_time"
@@ -202,6 +229,7 @@
                     ></v-text-field>
                   </v-col>
                 </v-row>
+
                 <v-btn
                   color="primary"
                   size="small"
@@ -266,14 +294,29 @@ const getDayName = (dayNumber) => {
   return daysOfWeek[dayNumber] || 'Unknown';
 };
 
-// Initialize department hours for all days
+// Format HH:MM time string to 12-hour display (e.g. "06:00" -> "6:00 AM")
+const formatTimeDisplay = (timeStr) => {
+  if (!timeStr) return 'Not Set';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return 'Not Set';
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+// Default open/close times
+const DEFAULT_OPEN  = '06:00';
+const DEFAULT_CLOSE = '19:00';
+
+// Initialize department hours for all days (defaults: 6 AM – 7 PM, open)
 const initializeDepartmentHours = () => {
   departmentHours.value = daysOfWeek.map((day, index) => ({
     day_of_week: index,
-    open_time: null,
-    close_time: null,
+    open_time: DEFAULT_OPEN,
+    close_time: DEFAULT_CLOSE,
     department_id: selectedDepartmentId.value,
     is_default: true,
+    is_closed: false,
     hours_id: null
   }));
 };
@@ -322,20 +365,22 @@ const loadDepartmentData = async () => {
     
     // Load department hours
     const hoursResponse = await DepartmentServices.getDepartmentHours(selectedDepartmentId.value);
+    initializeDepartmentHours();
     if (hoursResponse.data.success && hoursResponse.data.data.length > 0) {
-      // Map existing hours to the structure
-      initializeDepartmentHours();
+      // Merge saved hours into the default structure
       hoursResponse.data.data.forEach(hours => {
         const index = departmentHours.value.findIndex(h => h.day_of_week === hours.day_of_week);
         if (index !== -1) {
           departmentHours.value[index] = {
             ...departmentHours.value[index],
-            ...hours
+            ...hours,
+            // Restore default times if the day was previously saved as closed (nulls)
+            open_time: hours.open_time || (hours.is_closed ? null : DEFAULT_OPEN),
+            close_time: hours.close_time || (hours.is_closed ? null : DEFAULT_CLOSE),
+            is_closed: hours.is_closed ?? false,
           };
         }
       });
-    } else {
-      initializeDepartmentHours();
     }
   } catch (err) {
     error.value = 'Failed to load department data: ' + (err.response?.data?.message || err.message);
@@ -379,9 +424,10 @@ const saveDepartmentHours = async (dayHours) => {
     const hoursData = {
       department_id: selectedDepartmentId.value,
       day_of_week: dayHours.day_of_week,
-      open_time: dayHours.open_time,
-      close_time: dayHours.close_time,
-      is_default: true
+      open_time: dayHours.is_closed ? null : dayHours.open_time,
+      close_time: dayHours.is_closed ? null : dayHours.close_time,
+      is_default: true,
+      is_closed: dayHours.is_closed ?? false
     };
     
     let response;

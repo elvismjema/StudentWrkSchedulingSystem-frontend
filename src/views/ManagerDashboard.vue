@@ -1,8 +1,16 @@
 <template>
   <PageFrame>
     <template #header>
-      <PageHeader :title="managerHeading" :subtitle="managerSubtitle">
+      <PageHeader :title="managerHeading" :subtitle="todayLabel">
         <template #actions>
+          <v-btn
+            variant="outlined"
+            prepend-icon="mdi-calendar-month-outline"
+            class="mr-2"
+            @click="router.push({ name: 'manager-schedule' })"
+          >
+            View Schedule
+          </v-btn>
           <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreateShiftPopup">
             Create Shift
           </v-btn>
@@ -10,134 +18,147 @@
       </PageHeader>
     </template>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-0">{{ error }}</v-alert>
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
-    <!-- Status strip ------------------------------------------------------ -->
-    <section class="status-strip" aria-label="At-a-glance metrics">
-      <StatCard
-        label="Clocked in now"
-        :value="workingNowCount"
-        :to="{ name: 'manager-schedule', query: { filter: 'today' } }"
-        icon="mdi-account-clock-outline"
-      >
-        <template v-if="clockedInAvatars.length" #subtitle>
-          <span class="avatar-row">
-            <span
-              v-for="a in clockedInAvatars"
-              :key="a.key"
-              class="avatar-row__pill"
-              :title="a.name"
-            >{{ a.initials }}</span>
-            <span v-if="clockedInOverflow > 0" class="avatar-row__overflow">+{{ clockedInOverflow }}</span>
-          </span>
-        </template>
-      </StatCard>
+    <!-- Top row: Who's Working Now + Pending Approvals -->
+    <div class="db-top-row mb-4">
 
-      <StatCard
-        label="Pending approvals"
-        :value="pendingApprovals.length"
-        :subtitle="pendingApprovals[0]?.workerName || ''"
-        :to="{ name: 'manager-approvals' }"
-        icon="mdi-clipboard-check-outline"
-      />
-
-      <StatCard
-        label="Unfilled · next 7 days"
-        :value="unfilledNext7Count"
-        :subtitle="unfilledNext7Subtitle"
-        :to="{ name: 'manager-schedule', query: { filter: 'open' } }"
-        icon="mdi-calendar-alert"
-      />
-
-      <!-- TODO: wire to timecards weekly rollup once backend returns totals. -->
-      <StatCard
-        label="Hours this week"
-        value="—"
-        subtitle="Estimated payroll"
-        :to="{ name: 'manager-time-pay' }"
-        :mute-zero="false"
-        coming-soon
-        icon="mdi-cash-clock"
-      />
-    </section>
-
-    <!-- Today timeline ---------------------------------------------------- -->
-    <section class="today-section" aria-label="Today's timeline">
-      <header class="today-section__head">
-        <h2 class="type-h2">Today</h2>
-        <span class="type-meta">{{ todayLabel }}</span>
-      </header>
-      <div class="today-section__grid">
-        <AvailabilityGrid
-          mode="readonly"
-          :range="todayRange"
-          :slot-min-time="deptOpeningHour"
-          :slot-max-time="deptClosingHour"
-          :events="todayEvents"
-          @event:click="onTimelineEventClick"
-        />
+      <!-- Who's Working Now -->
+      <div class="db-card">
+        <div class="db-card__head">
+          <div>
+            <div class="db-card__title">Who's Working Now</div>
+            <div class="db-card__sub">Currently clocked-in workers</div>
+          </div>
+          <div class="working-count">
+            <span class="working-count__num">{{ workingNowCount }}</span>
+            <span class="pulse-dot" />
+          </div>
+        </div>
+        <div v-if="workingNow.length === 0" class="db-empty">
+          No workers currently clocked in
+        </div>
+        <ul v-else class="worker-list">
+          <li
+            v-for="shift in workingNow"
+            :key="shift.shift_id || shift.id"
+            class="worker-row"
+          >
+            <span class="worker-avatar">{{ initialsFor(shift.assignedUser?.fName || shift.user?.fName, shift.assignedUser?.lName || shift.user?.lName) }}</span>
+            <div class="worker-info">
+              <span class="worker-name">{{ ((shift.assignedUser?.fName || shift.user?.fName || '') + ' ' + (shift.assignedUser?.lName || shift.user?.lName || '')).trim() }}</span>
+              <span class="worker-dept">{{ shift.position?.position_name || 'Shift' }}</span>
+            </div>
+            <div class="worker-right">
+              <span class="worker-time">{{ formatRange(shift.start_time, shift.end_time) }}</span>
+              <span class="badge badge--green">In Progress</span>
+            </div>
+          </li>
+        </ul>
       </div>
-    </section>
 
-    <!-- Two-up: Needs attention + Upcoming -------------------------------- -->
-    <section class="two-up">
-      <article class="panel">
-        <header class="panel__head">
-          <h2 class="type-h2">Needs attention</h2>
-          <router-link :to="{ name: 'manager-approvals' }" class="panel__link">
-            View all <v-icon size="16">mdi-arrow-right</v-icon>
+      <!-- Pending Approvals -->
+      <div class="db-card">
+        <div class="db-card__head">
+          <div>
+            <div class="db-card__title">Pending Approvals</div>
+            <div class="db-card__sub">{{ pendingApprovals.length }} waiting</div>
+          </div>
+          <router-link :to="{ name: 'manager-approvals' }" class="db-link">
+            View All <v-icon size="15">mdi-arrow-right</v-icon>
           </router-link>
-        </header>
-        <div v-if="pendingApprovals.length === 0" class="panel__empty">
-          <v-icon size="20" color="success">mdi-check-circle-outline</v-icon>
-          <span>All caught up.</span>
         </div>
-        <ul v-else class="list">
-          <li v-for="item in pendingApprovals.slice(0, 5)" :key="item.id" class="list__row">
-            <router-link :to="{ name: 'manager-approvals', hash: `#item-${item.id}` }" class="list__link">
-              <div class="list__primary">
-                <span class="type-h3">{{ item.workerName }}</span>
-                <span class="list__chip">{{ item.type }}</span>
-              </div>
-              <div class="type-meta list__meta">{{ item.dateLabel }} · {{ item.timeRange }}</div>
-            </router-link>
+        <div v-if="pendingApprovals.length === 0" class="db-empty">
+          No pending requests
+        </div>
+        <ul v-else class="approval-list">
+          <li v-for="item in pendingApprovals.slice(0, 3)" :key="item.id" class="approval-row">
+            <div class="approval-row__top">
+              <span class="badge badge--neutral">{{ item.type }}</span>
+              <span class="badge badge--orange">Pending</span>
+            </div>
+            <div class="approval-row__name">{{ item.workerName }}</div>
+            <div class="approval-row__meta">{{ item.dateLabel }} · {{ item.timeRange }}</div>
           </li>
         </ul>
-      </article>
+      </div>
+    </div>
 
-      <article class="panel">
-        <header class="panel__head">
-          <h2 class="type-h2">Upcoming</h2>
-          <router-link :to="{ name: 'manager-schedule' }" class="panel__link">
-            View schedule <v-icon size="16">mdi-arrow-right</v-icon>
+    <!-- Middle row: Coming Up + Unfilled Shifts -->
+    <div class="db-mid-row mb-4">
+
+      <!-- Coming Up -->
+      <div class="db-card">
+        <div class="db-card__head">
+          <div>
+            <div class="db-card__title">Coming Up</div>
+            <div class="db-card__sub">Next shifts today</div>
+          </div>
+          <router-link :to="{ name: 'manager-schedule' }" class="db-link">
+            View All <v-icon size="15">mdi-arrow-right</v-icon>
           </router-link>
-        </header>
-        <div v-if="upcomingPreview.length === 0" class="panel__empty">
-          <v-icon size="20" color="success">mdi-check-circle-outline</v-icon>
-          <span>No shifts starting in the next 24 hours.</span>
         </div>
-        <ul v-else class="list">
-          <li v-for="shift in upcomingPreview" :key="shift.shift_id || shift.id" class="list__row">
-            <router-link :to="{ name: 'manager-schedule' }" class="list__link">
-              <div class="list__primary">
-                <span class="type-h3">{{ shift.positionName }}</span>
-                <span class="list__chip">{{ shift.assigneeName || 'Open' }}</span>
-              </div>
-              <div class="type-meta list__meta">{{ shift.dateLabel }} · {{ shift.timeRange }}</div>
-            </router-link>
+        <div v-if="comingUpToday.length === 0" class="db-empty">
+          No more shifts scheduled today
+        </div>
+        <ul v-else class="worker-list">
+          <li
+            v-for="shift in comingUpToday"
+            :key="shift.shift_id || shift.id"
+            class="worker-row"
+          >
+            <span class="worker-avatar">{{ shift.initials }}</span>
+            <div class="worker-info">
+              <span class="worker-name">{{ shift.assigneeName }}</span>
+              <span class="worker-dept">{{ shift.departmentName || shift.positionName }}</span>
+            </div>
+            <span class="worker-time">{{ shift.timeRange }}</span>
           </li>
         </ul>
-      </article>
-    </section>
+      </div>
 
-    <!-- Demoted shortcuts ------------------------------------------------- -->
-    <nav class="shortcut-links" aria-label="Shortcuts">
-      <button type="button" class="shortcut-links__item" @click="openCreateShiftPopup">Create shift</button>
-      <span class="shortcut-links__sep" aria-hidden="true">·</span>
-      <button type="button" class="shortcut-links__item" @click="router.push({ name: 'manager-templates' })">New template</button>
-      <span class="shortcut-links__sep" aria-hidden="true">·</span>
-      <button type="button" class="shortcut-links__item" @click="router.push({ name: 'manager-student-workers' })">Invite worker</button>
-    </nav>
+      <!-- Unfilled Shifts -->
+      <div class="db-card">
+        <div class="db-card__head">
+          <div>
+            <div class="db-card__title">Unfilled Shifts</div>
+            <div class="db-card__sub">Shifts needing coverage</div>
+          </div>
+          <router-link :to="{ name: 'manager-schedule', query: { filter: 'open' } }" class="db-link">
+            View All <v-icon size="15">mdi-arrow-right</v-icon>
+          </router-link>
+        </div>
+        <div v-if="unfilledNext7.length === 0" class="db-empty">
+          No unfilled shifts in the next 7 days
+        </div>
+        <ul v-else class="approval-list">
+          <li
+            v-for="shift in unfilledNext7.slice(0, 3)"
+            :key="shift.shift_id || shift.id"
+            class="approval-row"
+          >
+            <div class="approval-row__top">
+              <span class="approval-row__name">{{ shift.position?.position_name || 'Shift' }}</span>
+              <span class="badge badge--orange">Open</span>
+            </div>
+            <div class="approval-row__meta">{{ formatDateShort(shift.shift_date) }} · {{ formatRange(shift.start_time, shift.end_time) }}</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="db-actions-row">
+      <button class="db-action-btn" @click="router.push('/manager/time-pay')">
+        <v-icon size="22" class="mb-1">mdi-currency-usd</v-icon>
+        <span>Time &amp; Pay</span>
+      </button>
+      <button class="db-action-btn" @click="router.push('/manager/workers')">
+        <v-icon size="22" class="mb-1">mdi-account-group-outline</v-icon>
+        <span>Student Workers</span>
+      </button>
+    </div>
+
   </PageFrame>
 </template>
 
@@ -146,8 +167,6 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import PageFrame from "../components/PageFrame.vue";
 import PageHeader from "../components/PageHeader.vue";
-import StatCard from "../components/StatCard.vue";
-import AvailabilityGrid from "../components/AvailabilityGrid.vue";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
@@ -357,6 +376,34 @@ const loadDashboardData = async () => {
   }
 };
 
+const comingUpToday = computed(() => {
+  const now = new Date();
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return (allShifts.value || [])
+    .filter((shift) => {
+      const start = toDateTime(shift.shift_date, shift.start_time);
+      return start && start > now && start <= endOfToday && !!shift.assigned_user_id;
+    })
+    .sort((a, b) => {
+      const aStart = toDateTime(a.shift_date, a.start_time)?.getTime() || 0;
+      const bStart = toDateTime(b.shift_date, b.start_time)?.getTime() || 0;
+      return aStart - bStart;
+    })
+    .slice(0, 5)
+    .map((shift) => {
+      const u = shift.assignedUser || shift.user || {};
+      const name = `${u.fName || ""} ${u.lName || ""}`.trim() || "Worker";
+      return {
+        ...shift,
+        assigneeName: name,
+        initials: initialsFor(u.fName, u.lName),
+        positionName: shift.position?.position_name || "Shift",
+        departmentName: shift.department?.department_name || deptContext.department_name || "",
+        timeRange: formatRange(shift.start_time, shift.end_time),
+      };
+    });
+});
+
 // Preserve existing behavior: Schedule opens CreateShiftModal via query flag.
 const openCreateShiftPopup = () => {
   router.push({ name: "manager-schedule", query: { createShift: "1" } });
@@ -366,9 +413,212 @@ onMounted(loadDashboardData);
 </script>
 
 <style scoped>
-.status-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-@media (max-width: 960px) { .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .status-strip { grid-template-columns: 1fr; } }
+/* ── Layout ───────────────────────────────────────────────────────────── */
+.db-top-row {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--space-3);
+}
+.db-mid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.db-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+@media (max-width: 960px) {
+  .db-top-row,
+  .db-mid-row,
+  .db-actions-row { grid-template-columns: 1fr; }
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────── */
+.db-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.db-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.db-card__sub {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.db-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--text-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.db-link:hover { color: var(--brand-primary); }
+.db-empty {
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+  padding: 28px 0;
+}
+
+/* ── Working count + pulse dot ────────────────────────────────────────── */
+.working-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.working-count__num {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-1);
+  line-height: 1;
+}
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* ── Worker rows ──────────────────────────────────────────────────────── */
+.worker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+.worker-row:last-child { border-bottom: none; }
+.worker-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.worker-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.worker-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.worker-dept { font-size: 12px; color: var(--text-2); }
+.worker-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.worker-time { font-size: 12px; color: var(--text-2); }
+
+/* ── Approval / unfilled rows ─────────────────────────────────────────── */
+.approval-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.approval-row {
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.approval-row__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+.approval-row__name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.approval-row__meta { font-size: 12px; color: var(--text-2); }
+
+/* ── Badges ───────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.badge--green  { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.badge--orange { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.badge--neutral { background: var(--surface-2); color: var(--text-2); border-color: var(--border-1); }
+
+/* ── Quick action buttons ─────────────────────────────────────────────── */
+.db-action-btn {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  width: 100%;
+}
+.db-action-btn:hover {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: var(--brand-primary);
+}
+
+/* keep old unused classes so any stray refs don't break -->
+.status-strip { display: none; }
 
 .avatar-row { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; }
 .avatar-row__pill {

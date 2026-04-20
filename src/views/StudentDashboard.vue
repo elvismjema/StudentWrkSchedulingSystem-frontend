@@ -365,6 +365,13 @@ function showSnack(text, color = "success") {
   snackbar.show = true;
 }
 
+function setClockStatus(record = null) {
+  clockStatus.isClockedIn = Boolean(record);
+  clockStatus.clockInTime = record?.clock_in_time || null;
+  clockStatus.clockRecordId = record?.id || null;
+  clockStatus.onBreak = Boolean(record?.on_break);
+}
+
 function normalizeOpenShiftPayload(payload) {
   if (Array.isArray(payload)) {
     return {
@@ -433,13 +440,8 @@ async function loadDashboard() {
       statusColor: r.status === "approved" ? "success" : r.status === "denied" ? "error" : "warning",
     }));
 
-    // Clock status
-    if (data.clockStatus) {
-      clockStatus.isClockedIn = data.clockStatus.isClockedIn || false;
-      clockStatus.clockInTime = data.clockStatus.clockInTime || null;
-      clockStatus.onBreak = data.clockStatus.onBreak || false;
-      clockStatus.clockRecordId = data.clockStatus.clockRecordId || null;
-    }
+    const clockRes = await studentService.getOpenClockRecord();
+    setClockStatus(clockRes?.data?.data || null);
   } catch (dashErr) {
     // Fallback: load data from individual endpoints
     try {
@@ -495,23 +497,9 @@ async function loadFromIndividualEndpoints() {
 
   // Clock status
   if (clockRes.status === "fulfilled") {
-    const record = clockRes.value?.data?.data || clockRes.value?.data;
-    if (record) {
-      clockStatus.isClockedIn = true;
-      clockStatus.clockInTime = record.clock_in_time;
-      clockStatus.clockRecordId = record.id;
-      clockStatus.onBreak = record.on_break || false;
-    } else {
-      clockStatus.isClockedIn = false;
-      clockStatus.clockInTime = null;
-      clockStatus.clockRecordId = null;
-      clockStatus.onBreak = false;
-    }
+    setClockStatus(clockRes.value?.data?.data || null);
   } else {
-    clockStatus.isClockedIn = false;
-    clockStatus.clockInTime = null;
-    clockStatus.clockRecordId = null;
-    clockStatus.onBreak = false;
+    setClockStatus();
   }
 
   // Open shifts

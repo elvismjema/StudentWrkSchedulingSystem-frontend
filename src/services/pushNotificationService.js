@@ -62,10 +62,15 @@ export async function subscribeToPush() {
     });
 
     const { endpoint, keys } = subscription.toJSON();
+    // Backend expects the nested Web Push shape: { endpoint, keys: { p256dh, auth } }.
+    // Sending flat fields here silently 400s and leaves the device unsubscribed on
+    // the server even though the browser thinks it's subscribed.
     await apiClient.post("/push-subscriptions", {
       endpoint,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
+      keys: {
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
     });
 
     return true;

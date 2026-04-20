@@ -1,14 +1,14 @@
-<template>
-  <div class="department-settings-container">
-    <v-card class="settings-card" elevation="2">
-      <v-card-title class="text-h4 mb-4">
-        <v-icon left>mdi-cog</v-icon>
-        Department Settings
+﻿<template>
+  <div class="department-hours-container">
+    <v-card class="hours-card" elevation="2">
+      <v-card-title class="text-h4 mb-2">
+        <v-icon left>mdi-clock-outline</v-icon>
+        Department Hours
       </v-card-title>
 
       <v-card-text>
-        <!-- Loading State -->
-        <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
+        <!-- Loading -->
+        <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4"></v-progress-linear>
 
         <!-- No department warning -->
         <v-alert v-if="!loading && !selectedDepartmentId" type="warning" class="mb-4">
@@ -26,8 +26,14 @@
           {{ error }}
         </v-alert>
 
+        <!-- Department name header -->
+        <div v-if="selectedDepartmentId && departmentName" class="mb-4 d-flex align-center">
+          <v-icon class="mr-2" color="primary">mdi-office-building-outline</v-icon>
+          <span class="text-h6 font-weight-medium">{{ departmentName }}</span>
+        </div>
+
         <!-- Success Alert -->
-        <v-alert v-if="successMessage" type="success" dismissible @click:close="successMessage = null" class="mb-4">
+        <v-alert v-if="successMessage" type="success" closable @click:close="successMessage = null" class="mb-4">
           {{ successMessage }}
         </v-alert>
 
@@ -196,6 +202,7 @@
                   <span class="text-caption mr-4 text-medium-emphasis" v-else>Closed all day</span>
                 </div>
               </v-expansion-panel-title>
+
               <v-expansion-panel-text>
                 <!-- Closed toggle -->
                 <v-switch
@@ -213,8 +220,8 @@
                       v-model="dayHours.open_time"
                       label="Open Time"
                       type="time"
-                      outlined
-                      dense
+                      variant="outlined"
+                      density="compact"
                     ></v-text-field>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -222,8 +229,8 @@
                       v-model="dayHours.close_time"
                       label="Close Time"
                       type="time"
-                      outlined
-                      dense
+                      variant="outlined"
+                      density="compact"
                     ></v-text-field>
                   </v-col>
                 </v-row>
@@ -232,11 +239,11 @@
                   color="primary"
                   size="small"
                   @click="saveDepartmentHours(dayHours)"
-                  :loading="savingHours"
+                  :loading="dayHours._saving"
                   class="mt-2"
                 >
-                  <v-icon left>mdi-content-save</v-icon>
-                  Save Hours
+                  <v-icon start>mdi-content-save</v-icon>
+                  Save
                 </v-btn>
               </v-expansion-panel-text>
             </v-expansion-panel>
@@ -253,14 +260,10 @@ import DepartmentServices from '../services/departmentServices.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import Utils from '../config/utils.js';
 
-// State
+// ── State ──────────────────────────────────────────────────────────────────────
 const loading = ref(false);
-const saving = ref(false);
-const savingHours = ref(false);
 const error = ref(null);
 const successMessage = ref(null);
-const formValid = ref(false);
-const settingsForm = ref(null);
 const hoursPanel = ref(null);
 
 const selectedDepartmentId = ref(null);
@@ -279,18 +282,21 @@ const departmentSettings = ref({
 
 const departmentHours = ref([]);
 
-// Validation Rules
-const rules = {
-  required: (v) => !!v || v === 0 || 'This field is required',
-  nonNegative: (v) => v >= 0 || 'Value must be non-negative',
-  positive: (v) => v > 0 || 'Value must be positive'
-};
+// ── Constants ──────────────────────────────────────────────────────────────────
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DEFAULT_OPEN  = '06:00';
+const DEFAULT_CLOSE = '19:00';
 
-// Days of the week
-const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const getDayName = (dayNumber) => DAYS[dayNumber] || 'Unknown';
 
-const getDayName = (dayNumber) => {
-  return daysOfWeek[dayNumber] || 'Unknown';
+const formatTimeDisplay = (timeStr) => {
+  if (!timeStr) return 'Not Set';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return 'Not Set';
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 };
 
 // Format HH:MM time string to 12-hour display (e.g. "06:00" -> "6:00 AM")
@@ -318,7 +324,6 @@ const initializeDepartmentHours = () => {
     is_closed: false,
     hours_id: null
   }));
-};
 
 // Resolve the manager's department and load data
 const resolveAndLoad = async (deptId, deptNameValue) => {
@@ -327,10 +332,8 @@ const resolveAndLoad = async (deptId, deptNameValue) => {
   await loadDepartmentData();
 };
 
-// Load department data
-const loadDepartmentData = async () => {
-  if (!selectedDepartmentId.value) return;
-  
+const loadDepartmentName = async () => {
+  if (!selectedDepartmentId.value || departmentName.value) return;
   try {
     loading.value = true;
     error.value = null;
@@ -364,40 +367,37 @@ const loadDepartmentData = async () => {
         }
       });
     }
-  } catch (err) {
-    error.value = 'Failed to load department data: ' + (err.response?.data?.message || err.message);
+  } catch {
+    // Non-fatal
+  }
+};
+
+const resolveAndLoad = async (deptId, deptNameValue) => {
+  selectedDepartmentId.value = deptId;
+  departmentName.value = deptNameValue || '';
+  loading.value = true;
+  try {
+    await Promise.all([loadDepartmentHours(), loadDepartmentName()]);
   } finally {
     loading.value = false;
   }
 };
 
-// Save department settings
-const saveDepartmentSettings = async () => {
-  if (!settingsForm.value || !formValid.value) return;
-  
-  try {
-    saving.value = true;
-    error.value = null;
-    successMessage.value = null;
-    
-    const response = await DepartmentServices.updateDepartment(
-      selectedDepartmentId.value,
-      departmentSettings.value
-    );
-    
-    if (response.data.success) {
-      successMessage.value = 'Department settings saved successfully!';
-      departmentSettings.value = { ...response.data.data };
-    }
-  } catch (err) {
-    error.value = 'Failed to save department settings: ' + (err.response?.data?.message || err.message);
-  } finally {
-    saving.value = false;
-  }
-};
-
-// Save department hours
+// ── Save ───────────────────────────────────────────────────────────────────────
 const saveDepartmentHours = async (dayHours) => {
+  dayHours._saving = true;
+  error.value = null;
+  successMessage.value = null;
+
+  const payload = {
+    department_id: selectedDepartmentId.value,
+    day_of_week:   dayHours.day_of_week,
+    open_time:     dayHours.is_closed ? null : dayHours.open_time,
+    close_time:    dayHours.is_closed ? null : dayHours.close_time,
+    is_default:    true,
+    is_closed:     dayHours.is_closed ?? false,
+  };
+
   try {
     savingHours.value = true;
     error.value = null;
@@ -414,24 +414,21 @@ const saveDepartmentHours = async (dayHours) => {
     
     let response;
     if (dayHours.hours_id) {
-      // Update existing hours
-      response = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, hoursData);
+      res = await DepartmentServices.updateDepartmentHours(dayHours.hours_id, payload);
     } else {
-      // Create new hours
-      response = await DepartmentServices.createDepartmentHours(hoursData);
+      res = await DepartmentServices.createDepartmentHours(payload);
     }
-    
-    if (response.data.success) {
-      successMessage.value = `Hours for ${getDayName(dayHours.day_of_week)} saved successfully!`;
-      // Update the hours_id if it was a new entry
-      if (!dayHours.hours_id && response.data.data.hours_id) {
-        dayHours.hours_id = response.data.data.hours_id;
+
+    if (res?.data?.success) {
+      successMessage.value = `${getDayName(dayHours.day_of_week)} hours saved.`;
+      if (!dayHours.hours_id && res.data.data?.hours_id) {
+        dayHours.hours_id = res.data.data.hours_id;
       }
     }
   } catch (err) {
-    error.value = 'Failed to save department hours: ' + (err.response?.data?.message || err.message);
+    error.value = 'Failed to save hours: ' + (err.response?.data?.message || err.message);
   } finally {
-    savingHours.value = false;
+    dayHours._saving = false;
   }
 };
 
@@ -495,13 +492,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.department-settings-container {
+.department-hours-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
   background: var(--surface-2);
 }
 
-.settings-card {
+.hours-card {
   border-radius: 14px;
   padding: 24px;
 }

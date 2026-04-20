@@ -7,11 +7,11 @@
         <p class="page-subtitle">{{ workers.length }} student workers</p>
       </div>
       <div class="header-actions">
-        <v-btn color="#8B1538" prepend-icon="mdi-account-plus" @click="openAddWorkerDialog">
+        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAddWorkerDialog">
           Add Worker
         </v-btn>
         <v-btn 
-          color="#8B1538" 
+          color="primary" 
           variant="outlined" 
           prepend-icon="mdi-briefcase-plus" 
           @click="goToPositionsScreen"
@@ -41,13 +41,13 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-container">
-      <v-progress-circular indeterminate color="#8B1538" size="40" />
+      <v-progress-circular indeterminate color="primary" size="40" />
       <p class="loading-text">Loading workers...</p>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="filteredWorkers.length === 0" class="empty-state">
-      <v-icon size="48" color="#667085">mdi-account-group-outline</v-icon>
+      <v-icon size="48" color="text-2">mdi-account-group-outline</v-icon>
       <h3 class="empty-title">No workers in your department yet</h3>
       <p class="empty-subtitle">Start by adding student workers to your department</p>
     </div>
@@ -64,31 +64,53 @@
         <v-card-text class="worker-card-content">
           <!-- Worker Avatar and Info -->
           <div class="worker-header">
-            <v-avatar class="worker-avatar" color="#8B1538" size="48">
+            <v-avatar class="worker-avatar" color="primary" size="48">
               <span class="avatar-text">{{ getWorkerInitials(worker) }}</span>
             </v-avatar>
             <div class="worker-info">
               <h3 class="worker-name">
                 {{ `${worker.fName || ''} ${worker.lName || ''}`.trim() || 'Unknown Worker' }}
               </h3>
-              <v-chip size="small" color="#8B1538" variant="outlined" class="position-chip">
-                {{ getPositionName(worker) }}
-              </v-chip>
             </div>
           </div>
 
           <!-- Availability Summary -->
           <div class="availability-section">
-            <h4 class="availability-title">Weekly Availability</h4>
-            <div class="availability-grid">
+            <div class="availability-summary-head">
+              <h4 class="availability-title">Weekly Availability</h4>
+              <div class="availability-totals">
+                <v-chip size="x-small" variant="tonal" color="blockAvailFg">
+                  Available {{ countSlotsByType(worker, 'available') }}
+                </v-chip>
+                <v-chip size="x-small" variant="tonal" color="blockOffLabel">
+                  Unavailable {{ countSlotsByType(worker, 'unavailable') }}
+                </v-chip>
+              </div>
+            </div>
+
+            <!-- Compact 7-day bar preview — one colored strip per availability block -->
+            <div class="preview-week">
               <div
                 v-for="day in weekDays"
                 :key="day.key"
-                class="availability-day"
+                class="preview-day"
               >
-                <div class="day-label">{{ day.label }}</div>
-                <div class="day-time">
-                  {{ getAvailabilityForDay(worker, day.key) }}
+                <div class="preview-day-label">{{ day.label.slice(0, 1) }}</div>
+                <div class="preview-day-bars">
+                  <template v-if="getDaySlots(worker, day.key).length">
+                    <div
+                      v-for="slot in getDaySlots(worker, day.key)"
+                      :key="`prev-${day.key}-${slot.startMinutes}`"
+                      class="preview-bar"
+                      :class="{
+                        'preview-bar--available': slot.type === 'available',
+                        'preview-bar--unavailable': slot.type === 'unavailable',
+                        'preview-bar--class': slot.type === 'class',
+                      }"
+                      :title="`${slot.label} · ${slot.type}`"
+                    />
+                  </template>
+                  <div v-else class="preview-bar-empty" />
                 </div>
               </div>
             </div>
@@ -98,11 +120,11 @@
     </div>
 
     <!-- Worker Detail Modal -->
-    <v-dialog v-model="workerModal.open" max-width="800px" scrollable>
+    <v-dialog v-model="workerModal.open" max-width="1200px" width="92vw" scrollable>
       <v-card v-if="workerModal.selectedWorker">
         <v-card-title class="modal-header">
           <div class="modal-worker-info">
-            <v-avatar class="modal-avatar" color="#8B1538" size="56">
+            <v-avatar class="modal-avatar" color="primary" size="56">
               <span class="avatar-text">{{ getWorkerInitials(workerModal.selectedWorker) }}</span>
             </v-avatar>
             <div>
@@ -125,30 +147,25 @@
             <v-window-item value="details">
               <div class="details-section">
                 <div class="detail-row">
-                  <span class="detail-label">Position:</span>
-                  <v-chip color="#8B1538" variant="outlined">
-                    {{ getPositionName(workerModal.selectedWorker) }}
-                  </v-chip>
-                </div>
-                <div class="detail-row">
                   <span class="detail-label">Email:</span>
                   <span class="detail-value">{{ workerModal.selectedWorker.email || 'No email' }}</span>
                 </div>
                 
                 <!-- Availability in Modal -->
                 <div class="modal-availability">
-                  <h4 class="section-title">Weekly Availability</h4>
-                  <div class="availability-grid">
-                    <div
-                      v-for="day in weekDays"
-                      :key="day.key"
-                      class="availability-day"
-                    >
-                      <div class="day-label">{{ day.label }}</div>
-                      <div class="day-time">
-                        {{ getAvailabilityForDay(workerModal.selectedWorker, day.key) }}
-                      </div>
+                  <div class="availability-summary-head">
+                    <h4 class="section-title">Weekly Availability</h4>
+                    <div class="availability-totals">
+                      <v-chip size="small" variant="tonal" color="blockAvailFg">
+                        Available {{ countSlotsByType(workerModal.selectedWorker, 'available') }}
+                      </v-chip>
+                      <v-chip size="small" variant="tonal" color="blockOffLabel">
+                        Unavailable {{ countSlotsByType(workerModal.selectedWorker, 'unavailable') }}
+                      </v-chip>
                     </div>
+                  </div>
+                  <div class="modal-availability__grid">
+                    <WorkerAvailabilityReadonly :availability="workerAvailability" />
                   </div>
                 </div>
               </div>
@@ -160,7 +177,7 @@
                 <div class="schedule-header">
                   <h4 class="section-title">Class Schedule</h4>
                   <v-btn
-                    color="#8B1538"
+                    color="primary"
                     variant="outlined"
                     :loading="loadingSchedule"
                     @click="loadClassSchedule"
@@ -172,7 +189,7 @@
 
                 <!-- Loading Schedule -->
                 <div v-if="loadingSchedule" class="schedule-loading">
-                  <v-progress-circular indeterminate color="#8B1538" size="32" />
+                  <v-progress-circular indeterminate color="primary" size="32" />
                   <p>Loading class schedule...</p>
                 </div>
 
@@ -183,7 +200,7 @@
 
                 <!-- No Schedule Data -->
                 <div v-else-if="!classSchedule || classSchedule.length === 0" class="no-schedule">
-                  <v-icon size="32" color="#667085">mdi-calendar-blank-outline</v-icon>
+                  <v-icon size="32" color="text-2">mdi-calendar-blank-outline</v-icon>
                   <p>No class schedule found</p>
                 </div>
 
@@ -211,7 +228,7 @@
                           :key="`${meeting.days.join('-')}-${meeting.start_time}`"
                           class="meeting-time"
                         >
-                          <v-chip size="small" color="#8B1538" variant="outlined">
+                          <v-chip size="small" color="primary" variant="outlined">
                             {{ formatMeetingDays(meeting.days) }}
                           </v-chip>
                           <span class="time-range">
@@ -228,14 +245,31 @@
         </v-card-text>
 
         <v-card-actions class="modal-actions">
-          <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
           <v-btn
-            color="#8B1538"
-            :loading="loadingSchedule"
-            @click="loadClassSchedule"
+            color="error"
+            variant="text"
+            :disabled="deletingWorker"
+            @click="openDeleteWorkerDialog"
           >
-            <v-icon start>mdi-calendar-search</v-icon>
-            View Schedule
+            Delete Worker
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" @click="closeWorkerModal">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteWorkerDialog" max-width="420px">
+      <v-card>
+        <v-card-title class="text-h6">Delete Worker Permanently?</v-card-title>
+        <v-card-text>
+          This permanently deletes the user account and cannot be undone.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="deletingWorker" @click="deleteWorkerDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="elevated" :loading="deletingWorker" @click="confirmDeleteWorker">
+            Delete
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -259,6 +293,7 @@ import apiClient from '../services/services.js';
 import studentScheduleService from '../services/studentScheduleService.js';
 import Utils from '../config/utils.js';
 import AddWorkerModal from '../components/AddWorkerModal.vue';
+import WorkerAvailabilityReadonly from '../components/WorkerAvailabilityReadonly.vue';
 
 const router = useRouter();
 
@@ -267,11 +302,13 @@ const loading = ref(false);
 const error = ref('');
 const searchQuery = ref('');
 const workers = ref([]);
-const workerAvailability = ref({}); // availability data keyed by worker ID
+const workerAvailabilityById = ref({}); // availability data keyed by worker ID
 const classSchedule = ref([]);
 const loadingSchedule = ref(false);
 const scheduleError = ref('');
 const activeTab = ref('details');
+const deletingWorker = ref(false);
+const deleteWorkerDialog = ref(false);
 
 // Department context
 const deptContext = Utils.getStore('currentDepartmentContext') || {};
@@ -310,6 +347,34 @@ const filteredWorkers = computed(() => {
   });
 });
 
+// Flattened availability slots for the currently-open worker, shaped for
+// AvailabilityGrid's recurring availability contract.
+const workerAvailability = computed(() => {
+  const worker = workerModal.selectedWorker;
+  if (!worker) return [];
+  const byDay = workerAvailabilityById.value[worker.userId || worker.id] || {};
+  const slots = [];
+  for (const dayKey of Object.keys(byDay)) {
+    for (const slot of byDay[dayKey] || []) {
+      if (!slot || typeof slot.dayOfWeek !== 'number') continue;
+      if (!slot.startTime || !slot.endTime) continue;
+      slots.push({
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        recurring: true,
+        unavailable: slot.type === 'unavailable',
+      });
+    }
+  }
+  return slots;
+});
+
+// Placeholder for this worker's upcoming shifts. The Student Workers
+// endpoint does not return assigned shifts today; when it does, map each
+// shift to { id, title, start, end, positionColor, state } here.
+const workerShifts = computed(() => []);
+
 // Methods
 const getWorkerInitials = (worker) => {
   const first = (worker.fName || '').charAt(0).toUpperCase();
@@ -317,22 +382,28 @@ const getWorkerInitials = (worker) => {
   return first && last ? `${first}${last}` : first || 'U';
 };
 
-const getPositionName = (worker) => {
-  return worker.position?.position_name || worker.positionName || 'Not assigned';
+const getDaySlots = (worker, dayKey) => {
+  if (!worker) return [];
+  const availability = workerAvailabilityById.value[worker.userId || worker.id] || {};
+  return availability[dayKey] || [];
 };
 
-const getAvailabilityForDay = (worker, dayKey) => {
-  const availability = workerAvailability.value[worker.userId || worker.id];
-  if (!availability || !availability[dayKey]) {
-    return '—';
-  }
-  
-  const dayAvailability = availability[dayKey];
-  if (dayAvailability.available && dayAvailability.startTime && dayAvailability.endTime) {
-    return `${formatTime(dayAvailability.startTime)} – ${formatTime(dayAvailability.endTime)}`;
-  }
-  
-  return 'Not set';
+const countSlotsByType = (worker, type) => {
+  if (!worker) return 0;
+  const total = weekDays.reduce((count, day) => {
+    const dayCount = getDaySlots(worker, day.key).filter((slot) => slot.type === type).length;
+    return count + dayCount;
+  }, 0);
+  return total;
+};
+
+const parseTimeToMinutes = (timeString) => {
+  if (!timeString) return 0;
+  const [hourRaw = '0', minuteRaw = '0'] = String(timeString).split(':');
+  const hours = Number.parseInt(hourRaw, 10);
+  const minutes = Number.parseInt(minuteRaw, 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
+  return (hours * 60) + minutes;
 };
 
 const formatTime = (timeString) => {
@@ -388,6 +459,31 @@ const closeWorkerModal = () => {
   workerModal.selectedWorker = null;
   classSchedule.value = [];
   scheduleError.value = '';
+  deleteWorkerDialog.value = false;
+};
+
+const openDeleteWorkerDialog = () => {
+  if (!workerModal.selectedWorker) return;
+  deleteWorkerDialog.value = true;
+};
+
+const confirmDeleteWorker = async () => {
+  const worker = workerModal.selectedWorker;
+  const workerId = worker?.userId || worker?.id;
+  if (!workerId) return;
+
+  deletingWorker.value = true;
+  try {
+    await apiClient.delete(`/users/${workerId}/permanent-manager`);
+    deleteWorkerDialog.value = false;
+    closeWorkerModal();
+    await loadWorkers();
+  } catch (err) {
+    error.value = err?.response?.data?.message || 'Failed to delete worker permanently.';
+    console.error('Error deleting worker:', err);
+  } finally {
+    deletingWorker.value = false;
+  }
 };
 
 // Enhanced worker management methods
@@ -487,21 +583,47 @@ const loadWorkersAvailability = async () => {
       
       // Convert availability array to object keyed by day
       const availabilityMap = {};
+      const dayKeyByNumber = {
+        0: 'sunday',
+        1: 'monday',
+        2: 'tuesday',
+        3: 'wednesday',
+        4: 'thursday',
+        5: 'friday',
+        6: 'saturday',
+      };
+
       availabilityData.forEach((availability) => {
-        if (availability.day_of_week) {
-          availabilityMap[availability.day_of_week.toLowerCase()] = {
-            available: availability.is_available,
-            startTime: availability.start_time,
-            endTime: availability.end_time,
-          };
+        const dayNumber = Number(availability.dayOfWeek);
+        const dayKey = dayKeyByNumber[dayNumber];
+        if (!dayKey || !availability.isRecurring) return;
+
+        if (!availabilityMap[dayKey]) {
+          availabilityMap[dayKey] = [];
         }
+
+        const timeRange = `${formatTime(availability.startTime)} – ${formatTime(availability.endTime)}`;
+        const type = String(availability.availabilityType || '').toLowerCase();
+        availabilityMap[dayKey].push({
+          label: timeRange,
+          type: type === 'unavailable' || type === 'time_off' ? 'unavailable' : 'available',
+          startMinutes: parseTimeToMinutes(availability.startTime),
+          endMinutes: parseTimeToMinutes(availability.endTime),
+          dayOfWeek: dayNumber,
+          startTime: String(availability.startTime || '').slice(0, 5),
+          endTime: String(availability.endTime || '').slice(0, 5),
+        });
+      });
+
+      Object.keys(availabilityMap).forEach((dayKey) => {
+        availabilityMap[dayKey].sort((a, b) => a.startMinutes - b.startMinutes);
       });
       
-      workerAvailability.value[worker.userId || worker.id] = availabilityMap;
+      workerAvailabilityById.value[worker.userId || worker.id] = availabilityMap;
     } catch (err) {
       console.warn(`No availability data for worker ${worker.userId || worker.id}:`, err);
       // Set empty availability for this worker
-      workerAvailability.value[worker.userId || worker.id] = {};
+      workerAvailabilityById.value[worker.userId || worker.id] = {};
     }
   });
 
@@ -556,6 +678,7 @@ watch(activeTab, (nextTab) => {
     loadClassSchedule();
   }
 });
+
 </script>
 
 <style scoped>
@@ -582,13 +705,13 @@ watch(activeTab, (nextTab) => {
   margin: 0;
   font-size: 40px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
   line-height: 1.1;
 }
 
 .page-subtitle {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -617,7 +740,7 @@ watch(activeTab, (nextTab) => {
 
 .loading-text {
   margin-top: 16px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -630,12 +753,12 @@ watch(activeTab, (nextTab) => {
   margin: 16px 0 8px;
   font-size: 20px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .empty-subtitle {
   margin: 0 0 24px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -646,7 +769,7 @@ watch(activeTab, (nextTab) => {
 }
 
 .worker-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -686,12 +809,8 @@ watch(activeTab, (nextTab) => {
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
   line-height: 1.2;
-}
-
-.position-chip {
-  font-size: 12px;
 }
 
 .availability-section {
@@ -699,36 +818,85 @@ watch(activeTab, (nextTab) => {
 }
 
 .availability-title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #667085;
+  color: var(--text-2);
 }
 
-.availability-grid {
+.availability-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.availability-totals {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ─── Compact 7-day preview bar (worker card) ─────────────────── */
+.preview-week {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 2px;
 }
 
-.availability-day {
-  text-align: center;
-  padding: 8px 4px;
-  border-radius: 6px;
-  background: #f9fafb;
+.preview-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.day-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #667085;
-  margin-bottom: 2px;
+.preview-day-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
 }
 
-.day-time {
-  font-size: 10px;
-  color: #1f2937;
-  line-height: 1.1;
+.preview-day-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 20px;
+}
+
+.preview-bar {
+  height: 7px;
+  border-radius: 3px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.preview-bar--available {
+  background-color: var(--block-avail-bg);
+  border-left: 2px solid var(--block-avail-fg);
+}
+
+.preview-bar--unavailable {
+  background-color: var(--block-off-bg);
+  border-left: 2px solid var(--block-off-fg);
+}
+
+.preview-bar--class {
+  background-color: var(--block-class-bg);
+  border-left: 2px solid var(--block-class-fg);
+}
+
+.preview-bar-empty {
+  height: 20px;
+  border-radius: 4px;
+  background-color: var(--surface-2);
+  width: 100%;
 }
 
 /* Modal Styles */
@@ -750,12 +918,12 @@ watch(activeTab, (nextTab) => {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .modal-worker-email {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -785,24 +953,33 @@ watch(activeTab, (nextTab) => {
 
 .detail-label {
   font-weight: 600;
-  color: #374151;
+  color: var(--text-2);
   min-width: 80px;
 }
 
 .detail-value {
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .modal-availability {
-  border-top: 1px solid #e3e5e8;
+  border-top: 1px solid var(--border-1);
   padding-top: 20px;
+}
+
+.modal-availability__grid {
+  min-height: 560px;
+  max-height: 75vh;
+  overflow: auto;
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  background: #fff;
 }
 
 .section-title {
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .schedule-section {
@@ -823,7 +1000,7 @@ watch(activeTab, (nextTab) => {
   justify-content: center;
   padding: 40px;
   text-align: center;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .no-schedule {
@@ -833,7 +1010,7 @@ watch(activeTab, (nextTab) => {
   justify-content: center;
   padding: 40px;
   text-align: center;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .schedule-list {
@@ -843,7 +1020,7 @@ watch(activeTab, (nextTab) => {
 }
 
 .course-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 8px;
 }
 
@@ -851,7 +1028,7 @@ watch(activeTab, (nextTab) => {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .course-details {
@@ -860,13 +1037,13 @@ watch(activeTab, (nextTab) => {
 
 .course-id {
   font-size: 12px;
-  color: #667085;
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
 .course-instructors {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
 }
 
 .instructor {
@@ -887,7 +1064,7 @@ watch(activeTab, (nextTab) => {
 
 .time-range {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-2);
 }
 
 .modal-actions {
@@ -912,8 +1089,9 @@ watch(activeTab, (nextTab) => {
     gap: 16px;
   }
 
-  .availability-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .availability-summary-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .modal-worker-info {
@@ -929,9 +1107,4 @@ watch(activeTab, (nextTab) => {
   }
 }
 
-@media (max-width: 480px) {
-  .availability-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 </style>

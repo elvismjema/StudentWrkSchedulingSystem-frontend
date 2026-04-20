@@ -1,5 +1,5 @@
 import apiClient from "./services.js";
-import Utils from "../config/utils.js";
+import { formatDateTime } from "../utils/tz.js";
 
 const iconForType = (type = "", title = "") => {
   switch (type) {
@@ -25,7 +25,7 @@ const toUiNotification = (item) => ({
   id: item.id,
   title: item.title,
   description: item.message,
-  timestamp: new Date(item.createdAt || item.updatedAt || Date.now()).toLocaleString(),
+  timestamp: formatDateTime(new Date(item.createdAt || item.updatedAt || Date.now())),
   unread: !item.isRead,
   icon: iconForType(item.type, item.title),
   // US1 AC3, US3 AC3 – deep-link path stored on the notification record
@@ -35,17 +35,9 @@ const toUiNotification = (item) => ({
   type: item.type || null,
 });
 
-const getCurrentUserId = () => {
-  const user = Utils.getStore("user");
-  return user?.userId || user?.id || user?.user_id;
-};
-
 class NotificationService {
   static async getNotifications() {
-    const userId = getCurrentUserId();
-    const response = await apiClient.get("/notifications", {
-      params: userId ? { userId } : {},
-    });
+    const response = await apiClient.get("/notifications");
     const payload = response?.data?.data || [];
     return payload.map(toUiNotification);
   }
@@ -68,10 +60,7 @@ class NotificationService {
   }
 
   static async clearAllNotifications() {
-    const userId = getCurrentUserId();
-    await apiClient.delete(`/notifications`, {
-      params: userId ? { userId } : {},
-    });
+    await apiClient.delete(`/notifications`);
     return true;
   }
 

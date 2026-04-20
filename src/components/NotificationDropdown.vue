@@ -15,8 +15,9 @@
         class="notification-btn"
       >
         <v-badge
-          :content="unreadCount"
-          :color="unreadCount > 0 ? 'error' : 'transparent'"
+          :model-value="unreadCount > 0"
+          :content="unreadCount > 99 ? '99+' : unreadCount"
+          color="error"
           floating
           offset-x="8"
           offset-y="8"
@@ -115,7 +116,7 @@
           class="view-all-btn"
           @click="handleViewAll"
         >
-          View All Notifications
+          View all notifications
         </v-btn>
       </div>
     </v-card>
@@ -123,14 +124,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
 import Utils from '../config/utils'
+import { resolveNotificationLink, isExternalNotificationLink } from '../utils/notificationLinks'
 
 const emit = defineEmits(['notification-click'])
 const router = useRouter()
 const currentUser = Utils.getStore("user") || {}
+const currentRole = String(currentUser.role || '').toLowerCase()
 
 const isOpen = ref(false)
 const notifications = ref([])
@@ -158,6 +161,20 @@ const handleNotificationClick = async (notification) => {
       console.error('Error marking notification as read:', error)
     }
   }
+
+  const targetLink = resolveNotificationLink(notification, currentRole)
+  if (targetLink) {
+    try {
+      if (isExternalNotificationLink(targetLink)) {
+        window.location.href = targetLink
+      } else {
+        await router.push(targetLink)
+      }
+    } catch {
+      window.location.href = Utils.resolveAppUrl(targetLink)
+    }
+  }
+
   emit('notification-click', notification)
   isOpen.value = false
 }
@@ -212,8 +229,17 @@ const handleViewAll = () => {
   isOpen.value = false
 }
 
+// Poll for new notifications every 30 seconds so students get
+// near-real-time updates when a manager approves/declines requests
+let pollTimer = null
+
 onMounted(() => {
   loadNotifications()
+  pollTimer = setInterval(loadNotifications, 30_000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
@@ -239,7 +265,7 @@ onMounted(() => {
 .header-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .header-actions {
@@ -263,15 +289,15 @@ onMounted(() => {
 .header-title h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   margin: 0;
 }
 
 .unread-count {
   font-size: 13px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 2px 8px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  padding: 4px 8px;
   border-radius: 12px;
 }
 
@@ -284,7 +310,7 @@ onMounted(() => {
 .notification-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
@@ -292,17 +318,16 @@ onMounted(() => {
 }
 
 .notification-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--surface-1);
 }
 
 .notification-item.unread {
-  background-color: #f0f7ff;
+  background-color: var(--state-info-lt);
 }
 
 .notification-icon {
   margin-right: 12px;
-  color: #666;
-  flex-shrink: 0;
+  color: var(--text-2);
 }
 
 .notification-content {
@@ -319,7 +344,7 @@ onMounted(() => {
 .notification-title {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.3;
   margin-bottom: 2px;
   white-space: normal;
@@ -329,7 +354,7 @@ onMounted(() => {
 
 .notification-time {
   font-size: 12px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -343,7 +368,7 @@ onMounted(() => {
 .unread-dot {
   width: 8px;
   height: 8px;
-  background-color: #1976d2;
+  background-color: var(--state-info);
   border-radius: 50%;
 }
 

@@ -2,7 +2,7 @@
   <div class="positions-page">
     <div class="page-header">
       <h1 class="page-title">Department Positions</h1>
-      <v-btn color="#8B1538" variant="outlined" prepend-icon="mdi-plus" @click="createPositionModal.open = true">
+      <v-btn color="primary" variant="outlined" prepend-icon="mdi-plus" @click="createPositionModal.open = true">
         Create Position
       </v-btn>
     </div>
@@ -12,12 +12,12 @@
     </v-alert>
 
     <div v-if="loading" class="loading-container">
-      <v-progress-circular indeterminate color="#8B1538" size="40" />
+      <v-progress-circular indeterminate color="primary" size="40" />
       <p class="loading-text">Loading positions...</p>
     </div>
 
     <div v-else-if="positions.length === 0" class="empty-state">
-      <v-icon size="48" color="#667085">mdi-briefcase-outline</v-icon>
+      <v-icon size="48" color="text-2">mdi-briefcase-outline</v-icon>
       <h3 class="empty-title">No positions yet</h3>
       <p class="empty-subtitle">Create your first position for this department.</p>
     </div>
@@ -26,8 +26,18 @@
       <v-card v-for="position in positions" :key="position.position_id" class="position-card" elevation="0">
         <v-card-text class="position-card-content">
           <div class="position-header">
-            <h3 class="position-name">{{ position.position_name }}</h3>
+            <div class="position-name-row">
+              <span
+                v-if="position.color"
+                class="position-color-swatch"
+                :style="{ backgroundColor: position.color }"
+              ></span>
+              <h3 class="position-name">{{ position.position_name }}</h3>
+            </div>
             <div class="position-actions">
+              <v-btn size="small" variant="text" color="primary" @click="openEditPosition(position)">
+                <v-icon>mdi-pencil</v-icon>
+              </v-btn>
               <v-btn size="small" variant="text" color="error" :disabled="position.workerCount > 0" @click="confirmDeletePosition(position)">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
@@ -50,6 +60,66 @@
       :department-id="deptContext.department_id"
       @position-created="onPositionCreated"
     />
+
+    <!-- Edit Position Dialog -->
+    <v-dialog v-model="editPositionModal.open" max-width="500px">
+      <v-card>
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-3">
+          <v-icon color="primary" start>mdi-pencil</v-icon>
+          Edit Position
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-text-field
+            v-model="editPositionModal.form.position_name"
+            label="Position Name *"
+            variant="outlined"
+            density="comfortable"
+            :rules="[v => !!v?.trim() || 'Position name is required']"
+            class="mb-3"
+          />
+          <v-textarea
+            v-model="editPositionModal.form.description"
+            label="Description"
+            variant="outlined"
+            density="comfortable"
+            rows="3"
+            class="mb-3"
+          />
+          <v-checkbox
+            v-model="editPositionModal.form.is_critical"
+            label="Critical Position"
+            color="primary"
+            hide-details
+            class="mb-4"
+          />
+
+          <!-- Color Picker -->
+          <div class="color-picker-section">
+            <div class="color-picker-label">Schedule Color</div>
+            <p class="color-picker-hint">This color will represent the position on the Manager Schedule.</p>
+            <div class="color-picker-row">
+              <input
+                type="color"
+                class="color-input"
+                :value="editPositionModal.form.color || DEFAULT_POSITION_COLOR"
+                @input="editPositionModal.form.color = $event.target.value"
+              />
+              <span class="color-preview-swatch" :style="{ backgroundColor: editPositionModal.form.color || DEFAULT_POSITION_COLOR }"></span>
+              <span class="color-hex-label">{{ editPositionModal.form.color || DEFAULT_POSITION_COLOR }}</span>
+              <v-btn size="small" variant="text" @click="editPositionModal.form.color = null">Reset</v-btn>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-5 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="editPositionModal.open = false">Cancel</v-btn>
+          <v-btn color="primary" variant="elevated" :loading="editPositionModal.saving" @click="saveEditPosition">
+            Save Changes
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="deletePositionModal.open" max-width="400px">
       <v-card>
@@ -84,6 +154,13 @@ import apiClient from "../services/services.js";
 import Utils from "../config/utils.js";
 import CreatePositionModal from "../components/CreatePositionModal.vue";
 
+// Default swatch for the position color picker. Mirrors --brand-primary from
+// src/styles/tokens.css; the native <input type="color"> needs a literal hex
+// string, so we cannot reference the CSS variable here.
+// TODO: audit color intent — consider reading from getComputedStyle(:root)
+// at mount so this stays in sync with the token if brand-primary changes.
+const DEFAULT_POSITION_COLOR = "#80162B"; /* brand-primary */
+
 const deptContext = Utils.getStore("currentDepartmentContext") || {};
 
 const loading = ref(false);
@@ -93,6 +170,18 @@ const positions = ref([]);
 
 const createPositionModal = reactive({
   open: false,
+});
+
+const editPositionModal = reactive({
+  open: false,
+  saving: false,
+  position: null,
+  form: {
+    position_name: '',
+    description: '',
+    is_critical: false,
+    color: null,
+  },
 });
 
 const deletePositionModal = reactive({
@@ -149,6 +238,36 @@ const onPositionCreated = () => {
   loadPositions();
 };
 
+const openEditPosition = (position) => {
+  editPositionModal.position = position;
+  editPositionModal.form.position_name = position.position_name || '';
+  editPositionModal.form.description = position.description || '';
+  editPositionModal.form.is_critical = !!position.is_critical;
+  editPositionModal.form.color = position.color || null;
+  editPositionModal.open = true;
+};
+
+const saveEditPosition = async () => {
+  if (!editPositionModal.position) return;
+  if (!editPositionModal.form.position_name?.trim()) return;
+  editPositionModal.saving = true;
+  try {
+    await apiClient.put(`/positions/${editPositionModal.position.position_id}`, {
+      position_name: editPositionModal.form.position_name.trim(),
+      description: editPositionModal.form.description?.trim() || null,
+      is_critical: editPositionModal.form.is_critical,
+      color: editPositionModal.form.color || null,
+    });
+    editPositionModal.open = false;
+    editPositionModal.position = null;
+    await loadPositions();
+  } catch (err) {
+    error.value = err?.response?.data?.message || 'Failed to update position.';
+  } finally {
+    editPositionModal.saving = false;
+  }
+};
+
 const confirmDeletePosition = (position) => {
   deletePositionModal.position = position;
   deletePositionModal.open = true;
@@ -190,7 +309,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 42px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .loading-container {
@@ -203,7 +322,7 @@ onMounted(async () => {
 
 .loading-text {
   margin-top: 12px;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .empty-state {
@@ -214,12 +333,12 @@ onMounted(async () => {
 .empty-title {
   margin: 16px 0 8px;
   font-size: 20px;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .empty-subtitle {
   margin: 0;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .positions-grid {
@@ -229,7 +348,7 @@ onMounted(async () => {
 }
 
 .position-card {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 16px;
 }
 
@@ -249,12 +368,12 @@ onMounted(async () => {
   font-size: 42px;
   line-height: 1;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .position-description {
   margin: 0 0 14px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 16px;
 }
 
@@ -265,8 +384,79 @@ onMounted(async () => {
 }
 
 .worker-count {
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
+}
+
+.position-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.position-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.position-color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Color picker in edit dialog */
+.color-picker-section {
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.color-picker-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.color-picker-hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0 0 10px;
+}
+
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-input {
+  width: 44px;
+  height: 36px;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.color-preview-swatch {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+
+.color-hex-label {
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--text-2);
 }
 
 @media (max-width: 768px) {

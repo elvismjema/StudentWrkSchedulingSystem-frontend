@@ -141,11 +141,29 @@
               </td>
               <td>
                 <div class="d-flex align-center justify-center gap-1">
-                  <v-tooltip text="Assign / Edit Role" location="top">
+                  <!-- Promote to Admin: only shown for non-admin users -->
+                  <v-tooltip
+                    v-if="getHighestRole(item) !== 'Admin'"
+                    text="Promote to Admin"
+                    location="top"
+                  >
                     <template #activator="{ props }">
-                      <v-btn v-bind="props" icon size="small" color="primary" variant="text"
-                        @click="openAssignRoleDialog(item)">
-                        <v-icon>mdi-pencil</v-icon>
+                      <v-btn v-bind="props" icon size="small" color="deep-purple" variant="text"
+                        @click="openPromoteToAdminDialog(item)">
+                        <v-icon>mdi-shield-crown</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+
+                  <!-- Assign / Manage Department: visible for all users (admins can manage anyone) -->
+                  <v-tooltip
+                    text="Manage Department Assignment"
+                    location="top"
+                  >
+                    <template #activator="{ props }">
+                      <v-btn v-bind="props" icon size="small" color="teal" variant="text"
+                        @click="openAssignDeptDialog(item)">
+                        <v-icon>mdi-office-building-marker</v-icon>
                       </v-btn>
                     </template>
                   </v-tooltip>
@@ -338,83 +356,29 @@
       </v-card>
     </v-dialog>
 
-    <!-- ═══ ASSIGN ROLE DIALOG ════════════════════════════════════════════════ -->
-    <v-dialog v-model="assignRoleDialog" max-width="600px">
+    <!-- ═══ PROMOTE TO ADMIN DIALOG ════════════════════════════════════════ -->
+    <v-dialog v-model="promoteToAdminDialog" max-width="500px">
       <v-card>
-        <v-card-title class="pa-5 pb-2">
-          Manage Roles — {{ selectedUser?.fName }} {{ selectedUser?.lName }}
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-2">
+          <v-icon color="deep-purple" start>mdi-shield-crown</v-icon>
+          Promote to Admin
         </v-card-title>
-        <v-card-subtitle class="px-5 pb-4 text-medium-emphasis">
-          {{ selectedUser?.email }}
-        </v-card-subtitle>
-
         <v-card-text class="px-5">
-          <!-- Current assignments -->
-          <h4 class="mb-2">Current Assignments</h4>
-          <v-list density="compact" class="mb-4 rounded border">
-            <v-list-item
-              v-for="ud in selectedUser?.userDepartments"
-              :key="ud.ud_id"
-            >
-              <template #prepend>
-                <v-icon size="20">mdi-office-building-outline</v-icon>
-              </template>
-              <v-list-item-title>{{ ud.department?.department_name }}</v-list-item-title>
-              <v-list-item-subtitle>
-                {{ ud.role?.role_name || 'No Role' }}
-                <span v-if="ud.position"> · {{ ud.position.position_name }}</span>
-              </v-list-item-subtitle>
-              <template #append>
-                <v-btn icon size="x-small" color="error" variant="text"
-                  @click="removeRole(ud.ud_id)">
-                  <v-icon>mdi-delete</v-icon>
-                </v-btn>
-              </template>
-            </v-list-item>
-            <v-list-item v-if="!selectedUser?.userDepartments?.length">
-              <v-list-item-title class="text-medium-emphasis text-caption">
-                No role assignments yet.
-              </v-list-item-title>
-            </v-list-item>
-          </v-list>
-
-          <!-- Add new assignment -->
-          <v-divider class="mb-4" />
-          <h4 class="mb-3">Add / Update Role</h4>
-          <v-form ref="roleForm" v-model="roleFormValid">
-            <v-select
-              v-model="roleFormData.department_id"
-              :items="departments"
-              item-title="department_name"
-              item-value="department_id"
-              label="Department (Optional)"
-              variant="outlined"
-              density="comfortable"
-              @update:modelValue="loadDepartmentRoles"
-              class="mb-3"
-            />
-            <v-select
-              v-model="roleFormData.role_id"
-              :items="availableRoles"
-              item-title="role_name"
-              item-value="role_id"
-              label="Role (Optional)"
-              variant="outlined"
-              density="comfortable"
-              class="mb-3"
-            />
-          </v-form>
+          <p>
+            You are about to grant <strong>site-wide admin access</strong> to
+            <strong>{{ promoteToAdminUser?.fName }} {{ promoteToAdminUser?.lName }}</strong>
+            ({{ promoteToAdminUser?.email }}).
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mt-3">
+            This will remove all their current department assignments and future shifts.
+            Admins manage the entire site, not a specific department.
+          </v-alert>
         </v-card-text>
-
         <v-card-actions class="px-5 pb-5">
           <v-spacer />
-          <v-btn variant="text" @click="closeAssignRoleDialog">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            :loading="saving"
-            @click="assignRole"
-          >
-            Assign
+          <v-btn variant="text" @click="promoteToAdminDialog = false">Cancel</v-btn>
+          <v-btn color="deep-purple" :loading="promotingToAdmin" @click="confirmPromoteToAdmin">
+            Make Admin
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -472,6 +436,146 @@
       </v-card>
     </v-dialog>
 
+    <!-- ═══ ASSIGN TO DEPARTMENT DIALOG ════════════════════════════════════ -->
+    <v-dialog v-model="assignDeptDialog" max-width="600px">
+      <v-card>
+        <v-card-title class="d-flex align-center gap-2 pa-5 pb-2">
+          <v-icon color="teal">mdi-office-building-marker</v-icon>
+          Manage Department — {{ assignDeptUser?.fName }} {{ assignDeptUser?.lName }}
+        </v-card-title>
+        <v-card-subtitle class="px-5 pb-4 text-medium-emphasis">
+          {{ assignDeptUser?.email }}
+        </v-card-subtitle>
+
+        <v-card-text class="px-5">
+          <!-- Current assignments with remove buttons -->
+          <h4 class="mb-2">Current Assignments</h4>
+          <v-list density="compact" class="mb-4 rounded border">
+            <v-list-item
+              v-for="ud in assignDeptUser?.userDepartments"
+              :key="ud.ud_id"
+            >
+              <template #prepend>
+                <v-icon size="20">mdi-office-building-outline</v-icon>
+              </template>
+              <v-list-item-title>{{ ud.department?.department_name }}</v-list-item-title>
+              <v-list-item-subtitle>
+                {{ ud.role?.role_name || 'No Role' }}
+                <span v-if="ud.position"> · {{ ud.position.position_name }}</span>
+              </v-list-item-subtitle>
+              <template #append>
+                <v-btn icon size="x-small" color="error" variant="text"
+                  :loading="removingRoleId === ud.ud_id"
+                  @click="removeRoleFromDeptDialog(ud.ud_id)">
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </template>
+            </v-list-item>
+            <v-list-item v-if="!assignDeptUser?.userDepartments?.length">
+              <v-list-item-title class="text-medium-emphasis text-caption">
+                No department assignments yet.
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+
+          <v-divider class="mb-4" />
+          <h4 class="mb-3">Assign to New Department</h4>
+
+          <!-- Warning about existing assignments -->
+          <v-alert
+            v-if="assignDeptCurrentAssignments.length > 0"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            <strong>Warning:</strong> This person is currently assigned to:
+            <ul class="mt-1 ml-4">
+              <li v-for="ud in assignDeptCurrentAssignments" :key="ud.ud_id">
+                {{ ud.department?.department_name }}: {{ ud.role?.role_name || 'No Role' }}
+              </li>
+            </ul>
+            Assigning them to a new department will <strong>remove all other assignments</strong>
+            and <strong>unassign them from future shifts</strong> in those departments.
+          </v-alert>
+
+          <v-form ref="assignDeptForm" v-model="assignDeptFormValid">
+            <v-select
+              v-model="assignDeptData.department_id"
+              :items="departments"
+              item-title="department_name"
+              item-value="department_id"
+              label="Department"
+              prepend-inner-icon="mdi-office-building"
+              variant="outlined"
+              density="comfortable"
+              :rules="[rules.required]"
+              @update:modelValue="loadAssignDeptRoles"
+              class="mb-3"
+            />
+            <v-select
+              v-model="assignDeptData.role_id"
+              :items="assignDeptRoles"
+              item-title="role_name"
+              item-value="role_id"
+              label="Role"
+              prepend-inner-icon="mdi-shield-account"
+              variant="outlined"
+              density="comfortable"
+              :rules="[rules.required]"
+              :disabled="!assignDeptData.department_id"
+              class="mb-3"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template #subtitle>Permission Level: {{ item.raw.permission_level }}</template>
+                </v-list-item>
+              </template>
+            </v-select>
+            <v-select
+              v-model="assignDeptData.position_id"
+              :items="assignDeptPositions"
+              item-title="position_name"
+              item-value="position_id"
+              label="Position (Optional)"
+              prepend-inner-icon="mdi-briefcase"
+              variant="outlined"
+              density="comfortable"
+              clearable
+              :disabled="!assignDeptData.department_id"
+            />
+          </v-form>
+
+          <!-- Confirmation checkbox when user already has assignments -->
+          <v-checkbox
+            v-if="assignDeptCurrentAssignments.length > 0"
+            v-model="assignDeptConfirmed"
+            label="I understand their current assignments and future shifts will be removed."
+            color="teal"
+            class="mt-2"
+          />
+        </v-card-text>
+
+        <v-card-actions class="px-5 pb-5">
+          <v-spacer />
+          <v-btn variant="text" @click="closeAssignDeptDialog">Cancel</v-btn>
+          <v-btn
+            color="teal"
+            :loading="assigningDept"
+            :disabled="
+              !assignDeptFormValid ||
+              !assignDeptData.department_id ||
+              !assignDeptData.role_id ||
+              (assignDeptCurrentAssignments.length > 0 && !assignDeptConfirmed)
+            "
+            @click="submitAssignDept"
+          >
+            Assign to Department
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Future shifts deactivation override -->
     <v-dialog v-model="futureShiftDialog" max-width="640">
       <v-card>
@@ -501,6 +605,7 @@ import AdminServices from '../services/adminServices.js';
 import UserRoleServices from '../services/userRoleServices.js';
 import DepartmentServices from '../services/departmentServices.js';
 import apiClient from '../services/services.js';
+import { TZ } from '../utils/tz.js';
 
 const route = useRoute();
 
@@ -517,7 +622,7 @@ const successMessage = ref(null);
 const users = ref([]);
 const pendingAssignments = ref([]);
 const departments = ref([]);
-const availableRoles = ref([]);
+
 const inviteRoles = ref([]);
 const invitePositions = ref([]);
 const usersDataSource = ref('');
@@ -540,16 +645,6 @@ const inviteFormValid = ref(false);
 const inviteForm = ref(null);
 const inviteData = ref({ email: '', department_id: null, role_id: null, position_id: null });
 
-const assignRoleDialog = ref(false);
-const roleFormValid = ref(false);
-const roleForm = ref(null);
-const selectedUser = ref(null);
-const roleFormData = ref({
-  department_id: null,
-  role_id: null,
-  position_id: null,
-});
-
 const deactivateDialog = ref(false);
 const futureShiftDialog = ref(false);
 const selectedDeactivationUser = ref(null);
@@ -557,6 +652,23 @@ const futureShiftData = ref(null);
 
 const deleteDialog = ref(false);
 const selectedDeleteUser = ref(null);
+
+// ─── Promote to Admin dialog ──────────────────────────────────────────────────
+const promoteToAdminDialog = ref(false);
+const promoteToAdminUser = ref(null);
+const promotingToAdmin = ref(false);
+
+// ─── Assign to Department dialog ─────────────────────────────────────────────
+const assignDeptDialog = ref(false);
+const assignDeptFormValid = ref(false);
+const assignDeptForm = ref(null);
+const assignDeptUser = ref(null);
+const assignDeptRoles = ref([]);
+const assignDeptPositions = ref([]);
+const assigningDept = ref(false);
+const assignDeptConfirmed = ref(false);
+const assignDeptData = ref({ department_id: null, role_id: null, position_id: null });
+const removingRoleId = ref(null);
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 const rules = {
@@ -634,10 +746,12 @@ const applyRoleFilterFromRoute = () => {
 };
 
 const getHighestRole = (user) => {
+  // Check global admin flag first (set by promoteToAdmin)
+  if (user.role === 'admin') return 'Admin';
   const memberships = user.userDepartments || [];
   const levels = memberships.map((ud) => Number(ud.role?.permission_level || 0));
   const max = Math.max(0, ...levels);
-  if (max >= 90) return 'Admin';
+  if (max >= 100) return 'Admin';
   if (max >= 50) return 'Manager';
   if (max > 0) return 'Student / Worker';
   return 'No Role';
@@ -661,7 +775,7 @@ const getHighestRoleIcon = (user) => {
 
 const formatDate = (date) => {
   if (!date) return '—';
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString('en-US', { timeZone: TZ });
 };
 
 const normalizeUsersPayload = (payload) => {
@@ -733,16 +847,6 @@ const loadDepartments = async () => {
   }
 };
 
-const loadDepartmentRoles = async () => {
-  const departmentId = roleFormData.value.department_id;
-  try {
-    const rolesRes = await UserRoleServices.getAllRoles(departmentId || null);
-    availableRoles.value = rolesRes?.data?.data || [];
-  } catch (err) {
-    error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
-  }
-};
-
 const loadInviteRoles = async () => {
   if (!inviteData.value.department_id) return;
   inviteData.value.role_id = null;
@@ -798,87 +902,94 @@ const cancelPending = async (id) => {
   }
 };
 
-// ─── Assign Role ──────────────────────────────────────────────────────────────
-const openAssignRoleDialog = (user) => {
-  selectedUser.value = user;
-  roleFormData.value = {
-    department_id: null,
-    role_id: null,
-    position_id: null,
-  };
-  loadDepartmentRoles();
-  assignRoleDialog.value = true;
+// ─── Assign to Department ────────────────────────────────────────────────────
+// Current non-admin department assignments for the user being assigned
+const assignDeptCurrentAssignments = computed(() => {
+  if (!assignDeptUser.value) return [];
+  return (assignDeptUser.value.userDepartments || []).filter(
+    (ud) => Number(ud.role?.permission_level || 0) < 100,
+  );
+});
+
+const openAssignDeptDialog = (user) => {
+  assignDeptUser.value = user;
+  assignDeptData.value = { department_id: null, role_id: null, position_id: null };
+  assignDeptRoles.value = [];
+  assignDeptPositions.value = [];
+  assignDeptConfirmed.value = false;
+  assignDeptDialog.value = true;
 };
 
-const closeAssignRoleDialog = () => {
-  assignRoleDialog.value = false;
-  selectedUser.value = null;
+const closeAssignDeptDialog = () => {
+  assignDeptDialog.value = false;
+  assignDeptUser.value = null;
 };
 
-const assignRole = async () => {
-  if (!selectedUser.value) return;
+// Remove a single department assignment directly from the Manage Department dialog
+const removeRoleFromDeptDialog = async (udId) => {
+  if (!confirm('Remove this department assignment?')) return;
+  try {
+    removingRoleId.value = udId;
+    await UserRoleServices.removeUserRole(udId);
+    successMessage.value = 'Department assignment removed.';
+    await loadUsers();
+    // Keep the dialog open and refresh the local user reference
+    if (assignDeptUser.value) {
+      const updated = users.value.find((u) => u.id === assignDeptUser.value.id);
+      if (updated) assignDeptUser.value = updated;
+    }
+  } catch (err) {
+    error.value = 'Failed to remove assignment: ' + (err.response?.data?.message || err.message);
+  } finally {
+    removingRoleId.value = null;
+  }
+};
 
-  if (!roleFormData.value.department_id && !roleFormData.value.role_id) {
-    error.value = 'Select at least a department or a role before assigning.';
+const loadAssignDeptRoles = async () => {
+  const departmentId = assignDeptData.value.department_id;
+  assignDeptData.value.role_id = null;
+  assignDeptData.value.position_id = null;
+  if (!departmentId) {
+    assignDeptRoles.value = [];
+    assignDeptPositions.value = [];
     return;
   }
-
   try {
-    saving.value = true;
-    error.value = null;
-
-    let departmentId = roleFormData.value.department_id;
-    if (!departmentId) {
-      departmentId =
-        selectedUser.value?.userDepartments?.[0]?.department_id ||
-        departments.value?.[0]?.department_id ||
-        null;
-    }
-
-    let roleId = roleFormData.value.role_id;
-    if (!roleId) {
-      const rolesResponse = await UserRoleServices.getAllRoles(departmentId || null);
-      const roles = rolesResponse?.data?.data || [];
-      roleId = roles[0]?.role_id || null;
-    }
-
-    if (!departmentId || !roleId) {
-      error.value = 'Unable to assign role. Please select a department or role with available options.';
-      return;
-    }
-
-    await UserRoleServices.assignUserRole({
-      user_id: selectedUser.value.id,
-      department_id: departmentId,
-      role_id: roleId,
-      position_id: null,
-    });
-    successMessage.value = 'Role assigned successfully!';
-    await loadUsers();
-    closeAssignRoleDialog();
+    const [rolesRes, posRes] = await Promise.all([
+      AdminServices.getDepartmentRoles(departmentId),
+      apiClient.get(`/positions?department_id=${departmentId}`),
+    ]);
+    // getDepartmentRoles already excludes admin-level (>= 100); filter again for safety
+    const allRoles = rolesRes?.data?.data || [];
+    assignDeptRoles.value = allRoles.filter((r) => Number(r.permission_level || 0) < 100);
+    assignDeptPositions.value = posRes?.data?.data || [];
   } catch (err) {
-    error.value = 'Failed to assign role: ' + (err.response?.data?.message || err.message);
-  } finally {
-    saving.value = false;
+    error.value = 'Failed to load roles: ' + (err.response?.data?.message || err.message);
   }
 };
 
-const removeRole = async (udId) => {
-  if (!confirm('Remove this role assignment?')) return;
+const submitAssignDept = async () => {
+  if (!assignDeptUser.value) return;
+  if (!assignDeptData.value.department_id || !assignDeptData.value.role_id) {
+    error.value = 'Please select both a department and a role.';
+    return;
+  }
   try {
-    saving.value = true;
-    await UserRoleServices.removeUserRole(udId);
-    successMessage.value = 'Role removed.';
+    assigningDept.value = true;
+    error.value = null;
+    const response = await AdminServices.assignDepartment({
+      user_id: assignDeptUser.value.id,
+      department_id: assignDeptData.value.department_id,
+      role_id: assignDeptData.value.role_id,
+      position_id: assignDeptData.value.position_id || null,
+    });
+    successMessage.value = response.data?.message || 'User assigned to department successfully.';
+    closeAssignDeptDialog();
     await loadUsers();
-    // Refresh selected user data
-    if (selectedUser.value) {
-      const updated = users.value.find((u) => u.id === selectedUser.value.id);
-      if (updated) selectedUser.value = updated;
-    }
   } catch (err) {
-    error.value = 'Failed to remove role: ' + (err.response?.data?.message || err.message);
+    error.value = 'Failed to assign department: ' + (err.response?.data?.message || err.message);
   } finally {
-    saving.value = false;
+    assigningDept.value = false;
   }
 };
 
@@ -942,6 +1053,29 @@ const confirmDelete = async () => {
   }
 };
 
+// ─── Promote to Admin ─────────────────────────────────────────────────────────
+const openPromoteToAdminDialog = (user) => {
+  promoteToAdminUser.value = user;
+  promoteToAdminDialog.value = true;
+};
+
+const confirmPromoteToAdmin = async () => {
+  if (!promoteToAdminUser.value) return;
+  try {
+    promotingToAdmin.value = true;
+    error.value = null;
+    const response = await AdminServices.promoteToAdmin(promoteToAdminUser.value.id);
+    successMessage.value = response.data?.message || 'User promoted to admin successfully.';
+    promoteToAdminDialog.value = false;
+    promoteToAdminUser.value = null;
+    await loadUsers();
+  } catch (err) {
+    error.value = 'Failed to promote user: ' + (err.response?.data?.message || err.message);
+  } finally {
+    promotingToAdmin.value = false;
+  }
+};
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   applyRoleFilterFromRoute();
@@ -962,11 +1096,11 @@ watch(
 .admin-users-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .admin-page-header {
-  border-bottom: 1px solid #e3e5e8;
+  border-bottom: 1px solid var(--border-1);
   padding-bottom: 1.25rem;
 }
 

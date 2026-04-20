@@ -13,13 +13,13 @@
       <v-spacer />
       <!-- Legend -->
       <div class="d-flex align-center gap-2 flex-wrap">
-        <div class="legend-dot" style="background:#9E9E9E"></div>
+        <div class="legend-dot legend-dot--muted"></div>
         <span class="text-caption">No position</span>
-        <div class="legend-dot" style="background:#F57C00"></div>
+        <div class="legend-dot legend-dot--break"></div>
         <span class="text-caption">Unassigned</span>
-        <div class="legend-dot" style="background:#E53935"></div>
+        <div class="legend-dot legend-dot--alert"></div>
         <span class="text-caption">Conflict</span>
-        <div class="legend-dot" style="background:#1976D2"></div>
+        <div class="legend-dot legend-dot--info"></div>
         <span class="text-caption">Complete</span>
       </div>
     </div>
@@ -281,14 +281,24 @@ const dialog = ref({
 const posName = (id) =>
   props.positions.find((p) => p.position_id === id)?.position_name || null
 
+// Status palette for calendar event dots. Mirrors the --state-* tokens from
+// src/styles/tokens.css because v-calendar consumes raw hex strings and we
+// cannot pass CSS variables through here.
+// TODO: audit color intent — consider reading these from getComputedStyle
+// at mount so the palette stays in sync with tokens if they ever change.
+const EVENT_COLOR_ALERT = '#B8402E'  // --state-alert (conflict)
+const EVENT_COLOR_MUTED = '#8A8A93'  // --text-3 (no position)
+const EVENT_COLOR_BREAK = '#C67B3C'  // --state-break (no worker)
+const EVENT_COLOR_INFO  = '#2F6B8F'  // --state-info (complete)
+
 const eventColor = (shift) => {
   const hasConflict = props.conflicts.some(
     (c) => c.templateShiftId != null && c.templateShiftId === shift.shift_id
   )
-  if (hasConflict)          return '#E53935' // red   – conflict
-  if (!shift.position_id)   return '#9E9E9E' // grey  – no position
-  if (!shift.assigned_user_id) return '#F57C00' // orange – no worker
-  return '#1976D2'                             // blue  – complete
+  if (hasConflict)             return EVENT_COLOR_ALERT
+  if (!shift.position_id)      return EVENT_COLOR_MUTED
+  if (!shift.assigned_user_id) return EVENT_COLOR_BREAK
+  return EVENT_COLOR_INFO
 }
 
 const buildTitle = (shift) => {
@@ -506,6 +516,11 @@ function emitUpdate() {
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+.legend-dot--muted { background: var(--text-3); }
+.legend-dot--break { background: var(--state-break); }
+.legend-dot--alert { background: var(--state-alert); }
+.legend-dot--info  { background: var(--state-info); }
 
 /* Show multi-line event titles */
 :deep(.fc-event-title) {

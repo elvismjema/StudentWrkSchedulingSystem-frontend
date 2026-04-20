@@ -136,6 +136,24 @@
           hide-details
         />
 
+        <v-divider class="my-3" />
+
+        <!-- Push Notification device toggle -->
+        <div v-if="pushSupported">
+          <v-switch
+            :model-value="pushEnabled"
+            label="Push notifications (this device)"
+            color="#8B1538"
+            density="comfortable"
+            hide-details
+            :loading="togglingPush"
+            @update:model-value="togglePushNotifications"
+          />
+          <p class="text-caption text-medium-emphasis mt-1 mb-0">
+            Receive instant alerts even when the app is closed.
+          </p>
+        </div>
+
         <v-btn
           color="#8B1538"
           variant="flat"
@@ -206,6 +224,12 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Utils from '../config/utils.js';
 import studentService from '../services/studentService.js';
+import {
+  isPushSupported,
+  getCurrentSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '../services/pushNotificationService.js';
 
 const router = useRouter();
 const user = Utils.getStore('user');
@@ -214,6 +238,9 @@ const editingProfile = ref(false);
 const savingProfile = ref(false);
 const signOutDialog = ref(false);
 const savingNotifPrefs = ref(false);
+const pushSupported = ref(false);
+const pushEnabled = ref(false);
+const togglingPush = ref(false);
 const snackbar = ref({ show: false, text: '', color: 'success' });
 
 const profile = reactive({
@@ -312,14 +339,47 @@ const showSnackbar = (text, color = 'success') => {
   snackbar.value = { show: true, text, color };
 };
 
-onMounted(() => {
+onMounted(async () => {
   // Load notification preferences from profile or localStorage
   const u = Utils.getStore('user');
   const savedPrefs = u?.notificationPreferences || Utils.getStore('notificationPreferences');
   if (savedPrefs) {
     Object.assign(notifPrefs, savedPrefs);
   }
+
+  // Check push subscription state
+  pushSupported.value = isPushSupported();
+  if (pushSupported.value) {
+    const sub = await getCurrentSubscription();
+    pushEnabled.value = !!sub;
+  }
 });
+
+const togglePushNotifications = async (enabled) => {
+  togglingPush.value = true;
+  try {
+    if (enabled) {
+      const success = await subscribeToPush();
+      pushEnabled.value = success;
+      if (success) {
+        showSnackbar('Push notifications enabled!', 'success');
+      } else if (Notification.permission === 'denied') {
+        showSnackbar('Permission denied. Enable notifications in browser settings.', 'warning');
+        pushEnabled.value = false;
+      }
+    } else {
+      await unsubscribeFromPush();
+      pushEnabled.value = false;
+      showSnackbar('Push notifications disabled.', 'info');
+    }
+  } catch {
+    showSnackbar('Failed to update push notification setting.', 'error');
+    // Revert toggle
+    pushEnabled.value = !enabled;
+  } finally {
+    togglingPush.value = false;
+  }
+};
 </script>
 
 <style scoped>

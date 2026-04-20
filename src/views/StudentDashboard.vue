@@ -832,6 +832,11 @@ async function loadFromIndividualEndpoints() {
       const breaks = record.breaks || record.breakRecords || [];
       clockStatus.onBreak = Array.isArray(breaks) && breaks.some((b) => !b.break_end);
     }
+  } else {
+    clockStatus.isClockedIn = false;
+    clockStatus.clockInTime = null;
+    clockStatus.clockRecordId = null;
+    clockStatus.onBreak = false;
   }
 
   // Open shifts

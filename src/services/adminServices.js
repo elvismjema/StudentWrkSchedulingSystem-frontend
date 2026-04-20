@@ -1,34 +1,4 @@
-import axios from "axios";
-import Utils from "../config/utils.js";
-
-let baseurl = import.meta.env.VITE_API_BASE;
-if (!baseurl) {
-  if (import.meta.env.DEV) {
-    baseurl = "http://localhost/workerscheduling-t2";
-  } else {
-    baseurl = "/workerscheduling-t2";
-  }
-}
-
-const apiClient = axios.create({
-  baseURL: baseurl,
-  withCredentials: true,
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest",
-  },
-  transformRequest: (data, headers) => {
-    let user = Utils.getStore("user");
-    if (user != null) {
-      let token = user.token;
-      let authHeader = "";
-      if (token != null && token != "") authHeader = "Bearer " + token;
-      headers["Authorization"] = authHeader;
-    }
-    return JSON.stringify(data);
-  },
-});
+import apiClient from "./services.js";
 
 const AdminServices = {
   // ─── Users ─────────────────────────────────────────────────────────────────
@@ -70,6 +40,29 @@ const AdminServices = {
   /** Get all active members of a specific department */
   getDepartmentMembers(departmentId) {
     return apiClient.get(`/admin/departments/${departmentId}/members`);
+  },
+
+  /**
+   * Get roles for a specific department, excluding admin-level roles.
+   * Used to populate the role dropdown in the Assign to Department dialog.
+   */
+  getDepartmentRoles(departmentId) {
+    return apiClient.get(`/admin/departments/${departmentId}/roles`);
+  },
+
+  /**
+   * Assign a manager or student worker to a single department.
+   * Enforces the one-department rule: all existing non-admin memberships (and future
+   * shifts in those departments) are removed before the new assignment is created.
+   * Notifications are sent to the assigned user and (for students) to dept managers.
+   */
+  assignDepartment(data) {
+    // data: { user_id, department_id, role_id, position_id? }
+    return apiClient.post("/admin/assign-department", data);
+  },
+
+  promoteToAdmin(userId) {
+    return apiClient.post(`/admin/users/${userId}/promote-to-admin`);
   },
 };
 

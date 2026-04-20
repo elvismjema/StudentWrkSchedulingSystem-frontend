@@ -100,12 +100,6 @@ const router = createRouter({
           meta: getStudentMobileRouteMeta("student-more"),
         },
         {
-          path: "departments",
-          name: "student-departments",
-          component: () => import("./views/StudentDepartments.vue"),
-          meta: getStudentMobileRouteMeta("student-departments"),
-        },
-        {
           path: "availability",
           name: "student-availability",
           component: () => import("./views/StudentAvailability.vue"),

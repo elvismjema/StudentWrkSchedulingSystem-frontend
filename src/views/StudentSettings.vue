@@ -149,9 +149,24 @@
             :loading="togglingPush"
             @update:model-value="togglePushNotifications"
           />
-          <p class="text-caption text-medium-emphasis mt-1 mb-0">
+          <p class="text-caption text-medium-emphasis mt-1 mb-2">
             Receive instant alerts even when the app is closed.
           </p>
+
+          <!-- Send a canned test push to every device this user has subscribed.
+               Only surfaced when push is enabled on *this* device — otherwise
+               the button would fire a push the user can't actually receive. -->
+          <v-btn
+            v-if="pushEnabled"
+            variant="outlined"
+            size="small"
+            color="#8B1538"
+            :loading="sendingTestPush"
+            prepend-icon="mdi-send-outline"
+            @click="handleSendTestPush"
+          >
+            Send test notification
+          </v-btn>
         </div>
 
         <v-btn
@@ -229,6 +244,7 @@ import {
   getCurrentSubscription,
   subscribeToPush,
   unsubscribeFromPush,
+  sendTestPush,
 } from '../services/pushNotificationService.js';
 
 const router = useRouter();
@@ -241,6 +257,7 @@ const savingNotifPrefs = ref(false);
 const pushSupported = ref(false);
 const pushEnabled = ref(false);
 const togglingPush = ref(false);
+const sendingTestPush = ref(false);
 const snackbar = ref({ show: false, text: '', color: 'success' });
 
 const profile = reactive({
@@ -354,6 +371,33 @@ onMounted(async () => {
     pushEnabled.value = !!sub;
   }
 });
+
+// Fires the self-serve test endpoint (POST /push-subscriptions/me/test).
+// The backend already returns a human-friendly `message` for every outcome
+// (sent / no devices / server misconfig) so we just surface it verbatim.
+// If sent > 0 but the user does not actually see a notification on their
+// device, the gap is almost always OS-level permission or service worker
+// activation — we hint at that with a warning-colored snackbar.
+const handleSendTestPush = async () => {
+  sendingTestPush.value = true;
+  try {
+    const result = await sendTestPush();
+    const color =
+      result?.sent > 0
+        ? 'success'
+        : result?.skippedReason === 'vapid-not-configured'
+          ? 'error'
+          : 'warning';
+    showSnackbar(result?.message || 'Test push attempted.', color);
+  } catch (err) {
+    showSnackbar(
+      err?.response?.data?.message || 'Could not send test notification.',
+      'error',
+    );
+  } finally {
+    sendingTestPush.value = false;
+  }
+};
 
 const togglePushNotifications = async (enabled) => {
   togglingPush.value = true;

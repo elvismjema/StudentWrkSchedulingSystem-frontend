@@ -48,6 +48,7 @@ const handleCredentialResponse = async (response) => {
         return;
       }
 
+      Utils.removeItem("currentDepartmentContext");
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;

@@ -94,11 +94,12 @@ const loadUserDepartments = async () => {
     loading.value = true;
     const user = Utils.getStore('user');
     
-    if (!user || !user.id) {
+    const userId = Utils.getCurrentUserId();
+    if (!user || !userId) {
       return;
     }
 
-    const response = await UserRoleServices.getUserRoles(user.id);
+    const response = await UserRoleServices.getUserRoles(userId);
     userDepartments.value = response.data;
 
     // Get user's role to determine if they can switch departments
@@ -107,8 +108,12 @@ const loadUserDepartments = async () => {
 
     // Set current department from storage or default to first (only for managers/admins)
     const storedContext = Utils.getStore('currentDepartmentContext');
-    if (storedContext && canSwitchDepartments) {
-      currentDepartmentId.value = storedContext.department_id;
+    const storedDepartment = userDepartments.value.find(
+      (dept) => Number(dept.department_id) === Number(storedContext?.department_id)
+    );
+    if (storedDepartment && canSwitchDepartments) {
+      currentDepartmentId.value = storedDepartment.department_id;
+      saveDepartmentContext(storedDepartment);
     } else if (userDepartments.value.length > 0 && canSwitchDepartments) {
       currentDepartmentId.value = userDepartments.value[0].department_id;
       saveDepartmentContext(userDepartments.value[0]);
@@ -142,6 +147,7 @@ const switchDepartment = (department) => {
 
 const saveDepartmentContext = (department) => {
   const context = {
+    user_id: Utils.getCurrentUserId(),
     department_id: department.department_id,
     department_name: department.department?.department_name,
     role_id: department.role_id,

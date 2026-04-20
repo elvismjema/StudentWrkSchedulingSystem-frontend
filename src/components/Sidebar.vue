@@ -57,20 +57,14 @@
 </template>
 
 <script setup>
-
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import Utils from '../config/utils'
 import UserRoleServices from '../services/userRoleServices.js'
 
 const drawer = ref(true)
-
-const rail = ref(false)
 const route = useRoute()
-
 const rail = ref(true)
 
 const user = ref(Utils.getStore("user") || {})
@@ -114,10 +108,9 @@ onMounted(async () => {
   const context = Utils.getStore('currentDepartmentContext')
   if (context?.department_name) {
     resolvedDepartmentName.value = context.department_name
-    return
   }
 
-  const userId = user.value?.userId || user.value?.id
+  const userId = Utils.getCurrentUserId()
   if (!userId) return
 
   try {
@@ -125,10 +118,15 @@ onMounted(async () => {
     const memberships = response?.data || []
     const activeMembership = memberships.find((membership) => membership.is_active) || memberships[0]
     const departmentName = activeMembership?.department?.department_name
-    if (!departmentName) return
+    if (!departmentName) {
+      Utils.removeItem('currentDepartmentContext')
+      resolvedDepartmentName.value = ''
+      return
+    }
 
     resolvedDepartmentName.value = departmentName
     Utils.setStore('currentDepartmentContext', {
+      user_id: userId,
       department_id: activeMembership.department_id,
       department_name: departmentName,
       role_name: activeMembership.role?.role_name || 'Student',

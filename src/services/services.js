@@ -66,6 +66,7 @@ const apiClient = axios.create({
       AuthServices.logoutUser(Utils.getStore("user"))
         .then((response) => {
           console.log(response);
+          Utils.removeItem("currentDepartmentContext");
           Utils.removeItem("user");
           Router.push({ name: "login" });
         })

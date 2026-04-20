@@ -83,8 +83,10 @@ import UserRoleServices from "../services/userRoleServices";
 const drawer = ref(true);
 const rail = ref(true);
 const user = ref(Utils.getStore("user") || {});
+const resolvedDepartmentName = ref("");
 
 const displayDepartment = computed(() => {
+  if (resolvedDepartmentName.value) return resolvedDepartmentName.value;
   const context = Utils.getStore("currentDepartmentContext");
   if (context?.department_name) return context.department_name;
   const membershipDepartment = user.value?.userDepartments?.[0]?.department?.department_name;
@@ -121,9 +123,11 @@ const toggleRail = () => {
 // department_id in localStorage.  Skipped when already present.
 onMounted(async () => {
   const existing = Utils.getStore("currentDepartmentContext");
-  if (existing?.department_id) return;
+  if (existing?.department_name) {
+    resolvedDepartmentName.value = existing.department_name;
+  }
 
-  const userId = user.value?.userId || user.value?.id;
+  const userId = Utils.getCurrentUserId();
   if (!userId) return;
 
   try {
@@ -137,14 +141,20 @@ onMounted(async () => {
       managerMembership ||
       memberships.find((m) => m.is_active) ||
       memberships[0];
-    if (!membership) return;
+    if (!membership) {
+      Utils.removeItem("currentDepartmentContext");
+      resolvedDepartmentName.value = "";
+      return;
+    }
 
     const ctx = {
+      user_id: userId,
       department_id: membership.department_id,
       department_name: membership.department?.department_name,
       role_name: membership.role?.role_name || "Manager",
       role_id: membership.role_id,
     };
+    resolvedDepartmentName.value = ctx.department_name || "";
     Utils.setStore("currentDepartmentContext", ctx);
     // Notify other components (e.g. ScheduleTemplates) on the same tab
     window.dispatchEvent(new CustomEvent("departmentContextReady", { detail: ctx }));

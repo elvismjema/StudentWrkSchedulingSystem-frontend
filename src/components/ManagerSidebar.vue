@@ -102,7 +102,7 @@ const isAdmin = computed(() => {
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-grid-outline", route: "/manager/dashboard" },
   { title: "Schedule", icon: "mdi-calendar-month-outline", route: "/manager/schedule" },
-  { title: "Templates/Tasks", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
+  { title: "Templates & Tasks", icon: "mdi-text-box-multiple-outline", route: "/manager/templates" },
   { title: "Approvals", icon: "mdi-checkbox-marked-outline", route: "/manager/approvals" },
   { title: "Time & Pay", icon: "mdi-clock-outline", route: "/manager/time-pay" },
   { title: "Student Workers", icon: "mdi-account-group-outline", route: "/manager/workers" },

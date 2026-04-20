@@ -4,8 +4,8 @@
     :close-on-content-click="false"
     location="bottom end"
     offset="8"
-    min-width="320"
-    max-width="400"
+    min-width="0"
+    max-width="calc(100vw - 24px)"
   >
     <template v-slot:activator="{ props }">
       <v-btn
@@ -98,8 +98,11 @@
       </div>
 
       <div v-else class="no-notifications">
-        <v-icon size="48" color="grey-lighten-1">mdi-bell-outline</v-icon>
-        <p>No notifications</p>
+        <div class="empty-icon-wrap">
+          <v-icon size="28">mdi-bell-check-outline</v-icon>
+        </div>
+        <div class="empty-title">No notifications</div>
+        <div class="empty-subtitle">You're all caught up.</div>
       </div>
 
       <v-divider></v-divider>
@@ -220,8 +223,9 @@ onMounted(() => {
 }
 
 .notification-dropdown {
+  width: min(360px, calc(100vw - 24px));
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -343,6 +347,42 @@ onMounted(() => {
   opacity: 1;
 }
 
+.no-notifications {
+  min-height: 128px;
+  padding: 22px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.empty-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f8e6ea;
+  color: #8B1538;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #2f2f2f;
+}
+
+.empty-subtitle {
+  max-width: 220px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #6f6f6f;
+}
+
 .dropdown-footer {
   padding: 8px;
 }
@@ -351,5 +391,32 @@ onMounted(() => {
   width: 100%;
   justify-content: center;
   font-weight: 500;
+  min-height: 36px;
+  white-space: normal;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 420px) {
+  .notification-dropdown {
+    width: calc(100vw - 16px);
+  }
+
+  .dropdown-header {
+    padding: 14px;
+  }
+
+  .header-title h3 {
+    font-size: 15px;
+  }
+
+  .no-notifications {
+    min-height: 116px;
+    padding: 18px 16px;
+  }
+
+  .view-all-btn {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
 }
 </style>

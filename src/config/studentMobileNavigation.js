@@ -11,9 +11,9 @@
  * Swap Board tab is not needed.
  *
  * 'More' is the catch-all hub for everything else (Tasks, Notifications,
- * Departments, Qualifications, Profile, Settings). Anything that doesn't
- * earn one of the four primary tabs lives behind More — do not add new
- * primary tabs to make a feature more discoverable.
+ * Departments, Profile, Settings). Anything that doesn't earn one of the
+ * four primary tabs lives behind More — do not add new primary tabs to
+ * make a feature more discoverable.
  */
 
 const studentMobilePrimaryTabs = [
@@ -98,17 +98,6 @@ export const studentMoreItems = [
     title: 'Departments',
     tab: null,
     order: 7,
-  },
-  {
-    key: 'qualifications',
-    label: 'Qualifications',
-    description: 'Skills & certifications',
-    icon: 'mdi-certificate',
-    color: 'teal',
-    routeName: 'student-qualifications',
-    title: 'Qualifications',
-    tab: null,
-    order: 8,
   },
   {
     key: 'profile',

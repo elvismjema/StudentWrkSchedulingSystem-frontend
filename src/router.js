@@ -135,12 +135,6 @@ const router = createRouter({
           meta: getStudentMobileRouteMeta("student-profile"),
         },
         {
-          path: "qualifications",
-          name: "student-qualifications",
-          component: () => import("./views/StudentQualifications.vue"),
-          meta: getStudentMobileRouteMeta("student-qualifications"),
-        },
-        {
           path: "settings",
           name: "student-settings",
           component: () => import("./views/StudentSettings.vue"),

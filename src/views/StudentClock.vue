@@ -496,23 +496,31 @@ const timesheetRows = computed(() => {
       return isNaN(dt) ? null : dt.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
     };
 
-    // Scheduled: prefer clock record fields, fall back to shift data
+    // Scheduled: entry.scheduled_start is a full datetime string after normalise;
+    // fall back to building one from weekShifts if not present.
     let scheduled = null;
     if (entry?.scheduled_start || shift) {
-      const sStart = fmtTime(entry?.scheduled_start || buildDT(shift, 'start_time') || shift?.start_time);
-      const sEnd   = fmtTime(entry?.scheduled_end   || buildDT(shift, 'end_time')   || shift?.end_time);
+      const sStart = fmtTime(entry?.scheduled_start || buildDT(shift, 'start_time') || combineDateAndTime(dateStr, shift?.start_time));
+      const sEnd   = fmtTime(entry?.scheduled_end   || buildDT(shift, 'end_time')   || combineDateAndTime(dateStr, shift?.end_time));
       if (sStart || sEnd) scheduled = (sStart || '') + (sStart && sEnd ? ' – ' : '') + (sEnd || '');
     }
 
-    // Actual: from clock record
+    // Actual: actual_start/actual_end are full ISO timestamps after normalise
     let actual = null;
     if (entry) {
-      const aStart = fmtTime(entry.actual_start || entry.clock_in_time);
-      const aEnd   = fmtTime(entry.actual_end   || entry.clock_out_time);
+      const aStart = fmtTime(entry.actual_start);
+      const aEnd   = fmtTime(entry.actual_end);
       if (aStart || aEnd) actual = (aStart || '') + (aStart && aEnd ? ' – ' : '') + (aEnd || '');
     }
 
-    const hours        = entry?.total_hours != null ? Number(entry.total_hours).toFixed(1) : null;
+    // Keep raw decimal for weekly sum; only round for per-row display.
+    // toFixed(1) on 0.03 → "0.0" which is misleading — show at least 2 decimals
+    // for sub-1-hour sessions so e.g. 18 min shows "0.30h" not "0.0h".
+    const rawHours = entry?.total_hours != null ? Number(entry.total_hours) : null;
+    const hours = rawHours != null
+      ? (rawHours < 1 && rawHours > 0 ? rawHours.toFixed(2) : rawHours.toFixed(1))
+      : null;
+
     const breakDuration = entry?.break_minutes ? entry.break_minutes + 'm' : null;
 
     let actualClass = '';
@@ -525,14 +533,20 @@ const timesheetRows = computed(() => {
   });
 });
 
+// Sum raw total_hours from timesheetData (not the rounded display strings)
+// so short sessions don't get zeroed out before summing.
+const weeklyTotalRaw = computed(() =>
+  timesheetData.value.reduce((acc, e) => acc + (e.total_hours != null ? Number(e.total_hours) : 0), 0)
+);
 const weeklyTotal = computed(() => {
-  const sum = timesheetRows.value.reduce((acc, r) => acc + (r.hours ? parseFloat(r.hours) : 0), 0);
-  return sum.toFixed(1);
+  const raw = weeklyTotalRaw.value;
+  return raw < 1 && raw > 0 ? raw.toFixed(2) : raw.toFixed(1);
 });
 
 // ── #4: Real hourly rate ──────────────────────────────────────────────────────
+// Use raw sum for earnings so rounding doesn't silently drop pay.
 const weeklyEarnings = computed(() =>
-  (parseFloat(weeklyTotal.value) * (hourlyRate.value || 0)).toFixed(2)
+  (weeklyTotalRaw.value * (hourlyRate.value || 0)).toFixed(2)
 );
 
 const combineDateAndTime = (dateStr, timeStr) => {

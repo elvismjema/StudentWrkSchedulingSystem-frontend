@@ -755,7 +755,7 @@ const currentDeptName = ref(_deptCtxInit.department_name || '')
 const currentUser = Utils.getStore('user') || {}
 
 const activeTab = ref('templates')
- ───────────────────────────────────────────────────────────────────
+
 const loading = ref(false)
 const saving = ref(false)
 const duplicating = ref(false)

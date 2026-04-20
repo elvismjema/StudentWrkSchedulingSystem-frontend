@@ -833,10 +833,7 @@ async function loadFromIndividualEndpoints() {
       clockStatus.onBreak = Array.isArray(breaks) && breaks.some((b) => !b.break_end);
     }
   } else {
-    clockStatus.isClockedIn = false;
-    clockStatus.clockInTime = null;
-    clockStatus.clockRecordId = null;
-    clockStatus.onBreak = false;
+    setClockStatus();
   }
 
   // Open shifts

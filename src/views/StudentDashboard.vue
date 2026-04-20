@@ -43,8 +43,48 @@
       </div>
 
       <!-- ── Clock Status Banner (priority 1) ──────────── -->
+      <!--
+        Render order matters here. The banner is the most prominent piece
+        of state on the dashboard and must never lie. We hold a neutral
+        skeleton until `clockStatus.resolved` flips true on the first load
+        so we don't flash "Not clocked in" (the reactive default) and
+        then snap over to "Clocked in" once the network resolves. When
+        the backend reports an open record that's clearly a forgotten
+        clock-out from a previous session, we render the dedicated stale
+        variant below instead of the green active-shift banner.
+      -->
       <div class="home-section">
+        <div v-if="!clockStatus.resolved" class="clock-banner clock-banner--skeleton" aria-hidden="true">
+          <div class="clock-banner__skeleton-dot"></div>
+          <div class="clock-banner__skeleton-bar"></div>
+        </div>
+        <div
+          v-else-if="clockStatus.stale"
+          class="clock-banner clock-banner--stale"
+          role="alert"
+          :aria-label="`Stale clock-in: ${clockStatus.staleReason}`"
+        >
+          <v-icon color="#b26a00" size="20" class="mr-2">mdi-alert-circle-outline</v-icon>
+          <div class="clock-banner__content">
+            <span class="clock-banner__label">Looks like you forgot to clock out</span>
+            <span class="clock-banner__elapsed">{{ clockStatus.staleReason }}</span>
+          </div>
+          <div class="clock-banner__actions">
+            <v-btn
+              size="small"
+              variant="flat"
+              color="#811429"
+              :loading="clockingIn"
+              :disabled="clockingIn"
+              prepend-icon="mdi-logout"
+              @click.stop="handleClockOut"
+            >
+              Clock Out
+            </v-btn>
+          </div>
+        </div>
         <ClockStatusBanner
+          v-else
           :clocked-in="clockStatus.isClockedIn"
           :clock-in-time="clockStatus.clockInTime"
           :on-break="clockStatus.onBreak"
@@ -275,8 +315,38 @@
         </template>
       </v-alert>
 
-      <!-- Clock Status Banner (desktop) -->
+      <!-- Clock Status Banner (desktop) — same three-state render as mobile -->
+      <div v-if="!clockStatus.resolved" class="clock-banner clock-banner--skeleton mb-6" aria-hidden="true">
+        <div class="clock-banner__skeleton-dot"></div>
+        <div class="clock-banner__skeleton-bar"></div>
+      </div>
+      <div
+        v-else-if="clockStatus.stale"
+        class="clock-banner clock-banner--stale mb-6"
+        role="alert"
+        :aria-label="`Stale clock-in: ${clockStatus.staleReason}`"
+      >
+        <v-icon color="#b26a00" size="20" class="mr-2">mdi-alert-circle-outline</v-icon>
+        <div class="clock-banner__content">
+          <span class="clock-banner__label">Looks like you forgot to clock out</span>
+          <span class="clock-banner__elapsed">{{ clockStatus.staleReason }}</span>
+        </div>
+        <div class="clock-banner__actions">
+          <v-btn
+            size="small"
+            variant="flat"
+            color="#811429"
+            :loading="clockingIn"
+            :disabled="clockingIn"
+            prepend-icon="mdi-logout"
+            @click.stop="handleClockOut"
+          >
+            Clock Out
+          </v-btn>
+        </div>
+      </div>
       <ClockStatusBanner
+        v-else
         :clocked-in="clockStatus.isClockedIn"
         :clock-in-time="clockStatus.clockInTime"
         :on-break="clockStatus.onBreak"
@@ -453,12 +523,70 @@ const pendingAcknowledgements = ref([]);
 const acknowledgingId = ref(null);
 const weeklyHours = ref(0);
 const weeklyShifts = ref(0);
+// The banner's rendered shape is driven by four separate pieces of state
+// so the dashboard never "flips" between Not clocked in → Clocked in as
+// the network settles. `resolved` stays false until the first load (or
+// fallback) returns; the banner renders a quiet loading strip in the
+// meantime instead of guessing. `stale` is set when the backend reports
+// an open record that clearly belongs to a forgotten clock-out from a
+// previous session — in that case we surface a recovery affordance
+// ("Clock Out") rather than green "Clocked in", because claiming the
+// student is actively working right now would be a lie.
 const clockStatus = reactive({
+  resolved: false,
   isClockedIn: false,
   clockInTime: null,
   onBreak: false,
   clockRecordId: null,
+  stale: false,
+  staleReason: null,
+  shiftEndAt: null,
 });
+
+// A clock-in is considered stale (forgotten clock-out) when either of
+// these is true. Shared between the happy-path and fallback mappers.
+const STALE_CLOCK_IN_HOURS = 16;   // no one works a 16h+ shift
+const STALE_SHIFT_END_HOURS = 4;    // record's shift ended 4h+ ago
+
+function deriveStaleness(clockInISO, shiftEndISO) {
+  const now = Date.now();
+  const clockInMs = clockInISO ? new Date(clockInISO).getTime() : NaN;
+  if (Number.isFinite(clockInMs)) {
+    const hoursOpen = (now - clockInMs) / 3600000;
+    if (hoursOpen >= STALE_CLOCK_IN_HOURS) {
+      return { stale: true, reason: `Open for ${Math.round(hoursOpen)}h — likely a missed clock-out` };
+    }
+  }
+  const shiftEndMs = shiftEndISO ? new Date(shiftEndISO).getTime() : NaN;
+  if (Number.isFinite(shiftEndMs)) {
+    const hoursSince = (now - shiftEndMs) / 3600000;
+    if (hoursSince >= STALE_SHIFT_END_HOURS) {
+      return { stale: true, reason: `Shift ended ${Math.round(hoursSince)}h ago — please clock out` };
+    }
+  }
+  return { stale: false, reason: null };
+}
+
+function applyClockStatus({ isClockedIn, clockInTime, onBreak, clockRecordId, shiftEndAt }) {
+  clockStatus.isClockedIn = Boolean(isClockedIn);
+  clockStatus.clockInTime = clockInTime || null;
+  clockStatus.onBreak = Boolean(onBreak);
+  clockStatus.clockRecordId = clockRecordId || null;
+  clockStatus.shiftEndAt = shiftEndAt || null;
+  if (isClockedIn) {
+    const { stale, reason } = deriveStaleness(clockInTime, shiftEndAt);
+    clockStatus.stale = stale;
+    clockStatus.staleReason = reason;
+  } else {
+    clockStatus.stale = false;
+    clockStatus.staleReason = null;
+  }
+  clockStatus.resolved = true;
+}
+
+function resetClockStatus() {
+  applyClockStatus({ isClockedIn: false });
+}
 
 // Swap dialog
 const swapDialogOpen = ref(false);
@@ -737,13 +865,21 @@ async function loadDashboard() {
     }
     pendingRequests.value = rawRequests;
 
-    // Clock status
-    if (data.clockStatus) {
-      clockStatus.isClockedIn = data.clockStatus.isClockedIn || false;
-      clockStatus.clockInTime = data.clockStatus.clockInTime || null;
-      clockStatus.onBreak = data.clockStatus.onBreak || false;
-      clockStatus.clockRecordId = data.clockStatus.clockRecordId || null;
-    }
+    // Clock status. Run through applyClockStatus so the staleness guard
+    // catches forgotten clock-outs even on the happy path — the backend
+    // today still returns isClockedIn: true whenever an open record
+    // exists, without checking how old it is.
+    const bcs = data.clockStatus || {};
+    const shiftEndAt = bcs.shift?.end_time && bcs.shift?.shift_date
+      ? `${bcs.shift.shift_date}T${bcs.shift.end_time}`
+      : bcs.shiftEndAt || null;
+    applyClockStatus({
+      isClockedIn: bcs.isClockedIn,
+      clockInTime: bcs.clockInTime,
+      onBreak: bcs.onBreak,
+      clockRecordId: bcs.clockRecordId,
+      shiftEndAt,
+    });
 
     // Pending shift acknowledgements (fetched separately — dashboard only returns count)
     try {
@@ -825,23 +961,22 @@ async function loadFromIndividualEndpoints() {
     const record =
       body && typeof body === "object" && "data" in body ? body.data : body;
     if (record && record.clock_in && !record.clock_out) {
-      clockStatus.isClockedIn = true;
-      clockStatus.clockInTime = record.clock_in;
-      clockStatus.clockRecordId = record.clock_id;
-      // onBreak: check if breaks array has an open entry (break_end is null)
       const breaks = record.breaks || record.breakRecords || [];
-      clockStatus.onBreak = Array.isArray(breaks) && breaks.some((b) => !b.break_end);
+      const shiftEndAt = record.shift?.end_time && record.shift?.shift_date
+        ? `${record.shift.shift_date}T${record.shift.end_time}`
+        : null;
+      applyClockStatus({
+        isClockedIn: true,
+        clockInTime: record.clock_in,
+        onBreak: Array.isArray(breaks) && breaks.some((b) => !b.break_end),
+        clockRecordId: record.clock_id,
+        shiftEndAt,
+      });
     } else {
-      clockStatus.isClockedIn = false;
-      clockStatus.clockInTime = null;
-      clockStatus.clockRecordId = null;
-      clockStatus.onBreak = false;
+      resetClockStatus();
     }
   } else {
-    clockStatus.isClockedIn = false;
-    clockStatus.clockInTime = null;
-    clockStatus.clockRecordId = null;
-    clockStatus.onBreak = false;
+    resetClockStatus();
   }
 
   // Open shifts
@@ -892,6 +1027,17 @@ function handleClockIn() {
 }
 
 function handleClockOut() {
+  // Stale fast-path: the banner is showing the amber "forgot to clock
+  // out" state. Skip the ±15-min dialog — it was designed around an
+  // in-progress shift, and the shift the record points at already
+  // ended hours ago. We go straight to a forced off-schedule clock-out
+  // with the staleness reason attached so the manager log has context.
+  if (clockStatus.stale) {
+    offScheduleReason.value = clockStatus.staleReason || "Auto-closed stale clock-in";
+    doClockOut({ offSchedule: true });
+    return;
+  }
+
   const decision = evaluateClockAction({
     action: "out",
     activeShift: nextShift.value,
@@ -921,9 +1067,21 @@ async function doClockIn({ offSchedule = false } = {}) {
       payload.offSchedule = true;
       payload.offScheduleReason = offScheduleReason.value || "No scheduled shift within 15 minutes";
     }
-    await studentService.clockIn(payload);
-    clockStatus.isClockedIn = true;
-    clockStatus.clockInTime = new Date().toISOString();
+    const res = await studentService.clockIn(payload);
+    // Pull the authoritative clock_id from the response so later
+    // actions (break, clock-out) have a handle. The controller
+    // returns the created record in res.data.data (ok() envelope).
+    const created = res?.data?.data || res?.data || {};
+    const shiftEndAt = created.shift?.end_time && created.shift?.shift_date
+      ? `${created.shift.shift_date}T${created.shift.end_time}`
+      : nextShift.value ? `${nextShift.value.shift_date}T${nextShift.value.end_time}` : null;
+    applyClockStatus({
+      isClockedIn: true,
+      clockInTime: created.clock_in || new Date().toISOString(),
+      onBreak: false,
+      clockRecordId: created.clock_id,
+      shiftEndAt,
+    });
     offScheduleDialog.value = false;
     showSnack(offSchedule ? "Clocked in — manager notified." : "Clocked in successfully!");
   } catch (err) {
@@ -940,10 +1098,7 @@ async function doClockOut({ offSchedule = false } = {}) {
       ? { offSchedule: true, offScheduleReason: offScheduleReason.value || "Clocking out outside the 15-minute window" }
       : {};
     await studentService.clockOut(payload);
-    clockStatus.isClockedIn = false;
-    clockStatus.clockInTime = null;
-    clockStatus.onBreak = false;
-    clockStatus.clockRecordId = null;
+    resetClockStatus();
     offScheduleDialog.value = false;
     showSnack(offSchedule ? "Clocked out — manager notified." : "Clocked out successfully!");
   } catch (err) {
@@ -1060,6 +1215,60 @@ onMounted(loadDashboard);
 <style scoped>
 /* ─── Shared (desktop) ─── */
 .student-dashboard { width: 100%; }
+
+/* ─── Clock banner skeleton + stale variants ───
+   These render in the same slot as <ClockStatusBanner>. We keep the
+   base .clock-banner shape local because the component itself is
+   scoped — duplicating the minimal shell here is cheaper than
+   plumbing a "loading" / "stale" mode through the component props
+   and risking regressions in the happy-path banner. */
+.clock-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-1, #e5e7eb);
+  background: var(--surface-1, #f7f7f8);
+}
+.clock-banner__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.clock-banner__label { font-weight: 600; color: var(--text-1, #1f2328); }
+.clock-banner__elapsed { font-size: 12px; color: var(--text-3, #6a737d); }
+.clock-banner__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.clock-banner--skeleton {
+  min-height: 52px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #eceef0 37%, #f3f4f6 63%);
+  background-size: 400% 100%;
+  animation: clock-banner-shimmer 1.4s ease-in-out infinite;
+  border-color: transparent;
+}
+.clock-banner__skeleton-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(0,0,0,0.08);
+}
+.clock-banner__skeleton-bar {
+  height: 10px; border-radius: 5px;
+  background: rgba(0,0,0,0.08);
+  flex: 1;
+  max-width: 220px;
+}
+@keyframes clock-banner-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+.clock-banner--stale {
+  background: #fff8e6;
+  border-color: #f1c47a;
+}
+.clock-banner--stale .clock-banner__label { color: #7a4a00; }
+.clock-banner--stale .clock-banner__elapsed { color: #8a5a12; }
 
 /* Desktop 'Up Next' card — When-I-Work style: date bubble + stacked text,
    3px maroon left rail. Mirrors the mobile hero card below. */

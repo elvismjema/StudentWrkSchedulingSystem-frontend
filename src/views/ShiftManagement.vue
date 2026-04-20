@@ -1580,17 +1580,20 @@ onMounted(async () => {
 .schedule-container {
   padding: 20px;
   background-color: #fafafa;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .calendar-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   gap: 12px;
+  flex: 0 0 auto;
 }
 
 .month-year {
@@ -1675,7 +1678,8 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex: 0 0 auto;
 }
 
 .greeting-title {
@@ -1694,8 +1698,10 @@ onMounted(async () => {
 }
 
 .calendar-scroll-container {
-  flex: 1;
-  min-height: 740px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .calendar-container {
@@ -1707,10 +1713,11 @@ onMounted(async () => {
 
 .fullcalendar-wrap {
   padding: 8px 10px 12px;
-  height: calc(100vh - 240px);
-  min-height: 520px;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .fullcalendar-wrap :deep(.fc) {
@@ -1720,6 +1727,15 @@ onMounted(async () => {
   --fc-today-bg-color: transparent;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-scrollgrid) {
+  height: 100%;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot) {
+  height: auto;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event) {
@@ -1795,11 +1811,12 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
-  padding: 8px 14px;
+  margin-bottom: 10px;
+  padding: 6px 14px;
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 10px;
+  flex: 0 0 auto;
 }
 
 .legend-label {

@@ -1,16 +1,9 @@
 <template>
   <div class="schedule-container">
     <div class="greeting-banner">
-      <h2 class="greeting-title">Manager Schedule</h2>
-      <p class="greeting-date">{{ currentGreetingDate }}</p>
-    </div>
-
-    <!-- Calendar Header -->
-    <div class="calendar-header">
-      <div>
-        <p class="selected-shift-note" v-if="selectedShift">
-          Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
-        </p>
+      <div class="greeting-left">
+        <h2 class="greeting-title">Manager Schedule</h2>
+        <p class="greeting-date">{{ currentGreetingDate }}</p>
       </div>
       <div class="header-controls">
         <v-btn variant="outlined" class="nav-btn" @click="previousWeek">
@@ -25,6 +18,10 @@
         </v-btn>
       </div>
     </div>
+
+    <p class="selected-shift-note" v-if="selectedShift">
+      Selected: {{ selectedShift.position?.position_name }} – {{ formatShiftTime(selectedShift.start_time, selectedShift.end_time) }}
+    </p>
 
     <!-- Position Color Legend -->
     <div v-if="positions.length > 0" class="position-legend">
@@ -1601,7 +1598,7 @@ onMounted(async () => {
 }
 
 .schedule-container {
-  padding: 20px;
+  padding: 14px 20px 16px;
   background-color: #fafafa;
   height: 100%;
   min-height: 0;
@@ -1627,9 +1624,9 @@ onMounted(async () => {
 }
 
 .selected-shift-note {
-  margin: 6px 0 0;
+  margin: 0 0 8px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .header-controls {
@@ -1701,23 +1698,31 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.greeting-left {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .greeting-title {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   color: #333;
   margin: 0;
+  line-height: 1.1;
 }
 
 .greeting-date {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
   color: #64748b;
   margin: 0;
-  text-align: right;
 }
 
 .calendar-scroll-container {
@@ -1848,12 +1853,13 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
-  padding: 6px 14px;
+  margin-bottom: 8px;
+  padding: 4px 12px;
   background: #fff;
   border: 1px solid #e0e0e0;
-  border-radius: 10px;
+  border-radius: 8px;
   flex: 0 0 auto;
+  font-size: 12px;
 }
 
 .legend-label {

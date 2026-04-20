@@ -617,7 +617,7 @@ onMounted(loadDashboardData);
   border-color: var(--brand-primary);
 }
 
-/* keep old unused classes so any stray refs don't break -->
+/* keep old unused classes so any stray refs don't break */
 .status-strip { display: none; }
 
 .avatar-row { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; }

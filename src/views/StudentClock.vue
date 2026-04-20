@@ -73,7 +73,6 @@
           color="primary"
           variant="flat"
           rounded="pill"
-          :disabled="!canClockIn"
           :loading="clockingIn"
           :class="['clock-btn', { 'clock-btn--mobile': mobile }]"
           aria-label="Clock in"
@@ -139,9 +138,11 @@
           </v-btn>
         </div>
 
-        <!-- #2: Hint only when no shift at all -->
+        <!-- Hint when no scheduled shift at all — user can still clock in
+             (e.g. covering for a teammate); they’ll get the off-schedule
+             warning first. -->
         <p v-if="!activeShift" class="text-caption text-medium-emphasis mt-2">
-          No upcoming shift found for today.
+          No scheduled shift — you can still clock in if you’re covering.
         </p>
       </div>
 
@@ -252,7 +253,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockInDialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="clockingIn" @click="doClockIn">Clock In</v-btn>
+          <v-btn color="primary" variant="flat" :loading="clockingIn" @click="doClockIn()">Clock In</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -271,7 +272,7 @@
         <v-card-actions class="pa-4 pt-0">
           <v-spacer />
           <v-btn variant="text" @click="clockOutDialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="clockingOut" @click="doClockOut">Clock Out</v-btn>
+          <v-btn color="primary" variant="flat" :loading="clockingOut" @click="doClockOut()">Clock Out</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -306,6 +307,16 @@
       </v-card>
     </v-dialog>
 
+    <!-- Off-schedule clock-in/out warning (±15 min rule) -->
+    <OffScheduleClockDialog
+      v-model="offScheduleDialog"
+      :action="offScheduleAction"
+      :reason="offScheduleReason"
+      :loading="offScheduleAction === 'in' ? clockingIn : clockingOut"
+      @confirm="confirmOffSchedule"
+      @cancel="offScheduleDialog = false"
+    />
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
       {{ snackbar.text }}
@@ -319,6 +330,8 @@ import { useDisplay } from 'vuetify';
 import Utils from '../config/utils.js';
 import { TZ } from '../utils/tz.js';
 import studentService from '../services/studentService.js';
+import OffScheduleClockDialog from '../components/student/OffScheduleClockDialog.vue';
+import { evaluateClockAction } from '../composables/useClockWindow.js';
 
 const { mobile } = useDisplay();
 
@@ -341,6 +354,12 @@ const clockInDialog    = ref(false);
 const clockOutDialog   = ref(false);
 const startBreakDialog = ref(false);  // #5
 const endBreakDialog   = ref(false);  // #5
+
+// Off-schedule warning (no shift within 15 min). Holds the reason so the
+// same dialog handles both clock-in and clock-out cases.
+const offScheduleDialog  = ref(false);
+const offScheduleAction  = ref('in'); // 'in' | 'out'
+const offScheduleReason  = ref('');
 
 const timesheetData  = ref([]);
 const weekShifts     = ref([]);       // #3 — published shifts for the week
@@ -677,17 +696,37 @@ const fetchProfile = async () => {
 };
 
 // ── Clock In/Out ──────────────────────────────────────────────────────────────
-const confirmClockIn = () => { clockInDialog.value = true; };
+// Route clock-in through the window check. On-schedule → normal confirm
+// dialog. Off-schedule → warning dialog (manager-will-be-notified).
+const confirmClockIn = () => {
+  const decision = evaluateClockAction({
+    action: 'in',
+    activeShift: activeShift.value,
+    now: now.value,
+  });
+  if (decision.offSchedule) {
+    offScheduleAction.value = 'in';
+    offScheduleReason.value = decision.reason;
+    offScheduleDialog.value = true;
+  } else {
+    clockInDialog.value = true;
+  }
+};
 
-const doClockIn = async () => {
+const doClockIn = async ({ offSchedule = false } = {}) => {
   clockingIn.value = true;
   try {
     const payload = activeShift.value
       ? { shiftId: activeShift.value.shift_id || activeShift.value.id }
       : {};
+    if (offSchedule) {
+      payload.offSchedule = true;
+      payload.offScheduleReason = offScheduleReason.value || 'No scheduled shift within 15 minutes';
+    }
     await studentService.clockIn(payload);
-    showSnackbar('Clocked in!', 'success');
+    showSnackbar(offSchedule ? 'Clocked in — manager notified.' : 'Clocked in!', 'success');
     clockInDialog.value = false;
+    offScheduleDialog.value = false;
     await fetchClockStatus();
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to clock in.', 'error');
@@ -696,20 +735,43 @@ const doClockIn = async () => {
   }
 };
 
-const confirmClockOut = () => { clockOutDialog.value = true; };
+const confirmClockOut = () => {
+  const decision = evaluateClockAction({
+    action: 'out',
+    activeShift: activeShift.value,
+    now: now.value,
+  });
+  if (decision.offSchedule) {
+    offScheduleAction.value = 'out';
+    offScheduleReason.value = decision.reason;
+    offScheduleDialog.value = true;
+  } else {
+    clockOutDialog.value = true;
+  }
+};
 
-const doClockOut = async () => {
+const doClockOut = async ({ offSchedule = false } = {}) => {
   clockingOut.value = true;
   try {
-    await studentService.clockOut();
-    showSnackbar('Clocked out!', 'success');
+    const payload = offSchedule
+      ? { offSchedule: true, offScheduleReason: offScheduleReason.value || 'Clocking out outside the 15-minute window' }
+      : {};
+    await studentService.clockOut(payload);
+    showSnackbar(offSchedule ? 'Clocked out — manager notified.' : 'Clocked out!', 'success');
     clockOutDialog.value = false;
+    offScheduleDialog.value = false;
     await fetchAll();
   } catch (err) {
     showSnackbar(err?.response?.data?.message || 'Failed to clock out.', 'error');
   } finally {
     clockingOut.value = false;
   }
+};
+
+// Off-schedule dialog confirm handler — routes to the right doClockIn/Out.
+const confirmOffSchedule = async () => {
+  if (offScheduleAction.value === 'in')  await doClockIn({ offSchedule: true });
+  else                                    await doClockOut({ offSchedule: true });
 };
 
 // ── #5: Break with confirmation ───────────────────────────────────────────────

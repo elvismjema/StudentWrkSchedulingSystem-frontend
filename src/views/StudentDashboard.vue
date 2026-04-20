@@ -394,6 +394,17 @@
 
     <!-- ─── Shared Dialogs ───────────────────────────────── -->
     <SwapDialog v-model="swapDialogOpen" :shift="swapShift" mode="cover" :coworkers="[]" @submitted="handleSwapSubmit" />
+
+    <!-- Off-schedule clock-in/out warning (±15 min rule, same as /student/clock) -->
+    <OffScheduleClockDialog
+      v-model="offScheduleDialog"
+      :action="offScheduleAction"
+      :reason="offScheduleReason"
+      :loading="clockingIn"
+      @confirm="confirmOffSchedule"
+      @cancel="offScheduleDialog = false"
+    />
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" location="bottom">
       {{ snackbar.text }}
       <template #actions><v-btn variant="text" @click="snackbar.show = false">Close</v-btn></template>
@@ -417,6 +428,8 @@ import WeekStrip from "../components/student/WeekStrip.vue";
 import ShiftCard from "../components/student/ShiftCard.vue";
 import SwapDialog from "../components/student/SwapDialog.vue";
 import PullToRefresh from "../components/mobile/PullToRefresh.vue";
+import OffScheduleClockDialog from "../components/student/OffScheduleClockDialog.vue";
+import { evaluateClockAction } from "../composables/useClockWindow.js";
 
 const { mobile } = useDisplay();
 
@@ -428,6 +441,12 @@ const loading = ref(true);
 const error = ref(null);
 const selectedDate = ref(localDateStr());
 const clockingIn = ref(false);
+
+// Off-schedule warning (±15 min rule). Mirrors /student/clock so the
+// dashboard’s Clock In / Clock Out run through the same confirmation flow.
+const offScheduleDialog = ref(false);
+const offScheduleAction = ref("in"); // 'in' | 'out'
+const offScheduleReason = ref("");
 
 // Dashboard data
 const nextShift = ref(null);
@@ -844,18 +863,59 @@ function getWeekStart(date) {
   return d;
 }
 
-async function handleClockIn() {
+// Route dashboard Clock In through the same ±15-min window check
+// used on /student/clock. On-schedule → proceed. Off-schedule → open
+// the shared warning dialog (manager-will-be-notified).
+function handleClockIn() {
+  const decision = evaluateClockAction({
+    action: "in",
+    activeShift: nextShift.value,
+    now: Date.now(),
+  });
+  if (decision.offSchedule) {
+    offScheduleAction.value = "in";
+    offScheduleReason.value = decision.reason;
+    offScheduleDialog.value = true;
+  } else {
+    doClockIn({ offSchedule: false });
+  }
+}
+
+function handleClockOut() {
+  const decision = evaluateClockAction({
+    action: "out",
+    activeShift: nextShift.value,
+    now: Date.now(),
+  });
+  if (decision.offSchedule) {
+    offScheduleAction.value = "out";
+    offScheduleReason.value = decision.reason;
+    offScheduleDialog.value = true;
+  } else {
+    doClockOut({ offSchedule: false });
+  }
+}
+
+async function doClockIn({ offSchedule = false } = {}) {
   const shiftId = nextShift.value?.shift_id;
-  if (!shiftId) {
+  // On-schedule clock-in still requires a shift id to bind to. Off-schedule
+  // clock-in is allowed without one — manager will review.
+  if (!offSchedule && !shiftId) {
     showSnack("No upcoming shift to clock into. Please acknowledge your shift first.", "warning");
     return;
   }
   clockingIn.value = true;
   try {
-    await studentService.clockIn({ shiftId });
+    const payload = shiftId ? { shiftId } : {};
+    if (offSchedule) {
+      payload.offSchedule = true;
+      payload.offScheduleReason = offScheduleReason.value || "No scheduled shift within 15 minutes";
+    }
+    await studentService.clockIn(payload);
     clockStatus.isClockedIn = true;
     clockStatus.clockInTime = new Date().toISOString();
-    showSnack("Clocked in successfully!");
+    offScheduleDialog.value = false;
+    showSnack(offSchedule ? "Clocked in — manager notified." : "Clocked in successfully!");
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to clock in", "error");
   } finally {
@@ -863,20 +923,30 @@ async function handleClockIn() {
   }
 }
 
-async function handleClockOut() {
+async function doClockOut({ offSchedule = false } = {}) {
   clockingIn.value = true;
   try {
-    await studentService.clockOut();
+    const payload = offSchedule
+      ? { offSchedule: true, offScheduleReason: offScheduleReason.value || "Clocking out outside the 15-minute window" }
+      : {};
+    await studentService.clockOut(payload);
     clockStatus.isClockedIn = false;
     clockStatus.clockInTime = null;
     clockStatus.onBreak = false;
     clockStatus.clockRecordId = null;
-    showSnack("Clocked out successfully!");
+    offScheduleDialog.value = false;
+    showSnack(offSchedule ? "Clocked out — manager notified." : "Clocked out successfully!");
   } catch (err) {
     showSnack(err?.response?.data?.message || "Failed to clock out", "error");
   } finally {
     clockingIn.value = false;
   }
+}
+
+// Off-schedule dialog confirm → route to the right doClockIn/Out.
+async function confirmOffSchedule() {
+  if (offScheduleAction.value === "in") await doClockIn({ offSchedule: true });
+  else                                    await doClockOut({ offSchedule: true });
 }
 
 async function handleStartBreak() {

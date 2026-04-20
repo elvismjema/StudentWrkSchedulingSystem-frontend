@@ -101,8 +101,8 @@ export default {
     return apiClient.post("/student/clock-in", payload);
   },
 
-  clockOut() {
-    return apiClient.post("/student/clock-out", {});
+  clockOut(payload = {}) {
+    return apiClient.post("/student/clock-out", payload);
   },
 
   startBreak(recordId) {

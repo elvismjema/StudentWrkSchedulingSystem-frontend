@@ -81,6 +81,18 @@ export async function subscribeToPush() {
 }
 
 /**
+ * Ask the backend to send a canned test push to every device the current
+ * user has subscribed. Returns the backend's delivery summary:
+ *   { message, sent, failed, pruned, devicesTargeted, skippedReason? }
+ * The caller is expected to surface `message` (the backend already picks
+ * a human-friendly string for every outcome). Throws on HTTP error.
+ */
+export async function sendTestPush() {
+  const { data } = await apiClient.post("/push-subscriptions/me/test");
+  return data;
+}
+
+/**
  * Unsubscribe this device from push notifications and remove from backend.
  * Returns true on success, false otherwise.
  */

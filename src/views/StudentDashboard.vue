@@ -148,11 +148,6 @@
               <div class="stat-value" style="color: #48111C">{{ weeklyShifts }}</div>
               <div class="stat-label">Shifts</div>
             </div>
-            <div class="stat-divider"></div>
-            <div class="stat-cell">
-              <div class="stat-value" style="color: #811429">${{ estimatedEarnings }}</div>
-              <div class="stat-label">Est. Pay</div>
-            </div>
           </div>
         </div>
 
@@ -351,8 +346,6 @@
                   <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#80162B">{{ weeklyHours }}</div><div class="text-caption text-medium-emphasis">Hours</div></div>
                   <v-divider />
                   <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#196CA2">{{ weeklyShifts }}</div><div class="text-caption text-medium-emphasis">Shifts</div></div>
-                  <v-divider />
-                  <div class="text-center"><div class="text-h5 font-weight-bold" style="color:#811429">${{ estimatedEarnings }}</div><div class="text-caption text-medium-emphasis">Earnings</div></div>
                 </div>
               </v-card-text>
             </v-card>
@@ -460,7 +453,6 @@ const pendingAcknowledgements = ref([]);
 const acknowledgingId = ref(null);
 const weeklyHours = ref(0);
 const weeklyShifts = ref(0);
-const estimatedEarnings = ref("0.00");
 const clockStatus = reactive({
   isClockedIn: false,
   clockInTime: null,
@@ -712,7 +704,6 @@ async function loadDashboard() {
     topOpenShifts.value = openShiftData.shifts.slice(0, 3);
     weeklyHours.value = data.estimatedWeeklyHours ?? 0;
     weeklyShifts.value = weekShifts.value.length;
-    estimatedEarnings.value = data.estimatedEarnings || "0.00";
 
     // Map pending requests — build display rows directly from counts
     // (acknowledgements are shown in the dedicated alert above, not here)
@@ -818,7 +809,6 @@ async function loadFromIndividualEndpoints() {
       if (isNaN(start) || isNaN(end)) return sum;
       return sum + Math.max(0, (end - start) / 3600000);
     }, 0).toFixed(1);
-    estimatedEarnings.value = (parseFloat(weeklyHours.value) * (user.value?.hourlyRate || 10)).toFixed(2);
   }
 
   // Clock status — field names match ClockRecord model: clock_in, clock_out, clock_id

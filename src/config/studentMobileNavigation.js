@@ -10,10 +10,23 @@
  * and on the Home dashboard as incoming-request cards, so a standalone
  * Swap Board tab is not needed.
  *
- * 'More' is the catch-all hub for everything else (Tasks, Notifications,
- * Departments, Qualifications, Profile, Settings). Anything that doesn't
- * earn one of the four primary tabs lives behind More — do not add new
- * primary tabs to make a feature more discoverable.
+ * 'More' is the catch-all hub for everything else (Tasks, Profile,
+ * Settings). Anything that doesn't earn one of the four primary tabs
+ * lives behind More — do not add new primary tabs to make a feature
+ * more discoverable.
+ *
+ * Notifications are intentionally NOT in the More grid — the bell icon
+ * in the top bar is the canonical entry point (per design doc:
+ * 'notifications via bell in top bar'), and its dropdown already has a
+ * 'View all notifications' link to the full page. Two entry points to
+ * the same destination is noise.
+ *
+ * Visual rule (per PLAN-student-mobile-ui-spec): icons in the More hub
+ * use a single restrained palette — brand maroon for the icon glyph on a
+ * neutral surface. We do NOT rainbow-color each entry; the design doc is
+ * explicit that 'if everything is brand-colored, nothing feels important'
+ * and that maroon should guide focus, not paint the whole screen. Each
+ * card is differentiated by its icon shape and label, not by hue.
  */
 
 const studentMobilePrimaryTabs = [
@@ -70,52 +83,17 @@ export const studentMoreItems = [
     key: 'tasks',
     label: 'Tasks',
     description: 'Assigned tasks & to-dos',
-    icon: 'mdi-checkbox-marked-outline',
-    color: 'blue',
+    icon: 'mdi-checkbox-marked-circle-outline',
     routeName: 'student-tasks',
     title: 'Tasks',
     tab: null,
     order: 5,
   },
   {
-    key: 'notifications',
-    label: 'Notifications',
-    description: 'Alerts & messages',
-    icon: 'mdi-bell-outline',
-    color: 'yellow',
-    routeName: 'student-notifications',
-    title: 'Notifications',
-    tab: null,
-    order: 6,
-  },
-  {
-    key: 'departments',
-    label: 'Departments',
-    description: 'Your departments',
-    icon: 'mdi-office-building',
-    color: 'darkblue',
-    routeName: 'student-departments',
-    title: 'Departments',
-    tab: null,
-    order: 7,
-  },
-  {
-    key: 'qualifications',
-    label: 'Qualifications',
-    description: 'Skills & certifications',
-    icon: 'mdi-certificate',
-    color: 'teal',
-    routeName: 'student-qualifications',
-    title: 'Qualifications',
-    tab: null,
-    order: 8,
-  },
-  {
     key: 'profile',
     label: 'Profile',
     description: 'Your account info',
-    icon: 'mdi-account',
-    color: 'primary',
+    icon: 'mdi-account-circle-outline',
     routeName: 'student-profile',
     title: 'Profile',
     tab: null,
@@ -124,9 +102,8 @@ export const studentMoreItems = [
   {
     key: 'settings',
     label: 'Settings',
-    description: 'Preferences & config',
-    icon: 'mdi-cog',
-    color: 'text-2',
+    description: 'Preferences & notifications',
+    icon: 'mdi-cog-outline',
     routeName: 'student-settings',
     title: 'Settings',
     tab: null,

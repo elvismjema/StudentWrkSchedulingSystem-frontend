@@ -3,7 +3,7 @@
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center pa-4">
         <v-icon class="mr-2" color="primary">{{ mode === 'cover' ? 'mdi-account-switch' : 'mdi-swap-horizontal' }}</v-icon>
-        {{ mode === 'cover' ? 'Find Cover' : 'Trade Shift' }}
+        {{ mode === 'cover' ? 'Request Cover' : 'Swap Shift' }}
         <v-spacer />
         <v-btn icon size="small" variant="text" aria-label="Close" @click="close">
           <v-icon>mdi-close</v-icon>
@@ -13,7 +13,7 @@
       <v-divider />
 
       <v-card-text class="pa-4">
-        <!-- Shift being covered/traded -->
+        <!-- Shift being covered/swapped -->
         <div v-if="shift" class="mb-4 pa-3 rounded-lg" style="background: #fafafa; border: 1px solid #e0e0e0">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">YOUR SHIFT</div>
           <div class="text-body-1 font-weight-medium">
@@ -29,7 +29,7 @@
           </div>
         </div>
 
-        <!-- Find Cover: just post to pool -->
+        <!-- Cover Request: post to pool -->
         <div v-if="mode === 'cover'">
           <v-textarea
             v-model="notes"
@@ -42,7 +42,7 @@
           />
         </div>
 
-        <!-- Trade: select coworker -->
+        <!-- Swap: select coworker -->
         <div v-else>
           <v-autocomplete
             v-model="selectedCoworker"
@@ -50,22 +50,22 @@
             :loading="loadingCoworkers"
             item-title="name"
             item-value="id"
-            label="Trade with"
+            label="Swap with"
             placeholder="Search coworkers..."
             variant="outlined"
             density="comfortable"
             no-data-text="No eligible coworkers found"
-            aria-label="Select coworker to trade with"
+            aria-label="Select coworker to swap with"
           />
           <v-textarea
             v-model="notes"
             label="Message (optional)"
-            placeholder="Include a note with your trade request..."
+            placeholder="Include a note with your swap request..."
             rows="2"
             variant="outlined"
             density="comfortable"
             class="mt-3"
-            aria-label="Message for trade request"
+            aria-label="Message for swap request"
           />
         </div>
 
@@ -94,7 +94,7 @@
           :disabled="mode === 'trade' && !selectedCoworker"
           @click="submit"
         >
-          {{ mode === 'cover' ? 'Post for Cover' : 'Send Request' }}
+          {{ mode === 'cover' ? 'Post Cover Request' : 'Send Request' }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -104,6 +104,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import studentService from '../../services/studentService.js';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -139,7 +140,7 @@ watch(() => props.modelValue, async (open) => {
 const loadCoworkers = async () => {
   loadingCoworkers.value = true;
   try {
-    const res = await studentService.getCoworkers(props.shift.id);
+    const res = await studentService.getCoworkers(props.shift.shift_id || props.shift.id);
     const data = res?.data?.data || res?.data || [];
     coworkers.value = data.map(c => ({
       id: c.id || c.userId,
@@ -152,10 +153,24 @@ const loadCoworkers = async () => {
   }
 };
 
+const buildDT = (shift, field) => {
+  const time = shift[field];
+  if (!time) return null;
+  if (typeof time === 'string' && (time.includes('T') || (time.includes('-') && time.length > 10))) return time;
+  const date = shift.shift_date || shift.date;
+  if (date) return String(date).slice(0, 10) + 'T' + time;
+  return null;
+};
+
 const formatShiftTime = (s) => {
-  const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const start = s.start_time || s.startTime || s.shift_start;
-  const end = s.end_time || s.endTime || s.shift_end;
+  const fmt = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    return dt.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const start = buildDT(s, 'start_time') || s.start_time || s.startTime || s.shift_start;
+  const end = buildDT(s, 'end_time') || s.end_time || s.endTime || s.shift_end;
   return fmt(start) + ' – ' + fmt(end);
 };
 
@@ -164,14 +179,16 @@ const submit = async () => {
   errorMsg.value = '';
   try {
     if (props.mode === 'cover') {
-      await studentService.findCover(props.shift.id, { notes: notes.value });
+      const sid = props.shift.shift_id || props.shift.id;
+      await studentService.findCover(sid, { notes: notes.value });
     } else {
-      await studentService.requestSwap(props.shift.id, {
+      const sid = props.shift.shift_id || props.shift.id;
+      await studentService.requestSwap(sid, {
         targetUserId: selectedCoworker.value,
         notes: notes.value,
       });
     }
-    emit('submitted', { mode: props.mode, shiftId: props.shift.id });
+    emit('submitted', { mode: props.mode, shiftId: props.shift.shift_id || props.shift.id });
     close();
   } catch (err) {
     errorMsg.value = err?.response?.data?.message || err?.message || 'Request failed. Please try again.';

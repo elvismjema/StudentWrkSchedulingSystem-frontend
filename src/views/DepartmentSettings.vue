@@ -417,7 +417,7 @@ onMounted(() => {
 .department-settings-container {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .settings-card {
@@ -426,7 +426,7 @@ onMounted(() => {
 }
 
 h3 {
-  color: #1f2328;
+  color: var(--text-1);
   font-weight: 600;
 }
 

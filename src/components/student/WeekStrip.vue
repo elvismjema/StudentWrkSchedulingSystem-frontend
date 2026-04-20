@@ -53,6 +53,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   selectedDate: { type: String, default: null },
@@ -103,7 +104,7 @@ const weekDays = computed(() => {
       dateStr,
       isToday: dateStr === todayStr.value,
       hasShift: shiftSet.has(dateStr),
-      ariaLabel: FULL_DAYS[i] + ', ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + (shiftSet.has(dateStr) ? ', has shifts' : ''),
+      ariaLabel: FULL_DAYS[i] + ', ' + d.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric' }) + (shiftSet.has(dateStr) ? ', has shifts' : ''),
     };
   });
 });
@@ -113,7 +114,7 @@ const weekLabel = computed(() => {
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   const opts = { month: 'short', day: 'numeric' };
-  return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', opts);
+  return start.toLocaleDateString('en-US', { timeZone: TZ, ...opts }) + ' – ' + end.toLocaleDateString('en-US', { timeZone: TZ, ...opts });
 });
 
 const selectDay = (dateStr) => {

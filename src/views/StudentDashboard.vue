@@ -812,15 +812,30 @@ async function loadFromIndividualEndpoints() {
   }
 
   // Clock status — field names match ClockRecord model: clock_in, clock_out, clock_id
+  //
+  // Defensive unwrap: the /clock-records/me/open endpoint returns two
+  // different shapes today — a raw ClockRecord when one is open, and a
+  // { success, data: null, message } wrapper when none is. The old
+  // "data.data || data" unwrap would fall through to the wrapper itself,
+  // and since the wrapper has no clock_out field, the check below used
+  // to evaluate to "isClockedIn = true" on fresh login. Require a real
+  // clock_in timestamp to treat the record as open.
   if (clockRes.status === "fulfilled") {
-    const record = clockRes.value?.data?.data || clockRes.value?.data;
-    if (record && !record.clock_out) {
+    const body = clockRes.value?.data;
+    const record =
+      body && typeof body === "object" && "data" in body ? body.data : body;
+    if (record && record.clock_in && !record.clock_out) {
       clockStatus.isClockedIn = true;
       clockStatus.clockInTime = record.clock_in;
       clockStatus.clockRecordId = record.clock_id;
       // onBreak: check if breaks array has an open entry (break_end is null)
       const breaks = record.breaks || record.breakRecords || [];
       clockStatus.onBreak = Array.isArray(breaks) && breaks.some((b) => !b.break_end);
+    } else {
+      clockStatus.isClockedIn = false;
+      clockStatus.clockInTime = null;
+      clockStatus.clockRecordId = null;
+      clockStatus.onBreak = false;
     }
   }
 

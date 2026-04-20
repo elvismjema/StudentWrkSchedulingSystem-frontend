@@ -10,6 +10,17 @@
         <!-- Loading State -->
         <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
 
+        <!-- No department warning -->
+        <v-alert v-if="!loading && !selectedDepartmentId" type="warning" class="mb-4">
+          No department found. Make sure you are assigned to a department as a manager.
+        </v-alert>
+
+        <!-- Department name header -->
+        <div v-if="selectedDepartmentId && departmentName" class="mb-4 d-flex align-center">
+          <v-icon class="mr-2" color="primary">mdi-office-building-outline</v-icon>
+          <span class="text-h6 font-weight-medium">{{ departmentName }}</span>
+        </div>
+
         <!-- Error Alert -->
         <v-alert v-if="error" type="error" dismissible @click:close="error = null" class="mb-4">
           {{ error }}
@@ -19,19 +30,6 @@
         <v-alert v-if="successMessage" type="success" dismissible @click:close="successMessage = null" class="mb-4">
           {{ successMessage }}
         </v-alert>
-
-        <!-- Department Selection -->
-        <v-select
-          v-model="selectedDepartmentId"
-          :items="departments"
-          item-title="department_name"
-          item-value="department_id"
-          label="Select Department"
-          outlined
-          dense
-          class="mb-6"
-          @update:modelValue="loadDepartmentData"
-        ></v-select>
 
         <v-divider class="mb-6"></v-divider>
 
@@ -250,8 +248,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import DepartmentServices from '../services/departmentServices.js';
+import UserRoleServices from '../services/userRoleServices.js';
 import Utils from '../config/utils.js';
 
 // State
@@ -264,8 +263,8 @@ const formValid = ref(false);
 const settingsForm = ref(null);
 const hoursPanel = ref(null);
 
-const departments = ref([]);
 const selectedDepartmentId = ref(null);
+const departmentName = ref('');
 const departmentSettings = ref({
   department_name: '',
   description: '',
@@ -321,32 +320,11 @@ const initializeDepartmentHours = () => {
   }));
 };
 
-// Load all departments
-const loadDepartments = async () => {
-  try {
-    loading.value = true;
-    error.value = null;
-    const response = await DepartmentServices.getDepartments();
-    if (response.data.success) {
-      departments.value = response.data.data;
-      
-      // Auto-select first department or user's department
-      const user = Utils.getStore('user');
-      if (user && user.department_id) {
-        selectedDepartmentId.value = user.department_id;
-      } else if (departments.value.length > 0) {
-        selectedDepartmentId.value = departments.value[0].department_id;
-      }
-      
-      if (selectedDepartmentId.value) {
-        await loadDepartmentData();
-      }
-    }
-  } catch (err) {
-    error.value = 'Failed to load departments: ' + (err.response?.data?.message || err.message);
-  } finally {
-    loading.value = false;
-  }
+// Resolve the manager's department and load data
+const resolveAndLoad = async (deptId, deptNameValue) => {
+  selectedDepartmentId.value = deptId;
+  departmentName.value = deptNameValue || '';
+  await loadDepartmentData();
 };
 
 // Load department data
@@ -361,6 +339,10 @@ const loadDepartmentData = async () => {
     const deptResponse = await DepartmentServices.getDepartment(selectedDepartmentId.value);
     if (deptResponse.data.success) {
       departmentSettings.value = { ...deptResponse.data.data };
+      // Keep departmentName in sync with the authoritative value from the DB
+      if (deptResponse.data.data.department_name) {
+        departmentName.value = deptResponse.data.data.department_name;
+      }
     }
     
     // Load department hours
@@ -453,9 +435,62 @@ const saveDepartmentHours = async (dayHours) => {
   }
 };
 
-// Lifecycle
-onMounted(() => {
-  loadDepartments();
+// ── Department context resolution (same pattern as ScheduleTemplates) ─────────
+// Listen for the event dispatched by ManagerSidebar when it finishes resolving
+// the manager's department (handles the race where the sidebar resolves after mount).
+const onDeptContextReady = (e) => {
+  const ctx = e.detail;
+  if (ctx?.department_id && !selectedDepartmentId.value) {
+    resolveAndLoad(ctx.department_id, ctx.department_name);
+  }
+};
+
+onMounted(async () => {
+  window.addEventListener('departmentContextReady', onDeptContextReady);
+
+  // 1. Try the stored context first (fastest, no network call needed).
+  const ctx = Utils.getStore('currentDepartmentContext');
+  if (ctx?.department_id) {
+    await resolveAndLoad(ctx.department_id, ctx.department_name);
+    return;
+  }
+
+  // 2. Fall back to fetching the user's department membership directly.
+  const currentUser = Utils.getStore('user') || {};
+  const userId = currentUser.userId || currentUser.id || currentUser.user_id;
+  if (!userId) return;
+
+  try {
+    loading.value = true;
+    const response = await UserRoleServices.getUserDepartments(userId);
+    const memberships = response?.data || [];
+    const managerMembership = memberships.find(
+      (m) => m.is_active && (m.role?.permission_level || 0) >= 50
+    );
+    const membership =
+      managerMembership ||
+      memberships.find((m) => m.is_active) ||
+      memberships[0];
+    if (membership) {
+      const deptId = membership.department_id;
+      const deptNameValue = membership.department?.department_name || '';
+      Utils.setStore('currentDepartmentContext', {
+        department_id: deptId,
+        department_name: deptNameValue,
+        role_name: membership.role?.role_name || 'Manager',
+        role_id: membership.role_id,
+      });
+      await resolveAndLoad(deptId, deptNameValue);
+    }
+  } catch (err) {
+    error.value = 'Failed to resolve your department: ' + (err.response?.data?.message || err.message);
+  } finally {
+    loading.value = false;
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('departmentContextReady', onDeptContextReady);
 });
 </script>
 

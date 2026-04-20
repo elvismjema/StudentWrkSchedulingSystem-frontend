@@ -122,14 +122,31 @@
       </div>
 
       <!-- ── Empty States ──────────────────────────────── -->
+      <!--
+        When the selected week is empty, check whether the wider data set
+        (3mo back / 6mo forward, fetched in loadShifts) actually contains
+        shifts in another week. If so, surface a one-tap jump to that
+        week — discoverability fix for the common case where a student
+        has shifts only in upcoming weeks but the default view is "this
+        week". Without this, the empty state was a dead end and looked
+        like the schedule was broken.
+      -->
       <div v-else class="schedule-empty">
         <v-icon size="40" color="#D1D5DB">{{ showOpenShifts ? 'mdi-briefcase-outline' : 'mdi-calendar-blank-outline' }}</v-icon>
         <div class="schedule-empty-text">
           {{ showOpenShifts ? 'No open shifts this week' : 'No shifts scheduled this week' }}
         </div>
         <div class="schedule-empty-sub">
-          {{ showOpenShifts ? 'Check back later or try another week' : 'Use the arrows to navigate to another week' }}
+          {{ nearestWeekWithShifts ? nearestWeekHintText : (showOpenShifts ? 'Check back later or try another week' : 'Use the arrows to navigate to another week') }}
         </div>
+        <button
+          v-if="nearestWeekWithShifts"
+          class="schedule-empty-jump"
+          @click="jumpToNearestWeekWithShifts"
+        >
+          <v-icon size="16" class="mr-1">{{ nearestWeekWithShifts.direction === 'future' ? 'mdi-arrow-right' : 'mdi-arrow-left' }}</v-icon>
+          {{ nearestWeekWithShifts.direction === 'future' ? 'Jump to next shift' : 'Jump to previous shift' }}
+        </button>
       </div>
     </div>
     <!-- /mobile -->
@@ -429,6 +446,71 @@ function onMobileShiftTap(item) {
     loading: false,
     claimConflict: null,
   });
+}
+
+// ── Mobile: discover nearest non-empty week ────────────────────────────────
+// When the visible week has no shifts, scan the underlying data (which
+// loadShifts already pulled with a wide 3mo-back / 6mo-forward window)
+// for the closest week that DOES have something to show. Prefer future
+// weeks — students mostly care about what's coming up, not what they
+// already worked. If no future week has shifts, fall back to the most
+// recent past week. Returns null when the entire data set is empty
+// (genuine "you have no shifts at all" case).
+const nearestWeekWithShifts = computed(() => {
+  // Build the source list the way mobileShiftGroups does, but without
+  // the week filter — we want every shift the student has access to in
+  // the current segment (My Shifts vs Open Shifts).
+  const sourceShifts = showOpenShifts.value
+    ? openShifts.value
+    : [
+        ...allShifts.value,
+        ...pendingAcks.value.map((a) => a.shift).filter(Boolean),
+      ];
+
+  if (!sourceShifts.length) return null;
+
+  // Collect unique shift dates as a sorted ISO string list.
+  const dates = [...new Set(
+    sourceShifts
+      .map((s) => s?.shift_date)
+      .filter(Boolean)
+  )].sort();
+
+  if (!dates.length) return null;
+
+  const currentStart = toIsoDate(mobileWeekStartDate.value);
+  const currentEnd = toIsoDate(mobileWeekEndDate.value);
+
+  // Find the first future date past the current week, else the last past one.
+  const future = dates.find((d) => d > currentEnd);
+  const past = [...dates].reverse().find((d) => d < currentStart);
+  const target = future || past;
+  if (!target) return null;
+
+  // Convert the target shift date to a week offset relative to today.
+  const targetWeekStart = startOfWeekMonday(new Date(target + 'T00:00:00'));
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const offset = Math.round((targetWeekStart - mobileBaseWeekStart) / msPerWeek);
+
+  return {
+    offset,
+    direction: future ? 'future' : 'past',
+    weekStart: targetWeekStart,
+  };
+});
+
+const nearestWeekHintText = computed(() => {
+  if (!nearestWeekWithShifts.value) return '';
+  const { weekStart, direction } = nearestWeekWithShifts.value;
+  const label = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return direction === 'future'
+    ? `Your next shift is the week of ${label}`
+    : `Your most recent shift was the week of ${label}`;
+});
+
+function jumpToNearestWeekWithShifts() {
+  if (!nearestWeekWithShifts.value) return;
+  mobileWeekOffset.value = nearestWeekWithShifts.value.offset;
 }
 
 // ── Mobile week navigation (authoritative on mobile) ──────────────────────
@@ -1102,5 +1184,26 @@ onMounted(loadShifts);
   font-size: 13px;
   color: #9CA3AF;
   margin-top: 4px;
+}
+.schedule-empty-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 10px 18px;
+  background: #811429;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.schedule-empty-jump:hover {
+  background: #6a1022;
+}
+.schedule-empty-jump:active {
+  background: #5a0d1c;
 }
 </style>

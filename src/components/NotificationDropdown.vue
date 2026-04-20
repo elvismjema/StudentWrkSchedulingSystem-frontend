@@ -249,7 +249,8 @@ onUnmounted(() => {
 }
 
 .notification-dropdown {
-  width: min(360px, calc(100vw - 24px));
+  width: min(430px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   border-radius: 8px;
   overflow: hidden;
@@ -257,33 +258,41 @@ onUnmounted(() => {
 
 .dropdown-header {
   padding: 16px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: 12px;
 }
 
 .header-title {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .header-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .mark-all-read-btn {
   font-size: 12px;
   font-weight: 500;
   min-width: auto;
+  white-space: nowrap;
 }
 
 .clear-all-btn {
   font-size: 12px;
   font-weight: 500;
   min-width: auto;
+  white-space: nowrap;
 }
 
 .header-title h3 {
@@ -299,6 +308,7 @@ onUnmounted(() => {
   background: var(--surface-2);
   padding: 4px 8px;
   border-radius: 12px;
+  white-space: nowrap;
 }
 
 .notifications-list {
@@ -376,6 +386,18 @@ onUnmounted(() => {
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.2s ease;
+}
+
+@media (max-width: 460px) {
+  .dropdown-header {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
 }
 
 .notification-item:hover .delete-btn {

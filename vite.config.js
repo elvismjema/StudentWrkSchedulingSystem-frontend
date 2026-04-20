@@ -16,23 +16,9 @@ export default defineConfig({
     vuetify({ autoImport: true }),
     VitePWA({
       registerType: "autoUpdate",
-      workbox: {
-        // Cache all static assets
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Don't precache API calls
-        navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/api/, /^\/workerscheduling-t2/],
-        runtimeCaching: [
-          {
-            urlPattern: /\/(api|workerscheduling-t2)(\/|$)/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-            },
-          },
-        ],
-      },
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
       manifest: {
         name: "OC Worker Scheduling",
         short_name: "OC Schedule",

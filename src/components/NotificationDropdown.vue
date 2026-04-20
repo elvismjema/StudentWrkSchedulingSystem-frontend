@@ -277,6 +277,7 @@ onMounted(() => {
 
 .notifications-list {
   max-height: 300px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -287,6 +288,7 @@ onMounted(() => {
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
+  min-width: 0;
 }
 
 .notification-item:hover {
@@ -300,6 +302,7 @@ onMounted(() => {
 .notification-icon {
   margin-right: 12px;
   color: #666;
+  flex-shrink: 0;
 }
 
 .notification-content {
@@ -319,16 +322,22 @@ onMounted(() => {
   color: #333;
   line-height: 1.3;
   margin-bottom: 2px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-time {
   font-size: 12px;
   color: #666;
   line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .notification-indicator {
   margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .unread-dot {
@@ -339,6 +348,7 @@ onMounted(() => {
 }
 
 .delete-btn {
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.2s ease;
 }

@@ -263,7 +263,9 @@ const calendarRef = ref(null);
 // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const loading = ref(true);
 const error = ref(null);
-const showOpenShifts = ref(true);
+// Default to My Shifts — students' own shifts are the primary use case;
+// Open Shifts is a secondary browse tab.
+const showOpenShifts = ref(false);
 const allShifts = ref([]);
 const openShifts = ref([]);
 const pendingAcks = ref([]);

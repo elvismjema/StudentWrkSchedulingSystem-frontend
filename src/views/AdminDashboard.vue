@@ -7,7 +7,7 @@
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
     <!-- Stat cards -->
-    <div class="ad-stat-grid mb-4">
+    <div class="ad-stat-grid">
       <button
         v-for="card in cards"
         :key="card.key"
@@ -17,24 +17,9 @@
         <div class="ad-stat-card__top">
           <v-icon size="20" class="ad-stat-card__icon">{{ card.icon }}</v-icon>
           <span class="ad-stat-card__label">{{ card.label }}</span>
+          <ArrowUpRight class="ad-stat-card__arrow" :size="16" />
         </div>
         <div class="ad-stat-card__value">{{ card.value }}</div>
-      </button>
-    </div>
-
-    <!-- Quick actions -->
-    <div class="ad-actions-row">
-      <button class="ad-action-btn" @click="router.push('/admin/users')">
-        <v-icon size="22" class="mb-1">mdi-account-multiple-outline</v-icon>
-        <span>Manage Users</span>
-      </button>
-      <button class="ad-action-btn" @click="router.push('/admin/departments')">
-        <v-icon size="22" class="mb-1">mdi-office-building-outline</v-icon>
-        <span>Departments</span>
-      </button>
-      <button class="ad-action-btn" @click="router.push('/admin/system-settings')">
-        <v-icon size="22" class="mb-1">mdi-cog-outline</v-icon>
-        <span>System Settings</span>
       </button>
     </div>
   </PageFrame>
@@ -45,6 +30,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import PageFrame from "../components/PageFrame.vue";
 import PageHeader from "../components/PageHeader.vue";
+import { ArrowUpRight } from "lucide-vue-next";
 import AdminServices from "../services/adminServices.js";
 import DepartmentServices from "../services/departmentServices.js";
 import UserRoleServices from "../services/userRoleServices.js";
@@ -211,6 +197,17 @@ onMounted(loadDashboard);
   gap: 8px;
   color: var(--text-2);
 }
+.ad-stat-card__arrow {
+  margin-left: auto;
+  color: var(--text-2);
+  opacity: 0.45;
+  flex-shrink: 0;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.ad-stat-card:hover .ad-stat-card__arrow {
+  color: #fff;
+  opacity: 1;
+}
 .ad-stat-card__icon {
   color: var(--text-2);
   transition: color 0.15s ease;
@@ -229,37 +226,5 @@ onMounted(loadDashboard);
   transition: color 0.15s ease;
 }
 
-/* ── Quick actions ────────────────────────────────────────────────────── */
-.ad-actions-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3);
-}
-@media (max-width: 600px) {
-  .ad-actions-row { grid-template-columns: 1fr; }
-}
-
-.ad-action-btn {
-  background: var(--surface-0);
-  border: 1px solid var(--border-1);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-1);
-  cursor: pointer;
-  width: 100%;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.ad-action-btn:hover {
-  background: var(--brand-primary);
-  color: #fff;
-  border-color: var(--brand-primary);
-}
+/* ── Quick actions removed ── */
 </style>

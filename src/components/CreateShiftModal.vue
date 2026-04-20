@@ -76,7 +76,7 @@
                 <div class="toggle-title">Recurring Shift</div>
                 <div class="toggle-subtitle">Repeat this shift weekly</div>
               </div>
-              <v-switch v-model="form.recurring" color="#8B1538" hide-details inset />
+              <v-switch v-model="form.recurring" color="primary" hide-details inset />
             </div>
           </v-col>
 
@@ -86,7 +86,7 @@
                 <div class="toggle-title">Post as Open Shift</div>
                 <div class="toggle-subtitle">Allow workers to claim this shift</div>
               </div>
-              <v-switch v-model="form.post_as_open" color="#8B1538" hide-details inset />
+              <v-switch v-model="form.post_as_open" color="primary" hide-details inset />
             </div>
           </v-col>
 
@@ -134,7 +134,7 @@
         <v-spacer />
         <v-btn variant="text" @click="closeModal">Cancel</v-btn>
         <v-btn
-          color="#8B1538"
+          color="primary"
           prepend-icon="mdi-content-save-outline"
           :loading="submitting"
           :disabled="isCreateDisabled"
@@ -152,6 +152,7 @@ import { computed, reactive, ref, watch } from "vue";
 import apiClient from "../services/services.js";
 import shiftService from "../services/shiftService.js";
 import Utils from "../config/utils.js";
+import { localDateStr } from "../utils/tz.js";
 
 const props = defineProps({
   modelValue: {
@@ -197,11 +198,7 @@ const form = reactive({
   notes: "",
 });
 
-const todayIso = computed(() => {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-});
+const todayIso = computed(() => localDateStr());
 
 const toItems = (response) => response?.data?.data || response?.data || [];
 
@@ -379,12 +376,12 @@ const submitShift = async () => {
   margin: 0;
   font-size: 26px;
   font-weight: 700;
-  color: #101828;
+  color: var(--text-1);
 }
 
 .modal-subtitle {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -393,7 +390,7 @@ const submitShift = async () => {
 }
 
 .toggle-row {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--border-1);
   border-radius: 12px;
   padding: 12px 16px;
   display: flex;
@@ -405,12 +402,12 @@ const submitShift = async () => {
 .toggle-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-1);
 }
 
 .toggle-subtitle {
   margin-top: 2px;
-  color: #667085;
+  color: var(--text-2);
   font-size: 14px;
 }
 

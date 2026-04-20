@@ -1,41 +1,66 @@
 <template>
-  <div class="admin-dashboard-page">
-    <section class="page-header">
-      <h1 class="page-title">Admin Dashboard</h1>
-      <p class="page-subtitle">System overview and quick access.</p>
-    </section>
+  <PageFrame>
+    <template #header>
+      <PageHeader :title="adminHeading" :subtitle="todayLabel" />
+    </template>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
-      {{ error }}
-    </v-alert>
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
-    <v-row class="kpi-grid">
-      <v-col
+    <!-- Stat cards -->
+    <div class="ad-stat-grid mb-4">
+      <button
         v-for="card in cards"
         :key="card.key"
-        cols="12"
-        md="6"
+        class="ad-stat-card"
+        @click="goTo(card)"
       >
-        <v-card class="kpi-card" elevation="0" @click="goTo(card)">
-          <v-card-text>
-            <div class="kpi-label-row">
-              <v-icon size="20" class="kpi-icon">{{ card.icon }}</v-icon>
-              <span class="kpi-label">{{ card.label }}</span>
-            </div>
-            <div class="kpi-value">{{ card.value }}</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-  </div>
+        <div class="ad-stat-card__top">
+          <v-icon size="20" class="ad-stat-card__icon">{{ card.icon }}</v-icon>
+          <span class="ad-stat-card__label">{{ card.label }}</span>
+        </div>
+        <div class="ad-stat-card__value">{{ card.value }}</div>
+      </button>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="ad-actions-row">
+      <button class="ad-action-btn" @click="router.push('/admin/users')">
+        <v-icon size="22" class="mb-1">mdi-account-multiple-outline</v-icon>
+        <span>Manage Users</span>
+      </button>
+      <button class="ad-action-btn" @click="router.push('/admin/departments')">
+        <v-icon size="22" class="mb-1">mdi-office-building-outline</v-icon>
+        <span>Departments</span>
+      </button>
+      <button class="ad-action-btn" @click="router.push('/admin/system-settings')">
+        <v-icon size="22" class="mb-1">mdi-cog-outline</v-icon>
+        <span>System Settings</span>
+      </button>
+    </div>
+  </PageFrame>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import PageFrame from "../components/PageFrame.vue";
+import PageHeader from "../components/PageHeader.vue";
 import AdminServices from "../services/adminServices.js";
 import DepartmentServices from "../services/departmentServices.js";
 import UserRoleServices from "../services/userRoleServices.js";
+import Utils from "../config/utils.js";
+import { TZ } from "../utils/tz.js";
+
+const currentUser = Utils.getStore("user") || {};
+const adminHeading = computed(() => {
+  const firstName = currentUser?.fName || "";
+  return firstName ? `Hey, ${firstName}` : "Hey there";
+});
+const todayLabel = computed(() =>
+  new Date().toLocaleDateString("en-US", {
+    timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric",
+  }),
+);
 
 const router = useRouter();
 const error = ref("");
@@ -142,68 +167,99 @@ onMounted(loadDashboard);
 </script>
 
 <style scoped>
-.admin-dashboard-page {
-  padding: 24px;
+/* ── Stat card grid ───────────────────────────────────────────────────── */
+.ad-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+@media (max-width: 960px) {
+  .ad-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .ad-stat-grid { grid-template-columns: 1fr; }
 }
 
-.page-header {
-  margin-bottom: 16px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 46px;
-  font-weight: 700;
-  line-height: 1.15;
-  color: #101828;
-}
-
-.page-subtitle {
-  margin: 6px 0 0;
-  color: #667085;
-  font-size: 17px;
-}
-
-.kpi-grid {
-  margin-top: 8px;
-}
-
-.kpi-card {
-  border: 1px solid #e4e7ec;
-  border-radius: 12px;
+.ad-stat-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-sans);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ad-stat-card:hover {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+.ad-stat-card:hover .ad-stat-card__top,
+.ad-stat-card:hover .ad-stat-card__icon,
+.ad-stat-card:hover .ad-stat-card__label,
+.ad-stat-card:hover .ad-stat-card__value {
+  color: #fff;
 }
 
-.kpi-card:hover {
-  border-color: #d0d5dd;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
-  transform: translateY(-1px);
-}
-
-.kpi-label-row {
+.ad-stat-card__top {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #667085;
-  font-size: 18px;
+  color: var(--text-2);
 }
-
-.kpi-value {
-  margin-top: 10px;
-  font-size: 52px;
+.ad-stat-card__icon {
+  color: var(--text-2);
+  transition: color 0.15s ease;
+}
+.ad-stat-card__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: color 0.15s ease;
+}
+.ad-stat-card__value {
+  font-size: 48px;
+  font-weight: 800;
   line-height: 1;
-  color: #101828;
-  font-weight: 700;
+  color: var(--text-1);
+  transition: color 0.15s ease;
 }
 
-@media (max-width: 960px) {
-  .page-title {
-    font-size: 36px;
-  }
+/* ── Quick actions ────────────────────────────────────────────────────── */
+.ad-actions-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+@media (max-width: 600px) {
+  .ad-actions-row { grid-template-columns: 1fr; }
+}
 
-  .kpi-value {
-    font-size: 42px;
-  }
+.ad-action-btn {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ad-action-btn:hover {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: var(--brand-primary);
 }
 </style>

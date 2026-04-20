@@ -3,15 +3,17 @@
  *
  * Single source of truth for the student mobile IA.
  *
- * Primary bottom nav: 4 tabs
- *   Home · Schedule · Clock (center) · Hours
+ * Primary bottom nav: 5 tabs (HARD CAP — do not add a 6th)
+ *   Home · Schedule · Clock (center) · Hours · More
  *
  * Swap/cover actions live inside Schedule on the individual shift cards
  * and on the Home dashboard as incoming-request cards, so a standalone
  * Swap Board tab is not needed.
  *
- * Secondary pages are accessible via the profile/avatar menu in the
- * top bar — not promoted to a bottom tab.
+ * 'More' is the catch-all hub for everything else (Tasks, Notifications,
+ * Departments, Qualifications, Profile, Settings). Anything that doesn't
+ * earn one of the four primary tabs lives behind More — do not add new
+ * primary tabs to make a feature more discoverable.
  */
 
 const studentMobilePrimaryTabs = [
@@ -51,6 +53,15 @@ const studentMobilePrimaryTabs = [
     icon: 'mdi-calendar-edit',
     iconOutline: 'mdi-calendar-edit-outline',
     order: 3,
+  },
+  {
+    key: 'more',
+    label: 'More',
+    routeName: 'student-more',
+    title: 'More',
+    icon: 'mdi-dots-horizontal',
+    iconOutline: 'mdi-dots-horizontal',
+    order: 4,
   },
 ];
 
@@ -141,12 +152,8 @@ const studentMobileRouteConfig = [
     mobileTab: item.tab,
     mobileOrder: item.order,
   })),
-  {
-    routeName: 'student-more',
-    mobileTitle: 'More',
-    mobileTab: null,
-    mobileOrder: 11,
-  },
+  // 'student-more' is now a primary bottom tab (see studentMobilePrimaryTabs
+  // above), so it picks up its meta there. No standalone entry needed here.
 ];
 
 export const studentMobileRouteOrder = studentMobileRouteConfig

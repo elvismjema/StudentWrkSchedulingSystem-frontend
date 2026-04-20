@@ -716,7 +716,7 @@ const calendarOptions = computed(() => ({
   events: calendarEvents.value,
   slotMinTime: calendarHours.value.slotMinTime,
   slotMaxTime: calendarHours.value.slotMaxTime,
-  slotDuration: '00:15:00',
+  slotDuration: '00:30:00',
   slotLabelInterval: '01:00:00',
   snapDuration: '00:15:00',
   nowIndicator: true,
@@ -1765,8 +1765,26 @@ onMounted(async () => {
   height: 100%;
 }
 
+/* Cap each half-hour slot so the full day always fits the viewport */
 .fullcalendar-wrap :deep(.fc .fc-timegrid-slot) {
-  height: auto;
+  height: 18px;
+  border-bottom: 0;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-lane) {
+  height: 18px;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-timegrid-slot-label) {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.fullcalendar-wrap :deep(.fc .fc-col-header-cell-cushion) {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  padding: 6px 0;
 }
 
 .fullcalendar-wrap :deep(.fc .fc-event) {

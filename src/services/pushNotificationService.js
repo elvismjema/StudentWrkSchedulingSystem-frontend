@@ -25,11 +25,13 @@
  *     sw.js via importScripts).
  */
 import apiClient from "./services.js";
+import Utils from "../config/utils.js";
 import {
   optInPush,
   optOutPush,
   isPushOptedIn,
   isPushSupported as _isPushSupported,
+  loginOneSignal,
 } from "../config/oneSignal.js";
 
 /** Re-export so StudentSettings.vue's existing import site still resolves. */
@@ -66,7 +68,33 @@ export async function subscribeToPush() {
   if (!isPushSupported()) return false;
 
   try {
-    return await optInPush();
+    const optedIn = await optInPush();
+
+    // Re-assert external_id on the subscription we just created.
+    //
+    // Per OneSignal v16 docs (https://documentation.onesignal.com/docs/users):
+    // "OneSignal.login operates on an existing Subscription." A login() call
+    // made at app boot (before the user grants permission) has nothing to
+    // attach to \u2014 the subscription doesn't exist yet. OneSignal creates the
+    // subscription during optIn(), and it starts out anonymous. Without a
+    // follow-up login() call the backend can't target this device via
+    // include_aliases.external_id, so pushes come back as
+    // "no subscriptions match".
+    //
+    // Calling login() here, immediately after optIn() resolves, associates
+    // the freshly-created subscription with the signed-in user's id.
+    try {
+      const user = Utils.getStore("user");
+      if (user && user.id !== undefined && user.id !== null) {
+        loginOneSignal(user.id);
+      }
+    } catch (err) {
+      // Never let the login step mask the optIn result. Log and continue \u2014
+      // the main.js bootstrap login will retry on the next page load.
+      console.warn("[PushNotificationService] post-optIn login skipped:", err);
+    }
+
+    return optedIn;
   } catch (err) {
     // Normalize into a readable error. OneSignal's SDK uses either a
     // permissionBlocked-style string or a plain Error here \u2014 surface the

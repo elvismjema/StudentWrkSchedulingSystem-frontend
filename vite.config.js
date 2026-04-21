@@ -16,6 +16,12 @@ export default defineConfig({
     vuetify({ autoImport: true }),
     VitePWA({
       registerType: "autoUpdate",
+      // We register the service worker explicitly from src/main.js via
+      // `virtual:pwa-register`. Setting injectRegister to false prevents the
+      // plugin from ALSO injecting its auto registerSW.js, which ties
+      // registration to the `window.load` event — that event can fire before
+      // the script runs on iOS PWAs, leaving the SW unregistered forever.
+      injectRegister: false,
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.js",

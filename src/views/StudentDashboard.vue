@@ -11,7 +11,7 @@
 
     <!-- Clock Status Banner -->
     <ClockStatusBanner
-      :is-clocked-in="clockStatus.isClockedIn"
+      :clocked-in="clockStatus.isClockedIn"
       :clock-in-time="clockStatus.clockInTime"
       :on-break="clockStatus.onBreak"
       class="mb-4"

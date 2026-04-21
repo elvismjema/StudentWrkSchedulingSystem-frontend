@@ -88,16 +88,16 @@ const ariaLabel = computed(() => {
   transition: background-color 0.3s;
 }
 .clock-banner--active {
-  background: #2E7D32;
+  background: #811429;
   color: white;
 }
 .clock-banner--break {
-  background: #E65100;
+  background: #C67B3C;
   color: white;
 }
 .clock-banner--idle {
-  background: #f5f5f5;
-  color: #616161;
+  background: #F4E6EA;
+  color: #48111C;
 }
 .clock-banner__content {
   display: flex;

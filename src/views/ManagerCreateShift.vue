@@ -453,14 +453,13 @@ const hasRequiredFields = computed(
   () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
 const hasWorkerQueryInputs = computed(
-  () => !!form.department_id && !!form.shift_date && !!form.start_time && !!form.end_time,
+  () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
 const workersNeededValid = computed(() => Number(form.workers_needed) >= 1 && Number(form.workers_needed) <= 10);
 const workerNoDataText = computed(() => {
   if (loadingWorkers.value) return "Loading workers...";
-  if (!hasWorkerQueryInputs.value) return "Select date and time first";
-  if (form.position_id) return "No available workers for this position and time";
-  return "No available workers for this shift time";
+  if (!hasWorkerQueryInputs.value) return "Select position, date, and time first";
+  return "No available workers match this shift";
 });
 
 const isCreateDisabled = computed(() => {
@@ -520,7 +519,7 @@ const loadWorkers = async () => {
   if (!hasWorkerQueryInputs.value) {
     departmentWorkers.value = [];
     form.assigned_user_id = null;
-    workerLoadError.value = "Select shift date and time to load available students.";
+    workerLoadError.value = "Select position, shift date, and time to load available students.";
     return;
   }
 
@@ -621,8 +620,40 @@ const getAssignedWorkerLabel = () => {
   return match?.label || "worker";
 };
 
+const validateSelectedWorkerEligibility = async () => {
+  if (!form.assigned_user_id || form.post_as_open) return true;
+
+  const response = await shiftService.getAssignableWorkers({
+    department_id: form.department_id,
+    position_id: form.position_id,
+    shift_date: form.shift_date,
+    start_time: form.start_time,
+    end_time: form.end_time,
+  });
+
+  const workers = toItems(response)
+    .map((user) => Number(user.userId || user.id))
+    .filter((id) => Number.isFinite(id));
+
+  return workers.includes(Number(form.assigned_user_id));
+};
+
 const submitShift = async () => {
   if (isCreateDisabled.value) return;
+
+  if (!form.post_as_open && form.assigned_user_id) {
+    try {
+      const eligible = await validateSelectedWorkerEligibility();
+      if (!eligible) {
+        errorMessage.value = "Selected worker no longer qualifies for this shift. Please choose another worker.";
+        await loadWorkers();
+        return;
+      }
+    } catch (error) {
+      errorMessage.value = error?.response?.data?.message || "Unable to validate assigned worker eligibility.";
+      return;
+    }
+  }
 
   submitting.value = true;
   errorMessage.value = "";

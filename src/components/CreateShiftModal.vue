@@ -110,7 +110,9 @@
               item-value="value"
               label="Assign To"
               variant="outlined"
-              :disabled="loadingWorkers || !form.department_id"
+              :disabled="loadingWorkers || !hasWorkerQueryInputs"
+              :loading="loadingWorkers"
+              :no-data-text="workerNoDataText"
               clearable
               hide-details="auto"
             />
@@ -228,6 +230,14 @@ const hasRequiredFields = computed(
 );
 const isPastDate = computed(() => !!form.shift_date && form.shift_date < todayIso.value);
 const workersNeededValid = computed(() => Number(form.workers_needed) >= 1 && Number(form.workers_needed) <= 10);
+const hasWorkerQueryInputs = computed(
+  () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
+);
+const workerNoDataText = computed(() => {
+  if (loadingWorkers.value) return "Loading workers...";
+  if (!hasWorkerQueryInputs.value) return "Select position, date, and time first";
+  return "No available workers match this shift";
+});
 
 const isCreateDisabled = computed(() => {
   if (submitting.value) return true;
@@ -280,18 +290,38 @@ const loadWorkers = async () => {
     return;
   }
 
+  if (!hasWorkerQueryInputs.value) {
+    departmentWorkers.value = [];
+    form.assigned_user_id = null;
+    return;
+  }
+
   loadingWorkers.value = true;
   try {
-    const response = await apiClient.get(`/user-departments?departmentId=${deptContext.department_id}&status=approved`);
-    const assignments = toItems(response);
-    departmentWorkers.value = assignments
-      .filter((assignment) => {
-        const roleName = String(assignment?.role?.role_name || assignment?.role_name || "").toLowerCase();
-        if (!roleName) return true;
-        return roleName.includes("student");
-      })
-      .map((assignment) => assignment.user || assignment)
-      .filter((worker) => worker && (worker.userId || worker.id));
+    const response = await shiftService.getAssignableWorkers({
+      department_id: form.department_id,
+      position_id: form.position_id,
+      shift_date: form.shift_date,
+      start_time: form.start_time,
+      end_time: form.end_time,
+    });
+    const workers = toItems(response);
+    departmentWorkers.value = workers
+      .filter((user) => Number(user.id) !== Number(currentUser.userId || currentUser.id))
+      .map((user) => ({
+        id: user.id,
+        userId: user.userId || user.id,
+        fName: user.fName,
+        lName: user.lName,
+        email: user.email,
+      }));
+
+    if (
+      form.assigned_user_id &&
+      !departmentWorkers.value.some((worker) => String(worker.userId || worker.id) === String(form.assigned_user_id))
+    ) {
+      form.assigned_user_id = null;
+    }
   } catch (error) {
     departmentWorkers.value = [];
     errorMessage.value = error?.response?.data?.message || "Failed to load workers.";
@@ -323,8 +353,47 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => [form.position_id, form.shift_date, form.start_time, form.end_time],
+  () => {
+    loadWorkers();
+  },
+);
+
+const validateSelectedWorkerEligibility = async () => {
+  if (!form.assigned_user_id || form.post_as_open) return true;
+
+  const response = await shiftService.getAssignableWorkers({
+    department_id: form.department_id,
+    position_id: form.position_id,
+    shift_date: form.shift_date,
+    start_time: form.start_time,
+    end_time: form.end_time,
+  });
+
+  const workers = toItems(response)
+    .map((user) => Number(user.userId || user.id))
+    .filter((id) => Number.isFinite(id));
+
+  return workers.includes(Number(form.assigned_user_id));
+};
+
 const submitShift = async () => {
   if (isCreateDisabled.value) return;
+
+  if (!form.post_as_open && form.assigned_user_id) {
+    try {
+      const eligible = await validateSelectedWorkerEligibility();
+      if (!eligible) {
+        errorMessage.value = "Selected worker no longer qualifies for this shift. Please choose another worker.";
+        await loadWorkers();
+        return;
+      }
+    } catch (error) {
+      errorMessage.value = error?.response?.data?.message || "Unable to validate assigned worker eligibility.";
+      return;
+    }
+  }
 
   submitting.value = true;
   errorMessage.value = "";

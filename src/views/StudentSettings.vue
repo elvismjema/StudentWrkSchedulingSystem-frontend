@@ -226,7 +226,9 @@ const handleSendTestPush = async () => {
     const color =
       result?.sent > 0
         ? 'success'
-        : result?.skippedReason === 'vapid-not-configured'
+        : result?.skippedReason === 'push-not-configured' ||
+            result?.skippedReason === 'onesignal-not-configured' ||
+            result?.skippedReason === 'vapid-not-configured'
           ? 'error'
           : 'warning';
     let text = result?.message || 'Test push attempted.';

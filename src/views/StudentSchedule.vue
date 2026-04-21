@@ -331,22 +331,28 @@ const mobileShiftGroups = computed(() => {
     };
   };
 
-  // Ack shifts (orange) — skip if also in allShifts
+  // Ack shifts (orange) — these are the student's OWN shifts awaiting
+  // acknowledgement, not open shifts anyone can claim. They must only
+  // appear under the My Shifts tab. Without this guard, a shift waiting
+  // for the student's response was showing under Open Shifts too, which
+  // implied it was claimable by anyone.
   const ackShiftIds = new Set(pendingAcks.value.map((a) => String(a.shift?.shift_id || a.shift?.id || '')));
-  pendingAcks.value.forEach((ack) => {
-    const s = ack.shift;
-    if (!s?.shift_date) return;
-    addToDay(s.shift_date, {
-      id: `ack-${ack.id}`,
-      type: 'pending_ack',
-      dept: s.department?.department_name || s.department_name || 'Shift',
-      timeLabel: formatTimeRange(s),
-      position: s.position?.position_name || s.position_name || '',
-      shift: s,
-      ack,
-      loading: false,
+  if (!showOpenShifts.value) {
+    pendingAcks.value.forEach((ack) => {
+      const s = ack.shift;
+      if (!s?.shift_date) return;
+      addToDay(s.shift_date, {
+        id: `ack-${ack.id}`,
+        type: 'pending_ack',
+        dept: s.department?.department_name || s.department_name || 'Shift',
+        timeLabel: formatTimeRange(s),
+        position: s.position?.position_name || s.position_name || '',
+        shift: s,
+        ack,
+        loading: false,
+      });
     });
-  });
+  }
 
   // My shifts (maroon)
   if (!showOpenShifts.value) {

@@ -3,7 +3,19 @@
  *
  * Uses Workbox via vite-plugin-pwa injectManifest strategy.
  * self.__WB_MANIFEST is replaced at build time with the precache manifest.
+ *
+ * Push delivery: we import the OneSignal SW module at the TOP of this file so
+ * OneSignal's push / notificationclick handlers are registered first. Only
+ * one service worker can control a given scope (/sev2026/t2/), and OneSignal
+ * needs to be inside whatever SW is registered here or its pushes never
+ * render. See https://documentation.onesignal.com/docs/onesignal-service-worker
+ * ("Combining multiple service workers"). We removed our own custom push /
+ * notificationclick listeners along with this change — OneSignal's module
+ * handles both for OneSignal-sent notifications, and we no longer have any
+ * non-OneSignal push traffic to serve.
  */
+
+importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
@@ -51,52 +63,9 @@ registerRoute(
   }),
 );
 
-// ---------------------------------------------------------------------------
-// Push event — show a notification
-// ---------------------------------------------------------------------------
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-
-  let data = {};
-  try {
-    data = event.data.json();
-  } catch {
-    data = { title: "New Notification", body: event.data.text() };
-  }
-
-  const title = data.title || "OC Schedule";
-  const options = {
-    body: data.body || "",
-    icon: "icons/icon-192x192.png",
-    badge: "icons/icon-72x72.png",
-    tag: data.tag || "oc-schedule",
-    data: { url: data.url || "/" },
-    requireInteraction: data.requireInteraction === true,
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-// ---------------------------------------------------------------------------
-// Notification click — open or focus the app at the right route
-// ---------------------------------------------------------------------------
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
-
-  event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if ("focus" in client) {
-            client.navigate(targetUrl);
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      }),
-  );
-});
+// Push event + notificationclick handlers are provided by the OneSignal SW
+// module imported at the top of this file. We intentionally do NOT register
+// our own here — two handlers would race, and we have no non-OneSignal push
+// traffic anymore. If we ever need to customize rendering beyond what
+// OneSignal's REST API payload supports, add a `web_buttons` array in the
+// backend notificationService payload instead of intercepting the push event.

@@ -277,7 +277,7 @@
                     <td colspan="5" class="empty-row">No punch log records for this period.</td>
                   </tr>
                   <tr v-for="row in detailPunchLog" :key="row.clock_id">
-                    <td>{{ formatDate(row.shift_date) }}</td>
+                    <td>{{ formatDate(row.shift_date || row.clock_in) }}</td>
                     <td>{{ formatDateTime(row.clock_in) }}</td>
                     <td>{{ row.clock_out ? formatDateTime(row.clock_out) : "Missing" }}</td>
                     <td>{{ formatHours(row.worked_hours) }}</td>
@@ -575,7 +575,11 @@ const formatDateTime = (value) => {
   return date.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 };
 
-const formatHours = (value) => `${Number(value || 0).toFixed(1)}h`;
+const formatHours = (value) => {
+  const n = Number(value || 0);
+  // Use 2 decimal places for sub-1h sessions so "0.03h" shows instead of "0.0h"
+  return n > 0 && n < 1 ? `${n.toFixed(2)}h` : `${n.toFixed(1)}h`;
+};
 const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 const getInitials = (worker) => {

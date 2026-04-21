@@ -100,7 +100,27 @@ export async function subscribeToPush() {
       "Service worker ready",
     );
   } catch (err) {
-    throw new Error(`Service worker not ready: ${err?.message || "unknown"}`);
+    // Fallback: the SW may never have been registered at all (iOS PWA race
+    // where `load` fires before the auto-registration script runs). Register
+    // it explicitly right here, then wait for ready again. If this also
+    // times out we give up.
+    console.warn(
+      "[PushNotificationService] serviceWorker.ready timed out, attempting manual registration...",
+      err,
+    );
+    try {
+      const swUrl =
+        (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/") + "sw.js";
+      const scope = import.meta.env.BASE_URL || "/";
+      await navigator.serviceWorker.register(swUrl, { scope });
+      registration = await withTimeout(
+        navigator.serviceWorker.ready,
+        15000,
+        "Service worker ready (after manual register)",
+      );
+    } catch (err2) {
+      throw new Error(`Service worker not ready: ${err2?.message || err?.message || "unknown"}`);
+    }
   }
 
   // If a stale subscription already exists (e.g. from before VAPID keys were

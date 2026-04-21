@@ -223,6 +223,17 @@
                 >
                   <v-icon>mdi-restore</v-icon>
                 </v-btn>
+                <!-- Add manual time entry for this worker -->
+                <v-btn
+                  size="small"
+                  icon
+                  variant="text"
+                  color="teal"
+                  @click="openManualEntryDialog(row)"
+                >
+                  <v-tooltip activator="parent" location="top">Add manual time entry</v-tooltip>
+                  <v-icon>mdi-clock-plus-outline</v-icon>
+                </v-btn>
               </div>
             </td>
           </tr>
@@ -270,21 +281,56 @@
                     <th>Clock Out</th>
                     <th>Hours</th>
                     <th>Status</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="detailPunchLog.length === 0">
-                    <td colspan="5" class="empty-row">No punch log records for this period.</td>
+                    <td colspan="6" class="empty-row">No punch log records for this period.</td>
                   </tr>
-                  <tr v-for="row in detailPunchLog" :key="row.clock_id">
-                    <td>{{ formatDate(row.shift_date || row.clock_in) }}</td>
-                    <td>{{ formatDateTime(row.clock_in) }}</td>
-                    <td>{{ row.clock_out ? formatDateTime(row.clock_out) : "Missing" }}</td>
-                    <td>{{ formatHours(row.worked_hours) }}</td>
+                  <tr v-for="punchRow in detailPunchLog" :key="punchRow.clock_id">
                     <td>
-                      <v-chip size="small" :color="punchStatusColor(row.status)" variant="tonal">
-                        {{ punchStatusLabel(row) }}
-                      </v-chip>
+                      {{ formatDate(punchRow.shift_date || punchRow.clock_in) }}
+                    </td>
+                    <td>{{ formatDateTime(punchRow.clock_in) }}</td>
+                    <td>{{ punchRow.clock_out ? formatDateTime(punchRow.clock_out) : "Missing" }}</td>
+                    <td>{{ formatHours(punchRow.worked_hours) }}</td>
+                    <td>
+                      <div class="d-flex align-center gap-1">
+                        <v-chip size="small" :color="punchStatusColor(punchRow.status)" variant="tonal">
+                          {{ punchStatusLabel(punchRow) }}
+                        </v-chip>
+                        <!-- Manual badge: shown when no shift is linked -->
+                        <v-chip
+                          v-if="punchRow.shift_id === null"
+                          size="x-small"
+                          color="teal"
+                          variant="tonal"
+                        >
+                          Manual
+                        </v-chip>
+                      </div>
+                    </td>
+                    <td>
+                      <!-- Only manual entries can be deleted -->
+                      <v-btn
+                        v-if="punchRow.shift_id === null"
+                        size="small"
+                        icon
+                        variant="text"
+                        color="error"
+                        :loading="deletingClockId === punchRow.clock_id"
+                        @click="confirmAction({
+                          title: 'Delete Manual Entry',
+                          message: `Delete this manual time entry for ${formatDate(punchRow.clock_in)}? This cannot be undone.`,
+                          confirmLabel: 'Delete',
+                          confirmColor: 'error',
+                          action: () => deleteManualEntry(punchRow.clock_id),
+                        })"
+                      >
+                        <v-tooltip activator="parent" location="top">Delete manual entry</v-tooltip>
+                        <v-icon>mdi-trash-can-outline</v-icon>
+                      </v-btn>
                     </td>
                   </tr>
                 </tbody>
@@ -389,6 +435,112 @@
       </v-card>
     </v-dialog>
 
+    <!-- Manual Entry Dialog — manager adds time for a worker who forgot to clock in -->
+    <v-dialog v-model="manualEntryDialog" max-width="520" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">
+          <div>
+            <div>Add Manual Time Entry</div>
+            <div class="text-caption text-medium-emphasis">
+              {{ manualEntryTarget ? `${workerLabel(manualEntryTarget.worker).name}` : '' }}
+            </div>
+          </div>
+          <v-btn icon variant="text" @click="closeManualEntryDialog">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider />
+        <v-card-text>
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            Use this to record hours for a worker who forgot to clock in or had untracked time.
+            This entry will appear in the punch log as <strong>Manual</strong>.
+          </v-alert>
+
+          <v-row dense>
+            <v-col cols="12">
+              <v-text-field
+                v-model="manualEntry.date"
+                label="Work Date"
+                type="date"
+                variant="outlined"
+                density="comfortable"
+                :max="todayStr"
+                hide-details="auto"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="manualEntry.clockIn"
+                label="Clock In Time"
+                type="time"
+                variant="outlined"
+                density="comfortable"
+                hide-details="auto"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="manualEntry.clockOut"
+                label="Clock Out Time (optional)"
+                type="time"
+                variant="outlined"
+                density="comfortable"
+                hide-details="auto"
+                hint="Leave blank if still working"
+                persistent-hint
+              />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field
+                v-model="manualEntry.note"
+                label="Note (optional)"
+                variant="outlined"
+                density="comfortable"
+                placeholder="e.g. Worker forgot to clock in"
+                maxlength="200"
+                hide-details="auto"
+              />
+            </v-col>
+          </v-row>
+
+          <!-- Live hours preview -->
+          <div v-if="manualEntryPreviewHours !== null" class="manual-preview mt-3">
+            <v-icon size="small" color="teal" class="mr-1">mdi-clock-check-outline</v-icon>
+            Calculated hours: <strong>{{ formatHours(manualEntryPreviewHours) }}</strong>
+          </div>
+
+          <v-alert
+            v-if="manualEntryError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ manualEntryError }}
+          </v-alert>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="justify-end gap-2 pa-4">
+          <v-btn variant="text" @click="closeManualEntryDialog">Cancel</v-btn>
+          <v-btn
+            color="teal"
+            variant="flat"
+            :loading="savingManualEntry"
+            :disabled="!manualEntry.date || !manualEntry.clockIn"
+            prepend-icon="mdi-clock-plus-outline"
+            @click="saveManualEntry"
+          >
+            Save Entry
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Confirmation dialog — driven by confirmAction() helper -->
     <v-dialog v-model="dialogOpen" max-width="440" persistent>
       <v-card>
@@ -442,6 +594,15 @@ const detailSummary = reactive({
   total_hours: 0,
   estimated_pay: 0,
 });
+
+// ── Manual Entry state ────────────────────────────────────────────────────────
+const manualEntryDialog = ref(false);
+const manualEntryTarget = ref(null); // the row (worker) we're adding time for
+const savingManualEntry = ref(false);
+const manualEntryError = ref("");
+const deletingClockId = ref(null);
+const manualEntry = reactive({ date: "", clockIn: "", clockOut: "", note: "" });
+// ─────────────────────────────────────────────────────────────────────────────
 
 const snackbar = reactive({
   open: false,
@@ -771,6 +932,93 @@ const exportCsv = () => {
   URL.revokeObjectURL(url);
 };
 
+// Today's date string for the date picker max attribute
+const todayStr = computed(() => localDateStr(new Date()));
+
+// Live hours preview — recomputes whenever date/time fields change
+const manualEntryPreviewHours = computed(() => {
+  if (!manualEntry.date || !manualEntry.clockIn || !manualEntry.clockOut) return null;
+  const inDt  = new Date(`${manualEntry.date}T${manualEntry.clockIn}`);
+  const outDt = new Date(`${manualEntry.date}T${manualEntry.clockOut}`);
+  if (Number.isNaN(inDt.getTime()) || Number.isNaN(outDt.getTime())) return null;
+  const ms = outDt - inDt;
+  if (ms <= 0) return null;
+  return ms / 3600000;
+});
+
+const openManualEntryDialog = (row) => {
+  manualEntryTarget.value = row;
+  // Pre-fill date to the period start or today, whichever is earlier
+  manualEntry.date = localDateStr(new Date());
+  manualEntry.clockIn = "";
+  manualEntry.clockOut = "";
+  manualEntry.note = "";
+  manualEntryError.value = "";
+  manualEntryDialog.value = true;
+};
+
+const closeManualEntryDialog = () => {
+  manualEntryDialog.value = false;
+  manualEntryTarget.value = null;
+  manualEntryError.value = "";
+};
+
+const saveManualEntry = async () => {
+  if (!manualEntry.date || !manualEntry.clockIn) return;
+  manualEntryError.value = "";
+
+  // Build ISO datetime strings in local (Oklahoma) time
+  const clockInISO  = `${manualEntry.date}T${manualEntry.clockIn}:00`;
+  const clockOutISO = manualEntry.clockOut ? `${manualEntry.date}T${manualEntry.clockOut}:00` : null;
+
+  if (clockOutISO) {
+    const inDt  = new Date(clockInISO);
+    const outDt = new Date(clockOutISO);
+    if (outDt <= inDt) {
+      manualEntryError.value = "Clock-out time must be after clock-in time.";
+      return;
+    }
+  }
+
+  savingManualEntry.value = true;
+  try {
+    await timePayService.createManualEntry(manualEntryTarget.value.user_id, {
+      clock_in:  clockInISO,
+      clock_out: clockOutISO,
+      note: manualEntry.note || undefined,
+    });
+    showSnack(`Manual entry saved for ${workerLabel(manualEntryTarget.value.worker).name}.`);
+    closeManualEntryDialog();
+    // Reload the timecard list so total hours update
+    await loadRows();
+    // If the detail dialog is open for this worker, refresh the punch log too
+    if (selectedRow.value?.user_id === manualEntryTarget.value?.user_id) {
+      await loadDetail(selectedRow.value);
+    }
+  } catch (error) {
+    manualEntryError.value = error?.response?.data?.message || "Failed to save manual entry.";
+  } finally {
+    savingManualEntry.value = false;
+  }
+};
+
+const deleteManualEntry = async (clockId) => {
+  deletingClockId.value = clockId;
+  try {
+    await timePayService.deleteManualEntry(clockId);
+    // Remove from punch log immediately
+    detailPunchLog.value = detailPunchLog.value.filter((p) => p.clock_id !== clockId);
+    showSnack("Manual entry deleted.");
+    // Reload the list row so totals update
+    await loadRows();
+    if (selectedRow.value) await loadDetail(selectedRow.value);
+  } catch (error) {
+    showSnack(error?.response?.data?.message || "Failed to delete manual entry.", "error");
+  } finally {
+    deletingClockId.value = null;
+  }
+};
+
 watch([periodStartStr, periodEndStr, statusFilter], () => {
   loadRows();
 });
@@ -910,6 +1158,13 @@ onMounted(loadRows);
   margin-top: 4px;
   font-size: 1.4rem;
   font-weight: 700;
+}
+
+.manual-preview {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-2);
 }
 
 @media (max-width: 960px) {

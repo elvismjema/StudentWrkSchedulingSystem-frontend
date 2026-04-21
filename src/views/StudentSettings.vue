@@ -255,21 +255,40 @@ const togglePushNotifications = async (enabled) => {
   togglingPush.value = true;
   try {
     if (enabled) {
+      // subscribeToPush now throws on real failures — only returns false for
+      // the two benign cases (no browser support, user denied the prompt).
       const success = await subscribeToPush();
       pushEnabled.value = success;
       if (success) {
-        showSnackbar('Push notifications enabled!', 'success');
+        showSnackbar('Push notifications enabled.', 'success');
       } else if (Notification.permission === 'denied') {
-        showSnackbar('Permission denied. Enable notifications in browser settings.', 'warning');
-        pushEnabled.value = false;
+        showSnackbar(
+          'Permission denied. Enable notifications in browser/system settings.',
+          'warning',
+        );
+      } else if (Notification.permission === 'default') {
+        // User dismissed the prompt without picking Allow or Deny.
+        showSnackbar(
+          'You need to tap "Allow" when the browser asks for permission.',
+          'warning',
+        );
+      } else {
+        showSnackbar('Push is not supported on this device.', 'warning');
       }
     } else {
       await unsubscribeFromPush();
       pushEnabled.value = false;
       showSnackbar('Push notifications disabled.', 'info');
     }
-  } catch {
-    showSnackbar('Failed to update push notification setting.', 'error');
+  } catch (err) {
+    // Log full error for debugging; show the clean message in the snackbar.
+    console.error('[StudentSettings] Push toggle failed:', err);
+    showSnackbar(
+      err?.message
+        ? `Couldn't enable push: ${err.message}`
+        : 'Failed to update push notification setting.',
+      'error',
+    );
     // Revert toggle
     pushEnabled.value = !enabled;
   } finally {

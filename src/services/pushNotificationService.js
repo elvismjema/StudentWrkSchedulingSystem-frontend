@@ -16,6 +16,25 @@ export function isPushSupported() {
   );
 }
 
+/** Race a promise against a timeout so a hanging browser API can't freeze the UI. */
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 /** Convert a base64url VAPID public key to a Uint8Array. */
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -44,7 +63,14 @@ export async function getCurrentSubscription() {
 /**
  * Request permission and subscribe this device to push notifications.
  * Saves the subscription to the backend.
- * Returns true on success, false otherwise.
+ *
+ * Returns true on success.
+ * Returns false ONLY for the benign "user-controlled" outcomes:
+ *   - browser doesn't support push at all
+ *   - user denied / dismissed the permission prompt
+ * Throws for anything else (VAPID fetch failed, service worker unavailable,
+ * pushManager.subscribe rejected, backend save failed) so the caller can
+ * show the underlying reason instead of silently snapping the toggle off.
  */
 export async function subscribeToPush() {
   if (!isPushSupported()) return false;
@@ -52,32 +78,80 @@ export async function subscribeToPush() {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return false;
 
+  // Anything below this point is a real failure — let it throw with context.
+  let vapidPublicKey;
   try {
-    const vapidPublicKey = await getVapidPublicKey();
-    const registration = await navigator.serviceWorker.ready;
+    vapidPublicKey = await getVapidPublicKey();
+  } catch (err) {
+    const status = err?.response?.status;
+    throw new Error(
+      status === 503
+        ? "Server hasn't configured push yet (VAPID keys missing)"
+        : `Couldn't reach the push key endpoint${status ? ` (HTTP ${status})` : ""}`,
+    );
+  }
 
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    });
+  let registration;
+  try {
+    // serviceWorker.ready waits forever if the SW never activates — bound it.
+    registration = await withTimeout(
+      navigator.serviceWorker.ready,
+      10000,
+      "Service worker ready",
+    );
+  } catch (err) {
+    throw new Error(`Service worker not ready: ${err?.message || "unknown"}`);
+  }
 
-    const { endpoint, keys } = subscription.toJSON();
+  // If a stale subscription already exists (e.g. from before VAPID keys were
+  // deployed), pushManager.subscribe can hang or reject. Clear it first so
+  // the next subscribe starts from a clean state.
+  try {
+    const existing = await withTimeout(
+      registration.pushManager.getSubscription(),
+      5000,
+      "Read existing subscription",
+    );
+    if (existing) {
+      await withTimeout(existing.unsubscribe(), 5000, "Clear existing subscription");
+    }
+  } catch (err) {
+    // Non-fatal — log and continue; subscribe() below will try anyway.
+    console.warn("[PushNotificationService] Could not clear existing subscription:", err);
+  }
+
+  let subscription;
+  try {
+    subscription = await withTimeout(
+      registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      }),
+      15000,
+      "pushManager.subscribe",
+    );
+  } catch (err) {
+    // Most common causes on iOS: PWA not installed to Home Screen, or the
+    // existing subscription is stale and needs to be cleared first.
+    throw new Error(`Browser refused to subscribe: ${err?.message || err?.name || "unknown"}`);
+  }
+
+  const { endpoint, keys } = subscription.toJSON();
+  try {
     // Backend expects the nested Web Push shape: { endpoint, keys: { p256dh, auth } }.
     // Sending flat fields here silently 400s and leaves the device unsubscribed on
     // the server even though the browser thinks it's subscribed.
     await apiClient.post("/push-subscriptions", {
       endpoint,
-      keys: {
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-      },
+      keys: { p256dh: keys.p256dh, auth: keys.auth },
     });
-
-    return true;
   } catch (err) {
-    console.error("[PushNotificationService] Subscribe error:", err);
-    return false;
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.message || err?.message || "unknown";
+    throw new Error(`Backend rejected subscription${status ? ` (HTTP ${status})` : ""}: ${msg}`);
   }
+
+  return true;
 }
 
 /**

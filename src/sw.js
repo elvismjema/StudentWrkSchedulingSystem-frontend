@@ -26,24 +26,26 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // ---------------------------------------------------------------------------
-// Immediate activation of new SW versions.
+// Service worker activation policy.
 //
-// Without these two calls, a freshly-installed SW stays in the 'waiting'
-// state until every open tab/window controlled by the old SW is closed.
-// In practice that meant users kept running the previous bundle for days
-// after a deploy — e.g. the Schedule page still landing on Open Shifts
-// after the default was flipped to My Shifts, because their browser was
-// still serving the pre-fix chunk out of the old SW's precache.
+// We keep skipWaiting() so a freshly-installed SW activates as soon as
+// install finishes, rather than sitting in 'waiting' until every controlled
+// tab closes. Without it, users kept running the previous bundle for days
+// after a deploy.
 //
-// skipWaiting() lets the new SW activate as soon as install finishes;
-// clients.claim() then takes control of existing pages on the next
-// navigation so the first post-deploy refresh serves new chunks.
+// We intentionally do NOT call clients.claim() here. claim() forces the new
+// SW to take control of already-open tabs mid-session \u2014 which, combined
+// with vite-plugin-pwa's default auto-reload-on-update behavior, caused
+// pages to reload on every deploy and sometimes loop (the OneSignal CDN
+// imported via importScripts can return slightly different bytes between
+// fetches, so the browser sees 'new SW' repeatedly). Leaving claim() off
+// means the new SW takes over on the NEXT natural page load/navigation,
+// which is the standard PWA update lifecycle and what the browser does by
+// default. Users still get updates promptly \u2014 they just don't get an
+// unexpected mid-session refresh.
 // ---------------------------------------------------------------------------
 self.addEventListener("install", () => {
   self.skipWaiting();
-});
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
 });
 
 // Network-first for all API calls (/workerscheduling-t2/...)

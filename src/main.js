@@ -26,7 +26,28 @@ import { initOneSignal, loginOneSignal } from "./config/oneSignal.js";
 // registration is needed.
 // ---------------------------------------------------------------------------
 if ("serviceWorker" in navigator) {
-  registerSW({ immediate: true });
+  // `registerSW` from vite-plugin-pwa by default triggers an automatic page
+  // reload when a newly-installed service worker takes control of the tab.
+  // With skipWaiting() + clients.claim() set in sw.js, a new SW activates as
+  // soon as it installs and immediately claims the current tab \u2014 which,
+  // combined with the default reload behavior, causes the page to refresh on
+  // every deploy AND can loop when the browser re-downloads sw.js on each
+  // navigation (e.g. when importScripts'd remote modules like OneSignal's
+  // CDN-served SW return slightly different bytes between fetches).
+  //
+  // We override onNeedRefresh/onRegisteredSW to do NOTHING on update \u2014 the
+  // new SW still installs in the background and will take control naturally
+  // the next time the user closes and reopens the tab, which is the
+  // standard PWA update lifecycle. No more forced reloads, no loops.
+  registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      // Intentionally no-op. Letting vite-plugin-pwa auto-reload was the
+      // source of the "page keeps refreshing" regression on /login.
+    },
+    onOfflineReady() {},
+    onRegisteredSW() {},
+  });
 }
 
 // ---------------------------------------------------------------------------

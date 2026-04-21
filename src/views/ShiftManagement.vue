@@ -39,7 +39,7 @@
             <div v-for="day in weekDays" :key="day.isoDate" class="day-column">
               <div class="day-header">
                 <div class="day-name">{{ day.name }}</div>
-                <div class="day-date" :class="{ today: day.isToday }">{{ day.date }}</div>
+                <div class="day-date" :class="{ today: day.isToday }">{{ day.monthDay }}</div>
               </div>
 
               <div class="hour-slots">
@@ -279,6 +279,7 @@ const weekDays = computed(() => {
       isoDate,
       name: d.toLocaleDateString('en-US', { weekday: 'short' }),
       date: d.getDate(),
+      monthDay: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       isToday: isoDate === todayIso
     }
   })
@@ -669,7 +670,7 @@ onMounted(() => {
 }
 
 .day-date {
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 600;
   color: #333;
   margin-top: 4px;
@@ -678,9 +679,8 @@ onMounted(() => {
 .day-date.today {
   color: #8B1538;
   background-color: #f8e6ea;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  padding: 2px 8px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

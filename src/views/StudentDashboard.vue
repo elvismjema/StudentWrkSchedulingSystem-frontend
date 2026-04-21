@@ -96,6 +96,52 @@
         />
       </div>
 
+      <!-- ── Active Shift Tasks ────────────────────────── -->
+      <div v-if="showActiveShiftTasks" class="home-section">
+        <div class="active-tasks-card">
+          <div class="active-tasks-head">
+            <div>
+              <div class="section-eyebrow" style="margin-bottom: 2px">SHIFT TASKS</div>
+              <div class="active-tasks-title">{{ activeShiftTaskListName }}</div>
+            </div>
+            <span class="active-tasks-count">{{ activeShiftTaskProgress }}</span>
+          </div>
+          <v-progress-linear
+            v-if="activeShiftTaskItems.length"
+            :model-value="activeShiftTaskPercent"
+            color="#811429"
+            rounded
+            height="6"
+            class="active-tasks-progress"
+          />
+          <div v-if="activeShiftTasksLoading" class="active-tasks-loading">
+            <v-skeleton-loader type="list-item-two-line" />
+          </div>
+          <div v-else-if="activeShiftTasksError" class="active-tasks-error">
+            <span>{{ activeShiftTasksError }}</span>
+            <button class="section-link" @click="loadActiveShiftTasks">Retry</button>
+          </div>
+          <div v-else class="active-tasks-list">
+            <button
+              v-for="item in activeShiftTaskItems"
+              :key="item.id"
+              class="active-task-row"
+              :class="{ 'active-task-row--done': isActiveTaskCompleted(item.id) }"
+              :disabled="activeShiftTaskPendingIds.has(item.id)"
+              @click="toggleActiveShiftTask(item.id, !isActiveTaskCompleted(item.id))"
+            >
+              <v-icon size="22" :color="isActiveTaskCompleted(item.id) ? '#15803D' : '#9CA3AF'">
+                {{ isActiveTaskCompleted(item.id) ? 'mdi-checkbox-marked-circle' : 'mdi-checkbox-blank-circle-outline' }}
+              </v-icon>
+              <span class="active-task-copy">
+                <span class="active-task-title">{{ item.title }}</span>
+                <span v-if="item.description" class="active-task-description">{{ item.description }}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Loading ────────────────────────────────────── -->
       <template v-if="loading">
         <div class="home-section">
@@ -358,6 +404,58 @@
         @end-break="handleEndBreak"
       />
 
+      <v-card v-if="showActiveShiftTasks" class="mb-6" elevation="0" rounded="lg" border>
+        <v-card-text class="pa-4">
+          <div class="d-flex align-center justify-space-between mb-3" style="gap:12px">
+            <div style="min-width:0">
+              <div class="text-subtitle-1 font-weight-bold d-flex align-center">
+                <v-icon size="20" class="mr-1">mdi-clipboard-check-outline</v-icon>
+                Shift Tasks
+              </div>
+              <div class="text-body-2 text-medium-emphasis text-truncate">{{ activeShiftTaskListName }}</div>
+            </div>
+            <v-chip size="small" :color="activeShiftTaskPercent === 100 ? 'success' : 'primary'" variant="tonal">
+              {{ activeShiftTaskProgress }}
+            </v-chip>
+          </div>
+          <v-progress-linear
+            v-if="activeShiftTaskItems.length"
+            :model-value="activeShiftTaskPercent"
+            color="primary"
+            rounded
+            height="6"
+            class="mb-3"
+          />
+          <v-skeleton-loader v-if="activeShiftTasksLoading" type="list-item-two-line, list-item-two-line" />
+          <v-alert v-else-if="activeShiftTasksError" type="error" variant="tonal" density="compact">
+            {{ activeShiftTasksError }}
+            <template #append>
+              <v-btn variant="text" size="small" @click="loadActiveShiftTasks">Retry</v-btn>
+            </template>
+          </v-alert>
+          <v-list v-else density="compact" class="pa-0">
+            <v-list-item
+              v-for="item in activeShiftTaskItems"
+              :key="item.id"
+              class="px-0"
+            >
+              <template #prepend>
+                <v-checkbox-btn
+                  :model-value="isActiveTaskCompleted(item.id)"
+                  :loading="activeShiftTaskPendingIds.has(item.id)"
+                  color="primary"
+                  @update:model-value="(val) => toggleActiveShiftTask(item.id, val)"
+                />
+              </template>
+              <v-list-item-title :class="{ 'text-decoration-line-through text-medium-emphasis': isActiveTaskCompleted(item.id) }">
+                {{ item.title }}
+              </v-list-item-title>
+              <v-list-item-subtitle v-if="item.description">{{ item.description }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+      </v-card>
+
       <!-- Loading (desktop) -->
       <template v-if="loading">
         <v-row>
@@ -477,11 +575,13 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from "vue";
+import { ref, computed, reactive, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useDisplay } from "vuetify";
 import Utils from "../config/utils.js";
 import studentService from "../services/studentService.js";
+import shiftTaskCompletionService from "../services/shiftTaskCompletionService.js";
+import taskListService from "../services/taskListService.js";
 
 import { shiftStartDT, shiftEndDT, formatTimeRange, formatShiftDate as _formatShiftDate, shiftDateStr } from "../utils/shiftDateTime.js";
 import { TZ, localDateStr } from "../utils/tz.js";
@@ -523,6 +623,12 @@ const pendingAcknowledgements = ref([]);
 const acknowledgingId = ref(null);
 const weeklyHours = ref(0);
 const weeklyShifts = ref(0);
+const activeClockShift = ref(null);
+const activeShiftTaskItems = ref([]);
+const activeShiftCompletedIds = ref(new Set());
+const activeShiftTaskPendingIds = ref(new Set());
+const activeShiftTasksLoading = ref(false);
+const activeShiftTasksError = ref("");
 // The banner's rendered shape is driven by four separate pieces of state
 // so the dashboard never "flips" between Not clocked in → Clocked in as
 // the network settles. `resolved` stays false until the first load (or
@@ -567,7 +673,7 @@ function deriveStaleness(clockInISO, shiftEndISO) {
   return { stale: false, reason: null };
 }
 
-function applyClockStatus({ isClockedIn, clockInTime, onBreak, clockRecordId, shiftEndAt }) {
+function applyClockStatus({ isClockedIn, clockInTime, onBreak, clockRecordId, shiftEndAt, shift }) {
   clockStatus.isClockedIn = Boolean(isClockedIn);
   clockStatus.clockInTime = clockInTime || null;
   clockStatus.onBreak = Boolean(onBreak);
@@ -581,6 +687,7 @@ function applyClockStatus({ isClockedIn, clockInTime, onBreak, clockRecordId, sh
     clockStatus.stale = false;
     clockStatus.staleReason = null;
   }
+  activeClockShift.value = Boolean(isClockedIn) && !clockStatus.stale ? shift || null : null;
   clockStatus.resolved = true;
 }
 
@@ -639,6 +746,103 @@ const nextShiftPosition = computed(() => {
     || nextShift.value.position?.position_name
     || '';
 });
+
+const showActiveShiftTasks = computed(() => (
+  clockStatus.resolved
+  && clockStatus.isClockedIn
+  && !clockStatus.stale
+  && (activeShiftTasksLoading.value || activeShiftTaskItems.value.length > 0 || activeShiftTasksError.value)
+));
+
+const activeShiftTaskListName = computed(() => (
+  activeClockShift.value?.taskList?.name
+  || activeClockShift.value?.department?.department_name
+  || activeClockShift.value?.department_name
+  || "Current Shift"
+));
+
+const activeShiftCompletedCount = computed(() => (
+  activeShiftTaskItems.value.filter((item) => activeShiftCompletedIds.value.has(Number(item.id))).length
+));
+
+const activeShiftTaskProgress = computed(() => (
+  `${activeShiftCompletedCount.value}/${activeShiftTaskItems.value.length || 0}`
+));
+
+const activeShiftTaskPercent = computed(() => {
+  if (!activeShiftTaskItems.value.length) return 0;
+  return Math.round((activeShiftCompletedCount.value / activeShiftTaskItems.value.length) * 100);
+});
+
+const isActiveTaskCompleted = (itemId) => activeShiftCompletedIds.value.has(Number(itemId));
+
+async function loadActiveShiftTasks() {
+  const shift = activeClockShift.value;
+  const shiftId = shift?.shift_id || shift?.id;
+  const taskListId = shift?.task_list_id || shift?.taskList?.id;
+
+  activeShiftTasksError.value = "";
+  activeShiftTaskPendingIds.value = new Set();
+
+  if (!shiftId || !taskListId) {
+    activeShiftTaskItems.value = [];
+    activeShiftCompletedIds.value = new Set();
+    activeShiftTasksLoading.value = false;
+    return;
+  }
+
+  activeShiftTasksLoading.value = true;
+  try {
+    let items = Array.isArray(shift.taskList?.items) ? shift.taskList.items : [];
+    if (!items.length) {
+      const listRes = await taskListService.getTaskList(taskListId);
+      items = listRes?.data?.data?.items || listRes?.data?.items || [];
+    }
+
+    activeShiftTaskItems.value = [...items].sort((a, b) => (
+      Number(a.sort_order || 0) - Number(b.sort_order || 0) || Number(a.id || 0) - Number(b.id || 0)
+    ));
+
+    const compRes = await shiftTaskCompletionService.getShiftCompletions(shiftId);
+    const completions = Array.isArray(compRes?.data?.data)
+      ? compRes.data.data
+      : Array.isArray(compRes?.data)
+        ? compRes.data
+        : [];
+    activeShiftCompletedIds.value = new Set(completions.map((c) => Number(c.task_list_item_id)));
+  } catch (err) {
+    console.error("Failed to load active shift tasks:", err);
+    activeShiftTaskItems.value = [];
+    activeShiftCompletedIds.value = new Set();
+    activeShiftTasksError.value = "Could not load this shift's tasks.";
+  } finally {
+    activeShiftTasksLoading.value = false;
+  }
+}
+
+async function toggleActiveShiftTask(itemId, checked) {
+  const shiftId = activeClockShift.value?.shift_id || activeClockShift.value?.id;
+  if (!shiftId || activeShiftTaskPendingIds.value.has(itemId)) return;
+
+  activeShiftTaskPendingIds.value = new Set([...activeShiftTaskPendingIds.value, itemId]);
+  try {
+    if (checked) {
+      await shiftTaskCompletionService.completeTask(shiftId, itemId);
+      activeShiftCompletedIds.value = new Set([...activeShiftCompletedIds.value, Number(itemId)]);
+    } else {
+      await shiftTaskCompletionService.uncompleteTask(shiftId, itemId);
+      const next = new Set(activeShiftCompletedIds.value);
+      next.delete(Number(itemId));
+      activeShiftCompletedIds.value = next;
+    }
+  } catch (err) {
+    showSnack(err?.response?.data?.message || "Could not update task status.", "error");
+  } finally {
+    const nextPending = new Set(activeShiftTaskPendingIds.value);
+    nextPending.delete(itemId);
+    activeShiftTaskPendingIds.value = nextPending;
+  }
+}
 
 // Split the next-shift date into the When-I-Work-style components: a
 // month/day bubble on the left and a weekday-prefix on the time row. Keeps
@@ -879,6 +1083,7 @@ async function loadDashboard() {
       onBreak: bcs.onBreak,
       clockRecordId: bcs.clockRecordId,
       shiftEndAt,
+      shift: bcs.shift || null,
     });
 
     // Pending shift acknowledgements (fetched separately — dashboard only returns count)
@@ -971,6 +1176,7 @@ async function loadFromIndividualEndpoints() {
         onBreak: Array.isArray(breaks) && breaks.some((b) => !b.break_end),
         clockRecordId: record.clock_id,
         shiftEndAt,
+        shift: record.shift || null,
       });
     } else {
       resetClockStatus();
@@ -1081,6 +1287,7 @@ async function doClockIn({ offSchedule = false } = {}) {
       onBreak: false,
       clockRecordId: created.clock_id,
       shiftEndAt,
+      shift: created.shift || nextShift.value || null,
     });
     offScheduleDialog.value = false;
     showSnack(offSchedule ? "Clocked in — manager notified." : "Clocked in successfully!");
@@ -1210,6 +1417,22 @@ async function handlePullRefresh(done) {
 }
 
 onMounted(loadDashboard);
+
+watch(
+  () => [
+    activeClockShift.value?.shift_id || activeClockShift.value?.id || null,
+    activeClockShift.value?.task_list_id || activeClockShift.value?.taskList?.id || null,
+  ],
+  ([shiftId, taskListId]) => {
+    if (shiftId && taskListId) loadActiveShiftTasks();
+    else {
+      activeShiftTaskItems.value = [];
+      activeShiftCompletedIds.value = new Set();
+      activeShiftTasksError.value = "";
+      activeShiftTasksLoading.value = false;
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -1715,6 +1938,95 @@ onMounted(loadDashboard);
   margin-top: 2px;
   display: inline-flex;
   align-items: center;
+}
+
+/* ── Active Shift Tasks ── */
+.active-tasks-card {
+  background: #ffffff;
+  border: 1px solid #EBEBEB;
+  border-radius: 14px;
+  padding: 14px;
+}
+.active-tasks-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.active-tasks-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A1A;
+  line-height: 1.25;
+}
+.active-tasks-count {
+  flex-shrink: 0;
+  color: #811429;
+  background: #F4E6EA;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.active-tasks-progress {
+  margin-bottom: 10px;
+}
+.active-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.active-task-row {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #F3F4F6;
+  border-radius: 10px;
+  background: #FAFAFA;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.active-task-row:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+.active-task-row--done {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+}
+.active-task-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.active-task-title {
+  color: #27272A;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.active-task-row--done .active-task-title {
+  color: #6B7280;
+  text-decoration: line-through;
+}
+.active-task-description {
+  color: #6B7280;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.active-tasks-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #B91C1C;
+  font-size: 13px;
 }
 
 /* ── Pending Requests ── */

@@ -20,7 +20,16 @@ const loginWithGoogle = () => {
   window.google.accounts.id.initialize({
     client_id: client,
     cancel_on_tap_outside: false,
-    auto_select: true,
+    // auto_select must stay FALSE. Google Identity Services relies on
+    // window.postMessage to complete its credential handshake between the
+    // hidden iframe and our page; Chrome's Cross-Origin-Opener-Policy
+    // blocks that postMessage under some configurations. When auto_select
+    // is true, GSI silently re-initializes on every render after a blocked
+    // handshake and the login view thrashes (page appears to keep
+    // refreshing, user never makes it past /login). Keeping this false
+    // means the user taps the rendered "Sign in as ..." button once to
+    // authenticate, which is the documented, COOP-safe flow.
+    auto_select: false,
     callback: window.handleCredentialResponse,
   });
   window.google.accounts.id.renderButton(document.getElementById("parent_id"), {

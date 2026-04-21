@@ -13,6 +13,27 @@ import { NetworkFirst } from "workbox-strategies";
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
+// ---------------------------------------------------------------------------
+// Immediate activation of new SW versions.
+//
+// Without these two calls, a freshly-installed SW stays in the 'waiting'
+// state until every open tab/window controlled by the old SW is closed.
+// In practice that meant users kept running the previous bundle for days
+// after a deploy — e.g. the Schedule page still landing on Open Shifts
+// after the default was flipped to My Shifts, because their browser was
+// still serving the pre-fix chunk out of the old SW's precache.
+//
+// skipWaiting() lets the new SW activate as soon as install finishes;
+// clients.claim() then takes control of existing pages on the next
+// navigation so the first post-deploy refresh serves new chunks.
+// ---------------------------------------------------------------------------
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // Network-first for all API calls (/workerscheduling-t2/...)
 registerRoute(
   ({ url }) => url.pathname.startsWith("/workerscheduling-t2"),

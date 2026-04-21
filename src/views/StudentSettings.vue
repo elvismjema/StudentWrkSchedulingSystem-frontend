@@ -215,11 +215,10 @@ onMounted(async () => {
 });
 
 // Fires the self-serve test endpoint (POST /push-subscriptions/me/test).
-// The backend already returns a human-friendly `message` for every outcome
-// (sent / no devices / server misconfig) so we just surface it verbatim.
-// If sent > 0 but the user does not actually see a notification on their
-// device, the gap is almost always OS-level permission or service worker
-// activation — we hint at that with a warning-colored snackbar.
+// The backend returns a structured summary: { sent, failed, pruned, failures, skippedReason? }.
+// We show a human-friendly message for every outcome, appending the first
+// underlying push-service error when delivery fails so the user can see
+// whether the problem is their subscription, permissions, or the server.
 const handleSendTestPush = async () => {
   sendingTestPush.value = true;
   try {
@@ -230,7 +229,18 @@ const handleSendTestPush = async () => {
         : result?.skippedReason === 'vapid-not-configured'
           ? 'error'
           : 'warning';
-    showSnackbar(result?.message || 'Test push attempted.', color);
+    let text = result?.message || 'Test push attempted.';
+    // Surface the first real push-service error (e.g. 403 Forbidden, 400 Bad Request)
+    // so the user can tell us / self-diagnose instead of seeing only "no deliveries succeeded".
+    if (result?.sent === 0 && Array.isArray(result?.failures) && result.failures.length > 0) {
+      const f = result.failures[0];
+      text += ` (${f.statusCode ?? 'err'}: ${f.message})`;
+    }
+    // If the server pruned subscriptions, tell the user to re-enable — that's the fix.
+    if (result?.sent === 0 && result?.pruned > 0) {
+      text += ' Turn push off then back on to re-subscribe.';
+    }
+    showSnackbar(text, color);
   } catch (err) {
     showSnackbar(
       err?.response?.data?.message || 'Could not send test notification.',

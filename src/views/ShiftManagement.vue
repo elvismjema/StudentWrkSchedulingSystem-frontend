@@ -816,10 +816,10 @@ const calendarOptions = computed(() => ({
   select: onCalendarSelect,
   datesSet: onCalendarDatesSet,
   eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-  // Show both weekday and numeric date (e.g. "Mon 4/20") so managers
-  // can tell which calendar day they're looking at without cross-checking
+  // Show weekday + month abbreviation + date (e.g. "Mon Apr 20") so managers
+  // can immediately see which date they are scheduling without cross-checking
   // the range label above the calendar.
-  dayHeaderFormat: { weekday: 'short', day: 'numeric', omitCommas: true },
+  dayHeaderFormat: { weekday: 'short', month: 'short', day: 'numeric', omitCommas: true },
   height: '100%',
   expandRows: true,
   eventContent: (arg) => {

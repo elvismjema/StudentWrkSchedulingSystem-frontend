@@ -24,11 +24,11 @@ defineProps({
 .placeholder-page {
   padding: 28px 36px;
   min-height: calc(100vh - 76px);
-  background: #f4f5f7;
+  background: var(--surface-2);
 }
 
 .placeholder-card {
-  border: 1px solid #d8dade;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
   background: #fff;
   padding: 28px;
@@ -38,12 +38,12 @@ defineProps({
   margin: 0;
   font-size: 34px;
   font-weight: 700;
-  color: #1f2328;
+  color: var(--text-1);
 }
 
 .placeholder-description {
   margin: 12px 0 0;
   font-size: 19px;
-  color: #667085;
+  color: var(--text-2);
 }
 </style>

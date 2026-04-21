@@ -8,10 +8,11 @@ import AddTutorial from "./views/AddTutorial.vue";
 import ViewTutorial from "./views/ViewTutorial.vue";
 import AddLesson from "./views/AddLesson.vue";
 import EditLesson from "./views/EditLesson.vue";
-import Student from "./views/Student.vue";
+import StudentShell from "./views/StudentShell.vue";
 import Manager from "./views/Manager.vue";
-import Admin from "./views/AdminDashboard.vue";
+import Admin from "./views/Admin.vue";
 import ShiftManagement from "./views/ShiftManagement.vue";
+import { getStudentMobileRouteMeta } from "./config/studentMobileNavigation";
 
 const getStoredRole = () => {
   const user = Utils.getStore("user");
@@ -71,70 +72,79 @@ const router = createRouter({
     {
       path: "/student",
       name: "student",
-      component: Student,
+      component: StudentShell,
       redirect: { name: "student-dashboard" },
       children: [
         {
           path: "dashboard",
           name: "student-dashboard",
           component: () => import("./views/StudentDashboard.vue"),
+          meta: getStudentMobileRouteMeta("student-dashboard"),
         },
         {
           path: "schedule",
           name: "student-schedule",
           component: () => import("./views/StudentSchedule.vue"),
+          meta: getStudentMobileRouteMeta("student-schedule"),
         },
         {
           path: "clock",
           name: "student-clock",
           component: () => import("./views/StudentClock.vue"),
+          meta: getStudentMobileRouteMeta("student-clock"),
         },
         {
           path: "more",
           name: "student-more",
           component: () => import("./views/StudentMore.vue"),
-        },
-        // Legacy routes — redirect to new structure
-        {
-          path: "departments",
-          redirect: { name: "student-dashboard" },
+          meta: getStudentMobileRouteMeta("student-more"),
         },
         {
           path: "availability",
           name: "student-availability",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentAvailability.vue"),
+          meta: getStudentMobileRouteMeta("student-availability"),
         },
+        // Legacy student trade-board URL support after removing standalone page
         {
           path: "trade-board",
-          name: "student-trade-board",
           redirect: { name: "student-schedule" },
-        },
-        {
-          path: "clock",
-          name: "student-clock",
-          component: () => import("./views/StudentClock.vue")
         },
         {
           path: "tasks",
           name: "student-tasks",
-          component: () => import("./views/StudentTasks.vue")
+          component: () => import("./views/StudentTasks.vue"),
+          meta: getStudentMobileRouteMeta("student-tasks"),
         },
         {
           path: "notifications",
           name: "student-notifications",
           component: () => import("./views/StudentNotifications.vue"),
+          meta: getStudentMobileRouteMeta("student-notifications"),
         },
         {
           path: "profile",
           name: "student-profile",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentProfile.vue"),
+          meta: getStudentMobileRouteMeta("student-profile"),
         },
         {
           path: "settings",
           name: "student-settings",
-          redirect: { name: "student-more" },
+          component: () => import("./views/StudentSettings.vue"),
+          meta: getStudentMobileRouteMeta("student-settings"),
+        },
+        {
+          path: "shifts/:id",
+          name: "student-shift-detail",
+          redirect: { name: "student-schedule" },
         },
       ],
+    },
+    // Top-level /shifts/:id → redirect to student schedule
+    {
+      path: "/shifts/:id",
+      redirect: { name: "student-schedule" },
     },
     {
       path: "/manager",
@@ -142,6 +152,17 @@ const router = createRouter({
       component: Manager,
       redirect: { name: "manager-dashboard" },
       children: [
+
+        {
+          path: "qualifications",
+          name: "manager-qualifications",
+          component: () => import("./views/StudentQualifications.vue")
+        },
+        {
+          path: "shifts",
+          name: "manager-shifts",
+          component: ShiftManagement
+        },
         {
           path: "dashboard",
           name: "manager-dashboard",
@@ -160,16 +181,7 @@ const router = createRouter({
         {
           path: "create-shift",
           name: "manager-create-shift",
-          component: ShiftManagement,
-        },
-        {
-          path: "availability",
-          name: "manager-availability",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Availability",
-            description: "Review worker availability and constraints.",
-          },
+          component: () => import("./views/ManagerCreateShift.vue"),
         },
         {
           path: "approvals",
@@ -177,36 +189,23 @@ const router = createRouter({
           component: () => import("./views/ManagerApprovals.vue"),
         },
         {
-          path: "time-attendance",
-          name: "manager-time-attendance",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Time & Attendance",
-            description: "Track clock-in activity and attendance records.",
-          },
+          path: "time-pay",
+          name: "manager-time-pay",
+          component: () => import("./views/ManagerTimePay.vue"),
         },
         {
-          path: "workers",
-          name: "manager-workers",
-          component: () => import("./views/UserManagement.vue"),
+          path: "time-attendance",
+          redirect: { name: "manager-time-pay" },
         },
         {
           path: "tasks",
           name: "manager-tasks",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Tasks",
-            description: "Assign and monitor worker tasks.",
-          },
+          component: () => import("./views/ManagerTasks.vue"),
         },
         {
           path: "reports",
           name: "manager-reports",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Reports",
-            description: "Generate operational and staffing reports.",
-          },
+          component: () => import("./views/ManagerReports.vue"),
         },
         {
           path: "notifications",
@@ -223,7 +222,22 @@ const router = createRouter({
           name: "manager-settings",
           component: () => import("./views/DepartmentSettings.vue"),
         },
+        {
+          path: "task-lists",
+          name: "manager-task-lists",
+          component: () => import("./views/TaskListsSettings.vue"),
+        },
         // ─── Admin-only routes ──────────────────────────────────────────────
+        {
+          path: "workers",
+          name: "manager-student-workers",
+          component: () => import("./views/ManagerStudentWorkers.vue"),
+        },
+        {
+          path: "positions",
+          name: "manager-positions",
+          component: () => import("./views/ManagerPositions.vue"),
+        },
         {
           path: "admin/users",
           name: "manager-admin-users",
@@ -260,15 +274,16 @@ const router = createRouter({
         {
           path: "reports",
           name: "admin-reports",
-          component: () => import("./views/ManagerPlaceholder.vue"),
-          props: {
-            title: "Reports",
-            description:
-              "View system-wide staffing and operations reports.",
-          },
+          component: () => import("./views/ManagerReports.vue"),
         },
-      ],
-    },
+
+        {
+          path: "settings",
+          name: "admin-settings",
+          component: () => import("./views/AdminSystemSettings.vue"),
+        }
+      ]
+    }
   ],
 });
 
@@ -287,7 +302,7 @@ router.beforeEach((to) => {
 
   // Require authentication for all other routes
   if (!role || !token) {
-    return { name: "login" };
+    return { name: "login", query: { redirect: to.fullPath } };
   }
 
   // Role-based access control
@@ -324,7 +339,7 @@ router.onError((error, to) => {
     error?.name === "ChunkLoadError";
 
   if (chunkFailure && to?.fullPath) {
-    window.location.assign(to.fullPath);
+    window.location.assign(Utils.resolveAppUrl(to.fullPath));
   }
 });
 

@@ -553,7 +553,7 @@ onMounted(async () => {
 
 .page-title {
   margin: 0;
-  color: #101828;
+  color: var(--text-1);
   font-size: 36px;
   line-height: 1.2;
   font-weight: 700;
@@ -561,7 +561,7 @@ onMounted(async () => {
 
 .selector-card,
 .settings-card {
-  border: 1px solid #e4e7ec;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
 }
 
@@ -589,14 +589,14 @@ onMounted(async () => {
 
 .section-title {
   margin: 0;
-  color: #101828;
+  color: var(--text-1);
   font-size: 22px;
   font-weight: 700;
 }
 
 .muted-text {
   margin: 8px 0 0;
-  color: #667085;
+  color: var(--text-2);
 }
 
 .chips-wrap {

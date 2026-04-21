@@ -1,41 +1,52 @@
 <template>
-  <div class="admin-dashboard-page">
-    <section class="page-header">
-      <h1 class="page-title">Admin Dashboard</h1>
-      <p class="page-subtitle">System overview and quick access.</p>
-    </section>
+  <PageFrame>
+    <template #header>
+      <PageHeader :title="adminHeading" :subtitle="todayLabel" />
+    </template>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
-      {{ error }}
-    </v-alert>
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
-    <v-row class="kpi-grid">
-      <v-col
+    <!-- Stat cards -->
+    <div class="ad-stat-grid">
+      <button
         v-for="card in cards"
         :key="card.key"
-        cols="12"
-        md="6"
+        class="ad-stat-card"
+        @click="goTo(card)"
       >
-        <v-card class="kpi-card" elevation="0" @click="goTo(card)">
-          <v-card-text>
-            <div class="kpi-label-row">
-              <v-icon size="20" class="kpi-icon">{{ card.icon }}</v-icon>
-              <span class="kpi-label">{{ card.label }}</span>
-            </div>
-            <div class="kpi-value">{{ card.value }}</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-  </div>
+        <div class="ad-stat-card__top">
+          <v-icon size="20" class="ad-stat-card__icon">{{ card.icon }}</v-icon>
+          <span class="ad-stat-card__label">{{ card.label }}</span>
+          <ArrowUpRight class="ad-stat-card__arrow" :size="16" />
+        </div>
+        <div class="ad-stat-card__value">{{ card.value }}</div>
+      </button>
+    </div>
+  </PageFrame>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import PageFrame from "../components/PageFrame.vue";
+import PageHeader from "../components/PageHeader.vue";
+import { ArrowUpRight } from "lucide-vue-next";
 import AdminServices from "../services/adminServices.js";
 import DepartmentServices from "../services/departmentServices.js";
 import UserRoleServices from "../services/userRoleServices.js";
+import Utils from "../config/utils.js";
+import { TZ } from "../utils/tz.js";
+
+const currentUser = Utils.getStore("user") || {};
+const adminHeading = computed(() => {
+  const firstName = currentUser?.fName || "";
+  return firstName ? `Hey, ${firstName}` : "Hey there";
+});
+const todayLabel = computed(() =>
+  new Date().toLocaleDateString("en-US", {
+    timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric",
+  }),
+);
 
 const router = useRouter();
 const error = ref("");
@@ -142,68 +153,78 @@ onMounted(loadDashboard);
 </script>
 
 <style scoped>
-.admin-dashboard-page {
-  padding: 24px;
+/* ── Stat card grid ───────────────────────────────────────────────────── */
+.ad-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+@media (max-width: 960px) {
+  .ad-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .ad-stat-grid { grid-template-columns: 1fr; }
 }
 
-.page-header {
-  margin-bottom: 16px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 46px;
-  font-weight: 700;
-  line-height: 1.15;
-  color: #101828;
-}
-
-.page-subtitle {
-  margin: 6px 0 0;
-  color: #667085;
-  font-size: 17px;
-}
-
-.kpi-grid {
-  margin-top: 8px;
-}
-
-.kpi-card {
-  border: 1px solid #e4e7ec;
-  border-radius: 12px;
+.ad-stat-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-sans);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ad-stat-card:hover {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+.ad-stat-card:hover .ad-stat-card__top,
+.ad-stat-card:hover .ad-stat-card__icon,
+.ad-stat-card:hover .ad-stat-card__label,
+.ad-stat-card:hover .ad-stat-card__value {
+  color: #fff;
 }
 
-.kpi-card:hover {
-  border-color: #d0d5dd;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
-  transform: translateY(-1px);
-}
-
-.kpi-label-row {
+.ad-stat-card__top {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #667085;
-  font-size: 18px;
+  color: var(--text-2);
 }
-
-.kpi-value {
-  margin-top: 10px;
-  font-size: 52px;
+.ad-stat-card__arrow {
+  margin-left: auto;
+  color: var(--text-2);
+  opacity: 0.45;
+  flex-shrink: 0;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.ad-stat-card:hover .ad-stat-card__arrow {
+  color: #fff;
+  opacity: 1;
+}
+.ad-stat-card__icon {
+  color: var(--text-2);
+  transition: color 0.15s ease;
+}
+.ad-stat-card__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: color 0.15s ease;
+}
+.ad-stat-card__value {
+  font-size: 48px;
+  font-weight: 800;
   line-height: 1;
-  color: #101828;
-  font-weight: 700;
+  color: var(--text-1);
+  transition: color 0.15s ease;
 }
 
-@media (max-width: 960px) {
-  .page-title {
-    font-size: 36px;
-  }
-
-  .kpi-value {
-    font-size: 42px;
-  }
-}
+/* ── Quick actions removed ── */
 </style>

@@ -4,8 +4,8 @@
     :close-on-content-click="false"
     location="bottom end"
     offset="8"
-    min-width="320"
-    max-width="400"
+    min-width="0"
+    max-width="calc(100vw - 24px)"
   >
     <template v-slot:activator="{ props }">
       <v-btn
@@ -15,8 +15,9 @@
         class="notification-btn"
       >
         <v-badge
-          :content="unreadCount"
-          :color="unreadCount > 0 ? 'error' : 'transparent'"
+          :model-value="unreadCount > 0"
+          :content="unreadCount > 99 ? '99+' : unreadCount"
+          color="error"
           floating
           offset-x="8"
           offset-y="8"
@@ -34,6 +35,30 @@
           <span class="unread-count" v-if="unreadCount > 0">
             {{ unreadCount }} unread
           </span>
+        </div>
+        <div class="header-actions">
+          <v-btn
+            variant="text"
+            size="small"
+            color="primary"
+            class="mark-all-read-btn"
+            @click="handleMarkAllAsRead"
+            :loading="markingAllAsRead"
+            v-if="unreadCount > 0"
+          >
+            Mark all as read
+          </v-btn>
+          <v-btn
+            variant="text"
+            size="small"
+            color="error"
+            class="clear-all-btn"
+            @click="handleClearAllNotifications"
+            :loading="clearingAll"
+            v-if="notifications.length > 0"
+          >
+            Clear all
+          </v-btn>
         </div>
       </div>
 
@@ -55,15 +80,30 @@
             <div class="notification-title">{{ notification.title }}</div>
             <div class="notification-time">{{ notification.timestamp }}</div>
           </div>
-          <div class="notification-indicator" v-if="notification.unread">
-            <div class="unread-dot"></div>
+          <div class="notification-actions">
+            <div class="notification-indicator" v-if="notification.unread">
+              <div class="unread-dot"></div>
+            </div>
+            <v-btn
+              icon
+              size="x-small"
+              variant="text"
+              color="grey-lighten-1"
+              class="delete-btn"
+              @click.stop="handleDeleteNotification(notification)"
+            >
+              <v-icon size="16">mdi-close</v-icon>
+            </v-btn>
           </div>
         </div>
       </div>
 
       <div v-else class="no-notifications">
-        <v-icon size="48" color="grey-lighten-1">mdi-bell-outline</v-icon>
-        <p>No notifications</p>
+        <div class="empty-icon-wrap">
+          <v-icon size="28">mdi-bell-check-outline</v-icon>
+        </div>
+        <div class="empty-title">No notifications</div>
+        <div class="empty-subtitle">You're all caught up.</div>
       </div>
 
       <v-divider></v-divider>
@@ -76,7 +116,7 @@
           class="view-all-btn"
           @click="handleViewAll"
         >
-          View All Notifications
+          View all notifications
         </v-btn>
       </div>
     </v-card>
@@ -84,17 +124,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import NotificationService from '../services/notifications'
 import Utils from '../config/utils'
+import { resolveNotificationLink, isExternalNotificationLink } from '../utils/notificationLinks'
 
 const emit = defineEmits(['notification-click'])
 const router = useRouter()
 const currentUser = Utils.getStore("user") || {}
+const currentRole = String(currentUser.role || '').toLowerCase()
 
 const isOpen = ref(false)
 const notifications = ref([])
+const markingAllAsRead = ref(false)
+const clearingAll = ref(false)
 
 const unreadCount = computed(() => {
   return notifications.value.filter(n => n.unread).length
@@ -117,8 +161,63 @@ const handleNotificationClick = async (notification) => {
       console.error('Error marking notification as read:', error)
     }
   }
+
+  const targetLink = resolveNotificationLink(notification, currentRole)
+  if (targetLink) {
+    try {
+      if (isExternalNotificationLink(targetLink)) {
+        window.location.href = targetLink
+      } else {
+        await router.push(targetLink)
+      }
+    } catch {
+      window.location.href = Utils.resolveAppUrl(targetLink)
+    }
+  }
+
   emit('notification-click', notification)
   isOpen.value = false
+}
+
+const handleDeleteNotification = async (notification) => {
+  try {
+    await NotificationService.deleteNotification(notification.id)
+    // Remove notification from list
+    const index = notifications.value.findIndex(n => n.id === notification.id)
+    if (index > -1) {
+      notifications.value.splice(index, 1)
+    }
+  } catch (error) {
+    console.error('Error deleting notification:', error)
+  }
+}
+
+const handleClearAllNotifications = async () => {
+  clearingAll.value = true
+  try {
+    await NotificationService.clearAllNotifications()
+    // Clear all notifications from list
+    notifications.value = []
+  } catch (error) {
+    console.error('Error clearing all notifications:', error)
+  } finally {
+    clearingAll.value = false
+  }
+}
+
+const handleMarkAllAsRead = async () => {
+  markingAllAsRead.value = true
+  try {
+    await NotificationService.markAllAsRead()
+    // Update all notifications to marked as read
+    notifications.value.forEach(notification => {
+      notification.unread = false
+    })
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error)
+  } finally {
+    markingAllAsRead.value = false
+  }
 }
 
 const handleViewAll = () => {
@@ -130,8 +229,17 @@ const handleViewAll = () => {
   isOpen.value = false
 }
 
+// Poll for new notifications every 30 seconds so students get
+// near-real-time updates when a manager approves/declines requests
+let pollTimer = null
+
 onMounted(() => {
   loadNotifications()
+  pollTimer = setInterval(loadNotifications, 30_000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
@@ -141,61 +249,95 @@ onMounted(() => {
 }
 
 .notification-dropdown {
+  width: min(430px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .dropdown-header {
   padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .header-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.mark-all-read-btn {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.clear-all-btn {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: auto;
+  white-space: nowrap;
 }
 
 .header-title h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-1);
   margin: 0;
 }
 
 .unread-count {
   font-size: 13px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 2px 8px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  padding: 4px 8px;
   border-radius: 12px;
+  white-space: nowrap;
 }
 
 .notifications-list {
   max-height: 300px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
 .notification-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
+  min-width: 0;
 }
 
 .notification-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--surface-1);
 }
 
 .notification-item.unread {
-  background-color: #f0f7ff;
+  background-color: var(--state-info-lt);
 }
 
 .notification-icon {
   margin-right: 12px;
-  color: #666;
+  color: var(--text-2);
 }
 
 .notification-content {
@@ -203,40 +345,99 @@ onMounted(() => {
   min-width: 0;
 }
 
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .notification-title {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-1);
   line-height: 1.3;
   margin-bottom: 2px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-time {
   font-size: 12px;
-  color: #666;
+  color: var(--text-2);
   line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .notification-indicator {
   margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .unread-dot {
   width: 8px;
   height: 8px;
-  background-color: #1976d2;
+  background-color: var(--state-info);
   border-radius: 50%;
 }
 
-.no-notifications {
-  padding: 32px 16px;
-  text-align: center;
-  color: #666;
+.delete-btn {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.no-notifications p {
-  margin: 12px 0 0 0;
-  font-size: 14px;
+@media (max-width: 460px) {
+  .dropdown-header {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+.notification-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.no-notifications {
+  min-height: 128px;
+  padding: 22px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.empty-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f8e6ea;
+  color: #8B1538;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #2f2f2f;
+}
+
+.empty-subtitle {
+  max-width: 220px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #6f6f6f;
 }
 
 .dropdown-footer {
@@ -247,5 +448,32 @@ onMounted(() => {
   width: 100%;
   justify-content: center;
   font-weight: 500;
+  min-height: 36px;
+  white-space: normal;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 420px) {
+  .notification-dropdown {
+    width: calc(100vw - 16px);
+  }
+
+  .dropdown-header {
+    padding: 14px;
+  }
+
+  .header-title h3 {
+    font-size: 15px;
+  }
+
+  .no-notifications {
+    min-height: 116px;
+    padding: 18px 16px;
+  }
+
+  .view-all-btn {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
 }
 </style>

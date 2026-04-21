@@ -3,9 +3,25 @@
   <head>
     <script src="https://accounts.google.com/gsi/client"></script>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tutorials</title>
+    <link rel="icon" href="%BASE_URL%favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Worker Scheduling System</title>
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#80162B" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="OC Schedule" />
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+
+    <!--
+      OneSignal Web SDK v16 — loaded via CDN, deferred so it doesn't block
+      first paint. The actual init() call lives in src/config/oneSignal.js
+      and pushes onto window.OneSignalDeferred, which this script drains
+      once it finishes bootstrapping. That means init order between this
+      <script> and src/main.js does not matter.
+    -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   </head>
   <body>
     <div id="app"></div>

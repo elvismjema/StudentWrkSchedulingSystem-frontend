@@ -53,13 +53,14 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { TZ } from '../../utils/tz.js';
 
 const props = defineProps({
   selectedDate: { type: String, default: null },
   shiftDates: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['update:selectedDate', 'week-change']);
+const emit = defineEmits(['select-day', 'change-week']);
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const FULL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -103,7 +104,7 @@ const weekDays = computed(() => {
       dateStr,
       isToday: dateStr === todayStr.value,
       hasShift: shiftSet.has(dateStr),
-      ariaLabel: FULL_DAYS[i] + ', ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + (shiftSet.has(dateStr) ? ', has shifts' : ''),
+      ariaLabel: FULL_DAYS[i] + ', ' + d.toLocaleDateString('en-US', { timeZone: TZ, month: 'long', day: 'numeric' }) + (shiftSet.has(dateStr) ? ', has shifts' : ''),
     };
   });
 });
@@ -113,21 +114,21 @@ const weekLabel = computed(() => {
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   const opts = { month: 'short', day: 'numeric' };
-  return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', opts);
+  return start.toLocaleDateString('en-US', { timeZone: TZ, ...opts }) + ' – ' + end.toLocaleDateString('en-US', { timeZone: TZ, ...opts });
 });
 
 const selectDay = (dateStr) => {
-  emit('update:selectedDate', dateStr);
+  emit('select-day', dateStr);
 };
 
 const prevWeek = () => {
   weekOffset.value--;
-  emit('week-change', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
+  emit('change-week', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
 };
 
 const nextWeek = () => {
   weekOffset.value++;
-  emit('week-change', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
+  emit('change-week', { offset: weekOffset.value, monday: toDateStr(mondayOfWeek.value) });
 };
 
 watch(weekOffset, () => {
@@ -135,7 +136,7 @@ watch(weekOffset, () => {
   if (!dates.includes(props.selectedDate)) {
     const today = todayStr.value;
     const inWeek = dates.includes(today) ? today : dates[0];
-    emit('update:selectedDate', inWeek);
+    emit('select-day', inWeek);
   }
 });
 </script>

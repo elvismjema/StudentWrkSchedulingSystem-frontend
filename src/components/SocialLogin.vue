@@ -2,9 +2,11 @@
 import { ref, onMounted } from "vue";
 import AuthServices from "../services/authServices";
 import Utils from "../config/utils.js";
-import { useRouter } from "vue-router";
+import { loginOneSignal } from "../config/oneSignal.js";
+import { useRouter, useRoute } from "vue-router";
 
 const router = useRouter();
+const route = useRoute();
 const fName = ref("");
 const lName = ref("");
 const user = ref({});
@@ -25,7 +27,7 @@ const loginWithGoogle = () => {
     type: "standard",
     theme: "outline",
     size: "large",
-    text: "signup_with",
+    text: "signin_with",
     width: 400,
   });
 };
@@ -47,15 +49,29 @@ const handleCredentialResponse = async (response) => {
         return;
       }
 
+      Utils.removeItem("currentDepartmentContext");
       Utils.setStore("user", user.value);
       fName.value = user.value.fName;
       lName.value = user.value.lName;
-      if (role === "admin") {
+
+      // Tell OneSignal who just signed in. This must happen BEFORE any
+      // subsequent push-subscription interaction so the external_id alias
+      // is in place when the backend later POSTs to the OneSignal REST API
+      // with `include_aliases: { external_id: [String(user.id)] }`.
+      // Idempotent — no-op if the same id is already set; transparently
+      // switches if a different user just signed in on this browser.
+      loginOneSignal(user.value.id);
+
+      // Deep-link restore: navigate to the originally intended path if available
+      const redirectPath = route.query.redirect;
+      if (redirectPath && redirectPath !== "/" && redirectPath !== "/login") {
+        router.push(redirectPath);
+      } else if (role === "admin") {
         router.push({ name: "admin-dashboard" });
       } else if (role === "manager") {
         router.push({ name: "manager-dashboard" });
       } else if (role === "student") {
-        router.push({ name: "student-schedule" });
+        router.push({ name: "student-dashboard" });
       }
     })
     .catch((error) => {

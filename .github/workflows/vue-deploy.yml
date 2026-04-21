@@ -36,6 +36,8 @@ jobs:
           VITE_APP_CLIENT_SECRET=${{ secrets.VITE_APP_CLIENT_SECRET }}
           VITE_APP_REFRESH_TOKEN=${{ secrets.VITE_APP_REFRESH_TOKEN }}
           VITE_APP_API_URL=https://accounts.google.com/gsi/client
+          VITE_MOBILE_SHELL_ENABLED=true
+          VITE_ONESIGNAL_APP_ID=${{ secrets.VITE_ONESIGNAL_APP_ID }}
           EOF
 
       - name: Build
@@ -44,6 +46,8 @@ jobs:
           VITE_APP_CLIENT_SECRET: ${{ secrets.VITE_APP_CLIENT_SECRET }}
           VITE_APP_REFRESH_TOKEN: ${{ secrets.VITE_APP_REFRESH_TOKEN }}
           VITE_APP_API_URL: "https://accounts.google.com/gsi/client"
+          VITE_MOBILE_SHELL_ENABLED: "true"
+          VITE_ONESIGNAL_APP_ID: ${{ secrets.VITE_ONESIGNAL_APP_ID }}
         run: npm run build
 
       - name: Deploy to server

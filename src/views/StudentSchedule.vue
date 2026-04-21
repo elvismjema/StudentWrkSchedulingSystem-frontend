@@ -211,6 +211,22 @@
           <div class="mb-2 d-flex align-center" style="gap:6px"><v-icon size="16" color="grey">mdi-office-building</v-icon><span class="text-body-2">{{ eventDialog.department }}</span></div>
           <div class="mb-2 d-flex align-center" style="gap:6px"><v-icon size="16" color="grey">mdi-calendar</v-icon><span class="text-body-2">{{ eventDialog.dateLabel }}</span></div>
           <div class="d-flex align-center" style="gap:6px"><v-icon size="16" color="grey">mdi-clock-outline</v-icon><span class="text-body-2">{{ eventDialog.timeLabel }}</span></div>
+          <!-- Manager-attached checklist. Only rendered when the shift has a
+               task list with at least one item; hidden otherwise so shifts
+               without tasks don't get a dangling empty section. -->
+          <div v-if="eventDialog.shift?.taskList?.items?.length" class="mt-3">
+            <div class="text-caption font-weight-bold text-medium-emphasis mb-1 d-flex align-center" style="gap:6px">
+              <v-icon size="14" color="grey">mdi-clipboard-check-outline</v-icon>
+              <span>TASKS ({{ eventDialog.shift.taskList.items.length }})</span>
+            </div>
+            <div v-for="item in eventDialog.shift.taskList.items" :key="item.id" class="d-flex align-start mb-1" style="gap:6px">
+              <v-icon size="14" color="grey" class="mt-1">mdi-checkbox-blank-circle-outline</v-icon>
+              <div>
+                <div class="text-body-2">{{ item.title }}</div>
+                <div v-if="item.description" class="text-caption text-medium-emphasis">{{ item.description }}</div>
+              </div>
+            </div>
+          </div>
           <v-alert v-if="eventDialog.type === 'pending_ack'" type="warning" variant="tonal" density="compact" class="mt-3">You need to acknowledge this shift to confirm your availability.</v-alert>
           <v-alert v-if="eventDialog.claimConflict" type="warning" variant="tonal" density="compact" class="mt-3">{{ eventDialog.claimConflict }}</v-alert>
         </v-card-text>

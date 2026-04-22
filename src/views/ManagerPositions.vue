@@ -23,27 +23,42 @@
     </div>
 
     <div v-else class="positions-grid">
+      <!--
+        Position card, modeled 1:1 on ManagerDashboard.vue's .db-card
+        ("Unfilled Shifts" / "Who's Working Now"). Same surfaces, spacing,
+        header row, and worker list so the two pages feel like one product.
+      -->
       <article
         v-for="position in positions"
         :key="position.position_id"
-        class="pos-card"
+        class="db-card pos-card"
         role="button"
         tabindex="0"
         @click="openEditPosition(position)"
         @keydown.enter.prevent="openEditPosition(position)"
         @keydown.space.prevent="openEditPosition(position)"
       >
-        <!-- Left color rail: always visible; falls back to brand so cards
-             without a configured color still feel intentional. -->
-        <span
-          class="pos-card__rail"
-          :style="{ background: position.color || 'var(--brand-primary)' }"
-        />
+        <header class="db-card__head">
+          <div class="pos-head-left">
+            <span
+              class="pos-swatch"
+              :style="{ background: position.color || 'var(--brand-primary)' }"
+              aria-hidden="true"
+            />
+            <div class="pos-head-text">
+              <h3 class="db-card__title">{{ position.position_name }}</h3>
+              <p class="db-card__sub">
+                {{ position.description || 'No description' }}
+              </p>
+            </div>
+          </div>
 
-        <div class="pos-card__body">
-          <header class="pos-card__head">
-            <h3 class="pos-card__title">{{ position.position_name }}</h3>
-            <div class="pos-card__actions" @click.stop>
+          <div class="pos-head-right" @click.stop>
+            <span class="pos-count-chip">
+              {{ position.workerCount || 0 }}
+              {{ position.workerCount === 1 ? 'worker' : 'workers' }}
+            </span>
+            <div class="pos-actions">
               <v-btn
                 icon="mdi-pencil"
                 variant="text"
@@ -64,28 +79,47 @@
                 @click="confirmDeletePosition(position)"
               />
             </div>
-          </header>
+          </div>
+        </header>
 
-          <p class="pos-card__desc">
-            {{ position.description || 'No description' }}
-          </p>
-
-          <footer class="pos-card__foot">
-            <div class="pos-card__stack">
+        <!--
+          Worker list body: mirrors the dashboard's .worker-list exactly.
+          When there are no workers we show a .db-empty state, same as the
+          dashboard does for "No workers currently clocked in".
+        -->
+        <ul
+          v-if="workersForPosition(position).length"
+          class="worker-list"
+        >
+          <li
+            v-for="worker in workersPreviewFor(position)"
+            :key="worker.userId"
+            class="worker-row"
+          >
+            <span class="worker-avatar">{{ initialsFor(worker.name) }}</span>
+            <div class="worker-info">
+              <span class="worker-name">{{ worker.name }}</span>
               <span
-                v-for="worker in workersPreviewFor(position)"
-                :key="worker.userId"
-                class="pos-avatar"
-                :title="worker.name"
-              >{{ initialsFor(worker.name) }}</span>
-              <span v-if="extraWorkersCount(position) > 0" class="pos-avatar pos-avatar--more">
-                +{{ extraWorkersCount(position) }}
+                v-if="(worker.positionIds || []).length > 1"
+                class="worker-dept"
+              >
+                Also covers {{ (worker.positionIds || []).length - 1 }}
+                other{{ (worker.positionIds || []).length - 1 === 1 ? '' : 's' }}
               </span>
             </div>
-            <span class="pos-card__count">
-              {{ position.workerCount || 0 }} worker{{ position.workerCount === 1 ? '' : 's' }}
-            </span>
-          </footer>
+          </li>
+        </ul>
+        <div v-else class="db-empty">No workers assigned yet</div>
+
+        <!-- "View all" footer mirrors .db-link used on the dashboard. -->
+        <div
+          v-if="extraWorkersCount(position) > 0"
+          class="pos-card__more"
+        >
+          <span class="db-link">
+            View all {{ workersForPosition(position).length }} workers
+            <v-icon size="14">mdi-arrow-right</v-icon>
+          </span>
         </div>
       </article>
     </div>
@@ -691,25 +725,127 @@ onMounted(async () => {
   color: var(--text-2);
 }
 
+/* ── Dashboard-parity primitives ────────────────────────────────────────────── */
+/* These classes are lifted verbatim from ManagerDashboard.vue's scoped
+   style block so position cards compose from the exact same vocabulary.
+   Kept 1:1 on purpose — if the dashboard's look ever changes, update both. */
+.db-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.db-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+.db-card__sub {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.db-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--text-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.db-link:hover { color: var(--brand-primary); }
+.db-empty {
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+  padding: 28px 0;
+}
+
+.worker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+.worker-row:last-child { border-bottom: none; }
+.worker-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.worker-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.worker-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.worker-dept { font-size: 12px; color: var(--text-2); }
+
 /* ── Position cards grid ─────────────────────────────────────────────────── */
+/* 2-column grid like the dashboard's .db-mid-row — gives cards real width so
+   content breathes the way the Unfilled Shifts / Coming Up cards do. */
 .positions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
   gap: var(--space-3, 16px);
 }
 
-/* A position card mirrors the dashboard's .db-card vocabulary: surface-0
-   background, border-1 hairline, radius-md corners, token typography. The
-   left rail uses the position's own schedule color as a tasteful accent. */
+/*
+  Position card extends .db-card (from ManagerDashboard.vue) with:
+   - cursor + hover lift for the whole-card click affordance
+   - min-height so cards align horizontally even when worker counts differ
+  All surfaces, borders, padding, radii come from .db-card directly so the
+  two pages feel visually identical.
+*/
 .pos-card {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  background: var(--surface-0);
-  border: 1px solid var(--border-1);
-  border-radius: var(--radius-md, 12px);
-  overflow: hidden;
   cursor: pointer;
+  min-height: 240px;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease,
@@ -724,118 +860,74 @@ onMounted(async () => {
   outline: none;
 }
 
-.pos-card__rail {
-  flex: 0 0 6px;
-  align-self: stretch;
-}
-
-.pos-card__body {
-  flex: 1;
-  min-width: 0;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pos-card__head {
+/* Left side of the card head: color swatch + title/description stack. */
+.pos-head-left {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.pos-card__title {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: var(--text-1);
+  gap: 12px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  flex: 1;
 }
 
-.pos-card__actions {
+.pos-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-top: 6px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.pos-head-text {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Right side: worker count chip + edit/delete actions. Actions fade in on
+   hover the same way dashboard quick-action buttons reveal themselves. */
+.pos-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pos-count-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface-1, #f5f6f8);
+  border: 1px solid var(--border-1);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pos-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   opacity: 0;
   transition: opacity 0.15s ease;
-  flex-shrink: 0;
 }
 
-.pos-card:hover .pos-card__actions,
-.pos-card:focus-within .pos-card__actions {
+.pos-card:hover .pos-actions,
+.pos-card:focus-within .pos-actions {
   opacity: 1;
 }
 
 /* Always show actions on touch devices so they're discoverable. */
 @media (hover: none) {
-  .pos-card__actions { opacity: 1; }
+  .pos-actions { opacity: 1; }
 }
 
-.pos-card__desc {
-  margin: 0;
-  color: var(--text-2);
-  font-size: 13px;
-  line-height: 1.45;
-  min-height: 1.45em;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.pos-card__foot {
+/* "View all N workers →" link sits below the list, aligned right so it
+   echoes the "View All →" pattern the dashboard uses on its cards. */
+.pos-card__more {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
   margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-1);
-}
-
-.pos-card__stack {
-  display: flex;
-  align-items: center;
-}
-
-.pos-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--brand-primary);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  border: 2px solid var(--surface-0);
-  flex-shrink: 0;
-}
-
-.pos-avatar + .pos-avatar {
-  margin-left: -8px;
-}
-
-.pos-avatar--more {
-  background: var(--surface-2, #eef1f4);
-  color: var(--text-2);
-  font-size: 10px;
-  letter-spacing: 0;
-}
-
-.pos-card__count {
-  font-size: 12px;
-  color: var(--text-2);
-  white-space: nowrap;
+  padding-top: 4px;
 }
 
 /* ── Edit Position modal ─────────────────────────────────────────────── */
@@ -1115,7 +1207,8 @@ onMounted(async () => {
   .positions-page { padding: 16px; }
   .page-title { font-size: 28px; }
   .positions-grid { grid-template-columns: 1fr; }
-  .pos-card__title { font-size: 18px; }
-  .pos-card__body { padding: 14px 16px; }
+  /* On phones we hide the count chip — the worker list underneath already
+     communicates the count and the chip competes for horizontal space. */
+  .pos-count-chip { display: none; }
 }
 </style>

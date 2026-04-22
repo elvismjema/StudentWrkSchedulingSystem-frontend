@@ -1444,15 +1444,20 @@ watch(
    base .clock-banner shape local because the component itself is
    scoped — duplicating the minimal shell here is cheaper than
    plumbing a "loading" / "stale" mode through the component props
-   and risking regressions in the happy-path banner. */
+   and risking regressions in the happy-path banner.
+
+   IMPORTANT: Do NOT set `background` or `border` on the base
+   .clock-banner rule here. Vue scoped CSS applies the parent
+   component's data attribute to the root element of child components,
+   so any background/border set here would bleed onto ClockStatusBanner
+   and override its --active maroon state. Each variant below is
+   self-contained for color. */
 .clock-banner {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--border-1, #e5e7eb);
-  background: var(--surface-1, #f7f7f8);
 }
 .clock-banner__content {
   display: flex;
@@ -1469,7 +1474,7 @@ watch(
   background: linear-gradient(90deg, #f3f4f6 25%, #eceef0 37%, #f3f4f6 63%);
   background-size: 400% 100%;
   animation: clock-banner-shimmer 1.4s ease-in-out infinite;
-  border-color: transparent;
+  border: 1px solid transparent;
 }
 .clock-banner__skeleton-dot {
   width: 16px; height: 16px; border-radius: 50%;
@@ -1488,7 +1493,7 @@ watch(
 
 .clock-banner--stale {
   background: #fff8e6;
-  border-color: #f1c47a;
+  border: 1px solid #f1c47a;
 }
 .clock-banner--stale .clock-banner__label { color: #7a4a00; }
 .clock-banner--stale .clock-banner__elapsed { color: #8a5a12; }

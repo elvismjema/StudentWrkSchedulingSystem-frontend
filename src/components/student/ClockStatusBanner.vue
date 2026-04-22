@@ -41,9 +41,9 @@
       </v-btn>
 
       <!-- State: clocked in, not on break → Start Break + Clock Out -->
-      <!-- Both actions get the same outlined-white treatment on the maroon
-           banner so they read with equal weight. The maroon banner itself
-           is the dominant visual; the buttons are secondary affordances. -->
+      <!-- Start Break is a secondary action: outlined white on maroon.
+           Clock Out is the primary CTA: solid white fill with maroon text
+           for maximum contrast and clear visual hierarchy. -->
       <template v-if="clockedIn && !onBreak">
         <v-btn
           size="small"
@@ -60,7 +60,7 @@
         </v-btn>
         <v-btn
           size="small"
-          variant="outlined"
+          variant="flat"
           color="white"
           :loading="loading"
           :disabled="loading"
@@ -212,10 +212,10 @@ const ariaLabel = computed(() => {
   min-width: max-content;
 }
 
-/* Clock-banner action buttons: equal-weight outlined-white pills on the
-   maroon banner. The emphasis variant (Clock Out) gets a thicker border
-   so the primary action still reads first without switching to a loud
-   fill that would fight the maroon background. */
+/* Clock-banner action buttons: outlined-white (Start Break) and
+   solid-white (Clock Out) on the maroon banner.
+   The solid white Clock Out button gets automatic maroon text from
+   Vuetify's contrast algorithm, making it the clear primary CTA. */
 .clock-banner-btn :deep(.v-btn__overlay) { opacity: 0; }
 .clock-banner-btn {
   letter-spacing: 0.3px;
@@ -224,10 +224,5 @@ const ariaLabel = computed(() => {
 }
 .clock-banner-btn--emphasis :deep(.v-btn__content) {
   font-weight: 700;
-}
-.clock-banner-btn--emphasis {
-  /* A whisker heavier border + subtle halo makes Clock Out the primary CTA
-     without introducing a fourth color. */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 </style>

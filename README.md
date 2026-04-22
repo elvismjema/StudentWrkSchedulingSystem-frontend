@@ -2,6 +2,47 @@
 
 SWS is the Student Work Scheduling System for Oklahoma Christian University. Managers create shifts, build recurring schedule templates, and review time-off and swap requests; student workers clock in and out, submit availability, request shift swaps, and track their hours — all in one place. The system produces time-and-attendance records that feed into payroll-ready reports, and it supports three distinct roles: **student**, **manager**, and **admin**.
 
+## A Quick Look
+
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/screenshots/manager-dashboard.jpg">
+        <img src="docs/screenshots/manager-dashboard.jpg" alt="Manager dashboard showing who's clocked in, pending approvals, coming-up shifts, and unfilled shifts" width="100%" />
+      </a>
+      <br /><sub><b>Manager dashboard</b> — who's working now, pending approvals, coming-up shifts, and shifts needing coverage at a glance.</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/screenshots/student-dashboard-mobile.jpg">
+        <img src="docs/screenshots/student-dashboard-mobile.jpg" alt="Student mobile dashboard showing current shift, upcoming shifts, and clock-in call to action" width="45%" />
+      </a>
+      <br /><sub><b>Student home (mobile PWA)</b> — current shift up top, one-tap Clock In, and upcoming shifts listed cleanly below.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/screenshots/clock-in-out-mobile.jpg">
+        <img src="docs/screenshots/clock-in-out-mobile.jpg" alt="Mobile Clock In/Out screen with next shift, clock-in button, and weekly timesheet" width="45%" />
+      </a>
+      <br /><sub><b>Clock In / Out</b> — geo/location-aware clock-in window, live timer while clocked in, and a weekly timesheet that updates in real time.</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/screenshots/availability-week-mobile.jpg">
+        <img src="docs/screenshots/availability-week-mobile.jpg" alt="Weekly availability grid with class blocks synced from student schedule plus available and unavailable windows" width="45%" />
+      </a>
+      <br /><sub><b>Availability with class sync</b> — classes pulled directly from the student's course schedule sit alongside available and unavailable blocks, so managers never schedule over a class.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top" align="center">
+      <a href="docs/screenshots/shift-detail-mobile.jpg">
+        <img src="docs/screenshots/shift-detail-mobile.jpg" alt="Shift detail dialog with location, date, time, checklist of tasks, and actions for Add to Calendar, Request Cover, and Swap" width="40%" />
+      </a>
+      <br /><sub><b>Shift detail</b> — per-shift task checklists, plus one-tap Add to Calendar, Request Cover, and Swap.</sub>
+    </td>
+  </tr>
+</table>
+
 ## Stack
 
 - **Vue 3** — component framework

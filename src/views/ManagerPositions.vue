@@ -23,32 +23,71 @@
     </div>
 
     <div v-else class="positions-grid">
-      <v-card v-for="position in positions" :key="position.position_id" class="position-card" elevation="0">
-        <v-card-text class="position-card-content">
-          <div class="position-header">
-            <div class="position-name-row">
+      <article
+        v-for="position in positions"
+        :key="position.position_id"
+        class="pos-card"
+        role="button"
+        tabindex="0"
+        @click="openEditPosition(position)"
+        @keydown.enter.prevent="openEditPosition(position)"
+        @keydown.space.prevent="openEditPosition(position)"
+      >
+        <!-- Left color rail: always visible; falls back to brand so cards
+             without a configured color still feel intentional. -->
+        <span
+          class="pos-card__rail"
+          :style="{ background: position.color || 'var(--brand-primary)' }"
+        />
+
+        <div class="pos-card__body">
+          <header class="pos-card__head">
+            <h3 class="pos-card__title">{{ position.position_name }}</h3>
+            <div class="pos-card__actions" @click.stop>
+              <v-btn
+                icon="mdi-pencil"
+                variant="text"
+                size="small"
+                density="comfortable"
+                color="primary"
+                aria-label="Edit position"
+                @click="openEditPosition(position)"
+              />
+              <v-btn
+                icon="mdi-delete-outline"
+                variant="text"
+                size="small"
+                density="comfortable"
+                color="error"
+                aria-label="Delete position"
+                :disabled="position.workerCount > 0"
+                @click="confirmDeletePosition(position)"
+              />
+            </div>
+          </header>
+
+          <p class="pos-card__desc">
+            {{ position.description || 'No description' }}
+          </p>
+
+          <footer class="pos-card__foot">
+            <div class="pos-card__stack">
               <span
-                v-if="position.color"
-                class="position-color-swatch"
-                :style="{ backgroundColor: position.color }"
-              ></span>
-              <h3 class="position-name">{{ position.position_name }}</h3>
+                v-for="worker in workersPreviewFor(position)"
+                :key="worker.userId"
+                class="pos-avatar"
+                :title="worker.name"
+              >{{ initialsFor(worker.name) }}</span>
+              <span v-if="extraWorkersCount(position) > 0" class="pos-avatar pos-avatar--more">
+                +{{ extraWorkersCount(position) }}
+              </span>
             </div>
-            <div class="position-actions">
-              <v-btn size="small" variant="text" color="primary" @click="openEditPosition(position)">
-                <v-icon>mdi-pencil</v-icon>
-              </v-btn>
-              <v-btn size="small" variant="text" color="error" :disabled="position.workerCount > 0" @click="confirmDeletePosition(position)">
-                <v-icon>mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </div>
-          <p class="position-description">{{ position.description || "No description available" }}</p>
-          <div class="position-meta">
-            <span class="worker-count">{{ position.workerCount || 0 }} workers assigned</span>
-          </div>
-        </v-card-text>
-      </v-card>
+            <span class="pos-card__count">
+              {{ position.workerCount || 0 }} worker{{ position.workerCount === 1 ? '' : 's' }}
+            </span>
+          </footer>
+        </div>
+      </article>
     </div>
 
     <CreatePositionModal
@@ -418,6 +457,24 @@ const openEditPosition = (position) => {
   inlinePickerValue.value = null;
 };
 
+// Up to 3 workers to render as stacked avatars on a position card. Truncated
+// to keep the card visually balanced; the exact total is shown next to it.
+const MAX_PREVIEW_AVATARS = 3;
+
+const workersForPosition = (position) => {
+  const pid = Number(position?.position_id || 0);
+  if (!pid) return [];
+  return departmentWorkers.value.filter((w) => (w.positionIds || []).map(Number).includes(pid));
+};
+
+const workersPreviewFor = (position) =>
+  workersForPosition(position).slice(0, MAX_PREVIEW_AVATARS);
+
+const extraWorkersCount = (position) => {
+  const total = workersForPosition(position).length;
+  return Math.max(0, total - MAX_PREVIEW_AVATARS);
+};
+
 // Build initials (max 2 chars) from “First Last” for the avatar circle.
 const initialsFor = (name) => {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -634,72 +691,151 @@ onMounted(async () => {
   color: var(--text-2);
 }
 
+/* ── Position cards grid ─────────────────────────────────────────────────── */
 .positions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3, 16px);
 }
 
-.position-card {
+/* A position card mirrors the dashboard's .db-card vocabulary: surface-0
+   background, border-1 hairline, radius-md corners, token typography. The
+   left rail uses the position's own schedule color as a tasteful accent. */
+.pos-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: var(--surface-0);
   border: 1px solid var(--border-1);
-  border-radius: 16px;
+  border-radius: var(--radius-md, 12px);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
-.position-card-content {
-  padding: 28px;
+.pos-card:hover,
+.pos-card:focus-visible {
+  border-color: var(--brand-primary);
+  box-shadow: 0 2px 14px rgba(16, 24, 40, 0.06);
+  transform: translateY(-1px);
+  outline: none;
 }
 
-.position-header {
+.pos-card__rail {
+  flex: 0 0 6px;
+  align-self: stretch;
+}
+
+.pos-card__body {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 18px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.position-name {
-  margin: 0;
-  font-size: 42px;
-  line-height: 1;
-  font-weight: 700;
-  color: var(--text-1);
-}
-
-.position-description {
-  margin: 0 0 14px;
-  color: var(--text-2);
-  font-size: 16px;
-}
-
-.position-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.worker-count {
-  color: var(--text-2);
-  font-size: 14px;
-}
-
-.position-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.position-name-row {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
 }
 
-.position-color-swatch {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+.pos-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pos-card__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--text-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pos-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
   flex-shrink: 0;
-  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.pos-card:hover .pos-card__actions,
+.pos-card:focus-within .pos-card__actions {
+  opacity: 1;
+}
+
+/* Always show actions on touch devices so they're discoverable. */
+@media (hover: none) {
+  .pos-card__actions { opacity: 1; }
+}
+
+.pos-card__desc {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 1.45em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pos-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-1);
+}
+
+.pos-card__stack {
+  display: flex;
+  align-items: center;
+}
+
+.pos-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border: 2px solid var(--surface-0);
+  flex-shrink: 0;
+}
+
+.pos-avatar + .pos-avatar {
+  margin-left: -8px;
+}
+
+.pos-avatar--more {
+  background: var(--surface-2, #eef1f4);
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.pos-card__count {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 
 /* ── Edit Position modal ─────────────────────────────────────────────── */
@@ -950,20 +1086,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .positions-page {
-    padding: 16px;
-  }
-
-  .page-title {
-    font-size: 32px;
-  }
-
-  .positions-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .position-name {
-    font-size: 34px;
-  }
+  .positions-page { padding: 16px; }
+  .page-title { font-size: 28px; }
+  .positions-grid { grid-template-columns: 1fr; }
+  .pos-card__title { font-size: 18px; }
+  .pos-card__body { padding: 14px 16px; }
 }
 </style>

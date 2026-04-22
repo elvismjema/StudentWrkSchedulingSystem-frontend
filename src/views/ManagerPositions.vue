@@ -957,6 +957,32 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.worker-count {
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.position-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.position-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.position-color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
 .color-input {
   width: 36px;
   height: 28px;

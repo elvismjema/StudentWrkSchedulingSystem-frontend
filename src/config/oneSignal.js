@@ -20,6 +20,8 @@
 // external_id as a string, and a number/string mismatch silently misses.
 // ---------------------------------------------------------------------------
 
+import Utils from "./utils.js";
+
 const APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
@@ -181,6 +183,39 @@ export function optInPush() {
         await OneSignal.User.PushSubscription.optIn();
         // Give the SDK a tick to update state after the permission response.
         await new Promise((r) => setTimeout(r, 0));
+
+        // Re-assert the external_id AFTER the subscription exists. OneSignal's
+        // login() API only associates an external_id with an *existing*
+        // subscription — per docs: "OneSignal.login operates on an existing
+        // Subscription." The login() call we fire at boot in initOneSignal()
+        // is a no-op when the user has not yet granted push permission, because
+        // no subscription exists to tag. Without this re-tag, every freshly-
+        // created subscription stays anonymous (External ID blank in the
+        // dashboard), and the backend's include_aliases: { external_id: [..] }
+        // targets nobody — the exact symptom we were debugging. Re-calling
+        // login() here, immediately after optIn() resolves, guarantees the
+        // just-minted subscription gets the external_id before any push is
+        // ever targeted at it.
+        try {
+          const existingUser = Utils.getStore("user");
+          const userId =
+            existingUser && existingUser.id !== undefined && existingUser.id !== null
+              ? existingUser.id
+              : null;
+          if (userId !== null) {
+            const externalId = String(userId);
+            await OneSignal.login(externalId);
+            _writeDebug({ step: "optIn:login", ok: true, userId: externalId });
+          } else {
+            _writeDebug({ step: "optIn:login", ok: false, error: "no user in localStorage" });
+          }
+        } catch (tagErr) {
+          // Do NOT fail the optIn flow because of a tagging problem — the
+          // subscription still exists and can be re-tagged on the next boot.
+          console.warn("[OneSignal] external_id tag after optIn failed:", tagErr);
+          _writeDebug({ step: "optIn:login", ok: false, error: String(tagErr) });
+        }
+
         resolve(Boolean(OneSignal.User.PushSubscription.optedIn));
       } catch (err) {
         reject(err);

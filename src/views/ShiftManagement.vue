@@ -261,7 +261,7 @@
               <v-col cols="12">
                 <v-select
                   v-model="newShift.assigned_user_id"
-                  :items="createAssignableWorkers"
+                  :items="departmentWorkers"
                   item-title="title"
                   item-value="value"
                   :label="newShift.post_as_open ? 'Assign To (optional — open shift)' : 'Assign To *'"
@@ -270,8 +270,6 @@
                   clearable
                   prepend-inner-icon="mdi-account-outline"
                   :disabled="newShift.post_as_open"
-                  :loading="loadingCreateWorkers"
-                  :no-data-text="createWorkerNoDataText"
                   :rules="newShift.post_as_open ? [] : [v => !!v || 'Please assign a worker or toggle Post as Open Shift']"
                 />
               </v-col>
@@ -386,7 +384,7 @@
               <v-col cols="12">
                 <v-select
                   v-model="editShift.assigned_user_id"
-                  :items="editAssignableWorkers"
+                  :items="departmentWorkers"
                   item-title="title"
                   item-value="value"
                   :label="editShift.post_as_open ? 'Assign Worker (optional — open shift)' : 'Assign Worker (optional - leave blank for open shift)'"
@@ -395,8 +393,6 @@
                   hide-details
                   prepend-inner-icon="mdi-account-outline"
                   :disabled="editShift.post_as_open"
-                  :loading="loadingEditWorkers"
-                  :no-data-text="editWorkerNoDataText"
                 />
               </v-col>
               <v-col cols="12">
@@ -561,6 +557,7 @@ import apiClient from '../services/services.js'
 import taskListService from '../services/taskListService.js'
 import shiftTaskCompletionService from '../services/shiftTaskCompletionService.js'
 import departmentServices from '../services/departmentServices.js'
+import UserRoleServices from '../services/userRoleServices.js'
 import Utils from '../config/utils.js'
 import { TZ, localDateStr } from '../utils/tz.js'
 
@@ -579,10 +576,7 @@ const endMinuteListRef = ref(null)
 const shifts = ref([])
 const departments = ref([])
 const positions = ref([])
-const createAssignableWorkers = ref([])
-const editAssignableWorkers = ref([])
-const loadingCreateWorkers = ref(false)
-const loadingEditWorkers = ref(false)
+const departmentWorkers = ref([])
 const filters = ref({
   position_id: null,
   shift_date: null
@@ -659,34 +653,6 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
-
-const hasCreateWorkerQueryInputs = computed(() => (
-  !!currentDeptId &&
-  !!newShift.value.position_id &&
-  !!newShift.value.shift_date &&
-  !!newShift.value.start_time &&
-  !!newShift.value.end_time
-))
-
-const hasEditWorkerQueryInputs = computed(() => (
-  !!currentDeptId &&
-  !!editShift.value.position_id &&
-  !!editShift.value.shift_date &&
-  !!editShift.value.start_time &&
-  !!editShift.value.end_time
-))
-
-const createWorkerNoDataText = computed(() => {
-  if (loadingCreateWorkers.value) return 'Loading workers...'
-  if (!hasCreateWorkerQueryInputs.value) return 'Select position, date, and time first'
-  return 'No available workers match this shift'
-})
-
-const editWorkerNoDataText = computed(() => {
-  if (loadingEditWorkers.value) return 'Loading workers...'
-  if (!hasEditWorkerQueryInputs.value) return 'Select position, date, and time first'
-  return 'No available workers match this shift'
-})
 
 const isEditSaveDisabled = computed(() => {
   return (
@@ -1487,101 +1453,35 @@ const loadTaskLists = async () => {
   }
 }
 
-const mapAssignableWorkers = (rows = []) => rows
-  .map((user) => ({
-    title: `${user.fName || ''} ${user.lName || ''}`.trim() || user.email || 'Unnamed Worker',
-    value: Number(user.userId || user.id),
-    email: user.email,
-  }))
-  .filter((worker) => Number.isFinite(worker.value))
-
-const loadAssignableWorkersForCreate = async () => {
-  if (!showCreateDialog.value || !hasCreateWorkerQueryInputs.value) {
-    createAssignableWorkers.value = []
-    if (newShift.value.assigned_user_id) newShift.value.assigned_user_id = null
-    return
-  }
-
+const loadDepartmentWorkers = async () => {
+  if (!currentDeptId) return
   try {
-    loadingCreateWorkers.value = true
-    const response = await shiftService.getAssignableWorkers({
-      department_id: currentDeptId,
-      position_id: newShift.value.position_id,
-      shift_date: newShift.value.shift_date,
-      start_time: newShift.value.start_time,
-      end_time: newShift.value.end_time,
-    })
-    createAssignableWorkers.value = mapAssignableWorkers(response?.data?.data || response?.data || [])
-    if (
-      newShift.value.assigned_user_id &&
-      !createAssignableWorkers.value.some((worker) => worker.value === Number(newShift.value.assigned_user_id))
-    ) {
-      newShift.value.assigned_user_id = null
-    }
+    const response = await UserRoleServices.getAllUsersWithRoles(true)
+    const users = response?.data || []
+
+    const departmentMembers = users.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) => Number(membership.department_id) === Number(currentDeptId),
+      ),
+    )
+
+    const studentMembers = departmentMembers.filter((user) =>
+      (user.userDepartments || []).some(
+        (membership) =>
+          Number(membership.department_id) === Number(currentDeptId) &&
+          String(membership?.role?.role_name || '').toLowerCase().includes('student'),
+      ),
+    )
+
+    const candidateUsers = studentMembers.length > 0 ? studentMembers : departmentMembers
+    departmentWorkers.value = candidateUsers.map((user) => ({
+      title: `${user.fName || ''} ${user.lName || ''}`.trim() || user.email || 'Unnamed Worker',
+      value: Number(user.id),
+      email: user.email,
+    }))
   } catch (error) {
-    createAssignableWorkers.value = []
-    if (newShift.value.assigned_user_id) newShift.value.assigned_user_id = null
-    errorMessage.value = error?.response?.data?.message || 'Failed to load assignable workers'
-    showError.value = true
-  } finally {
-    loadingCreateWorkers.value = false
+    console.error('Error loading department workers:', error)
   }
-}
-
-const loadAssignableWorkersForEdit = async () => {
-  if (!showEditDialog.value || !hasEditWorkerQueryInputs.value) {
-    editAssignableWorkers.value = []
-    if (editShift.value.assigned_user_id) editShift.value.assigned_user_id = null
-    return
-  }
-
-  try {
-    loadingEditWorkers.value = true
-    const response = await shiftService.getAssignableWorkers({
-      department_id: currentDeptId,
-      position_id: editShift.value.position_id,
-      shift_date: editShift.value.shift_date,
-      start_time: editShift.value.start_time,
-      end_time: editShift.value.end_time,
-      exclude_shift_id: editShift.value.shift_id,
-    })
-    editAssignableWorkers.value = mapAssignableWorkers(response?.data?.data || response?.data || [])
-    if (
-      editShift.value.assigned_user_id &&
-      !editAssignableWorkers.value.some((worker) => worker.value === Number(editShift.value.assigned_user_id))
-    ) {
-      editShift.value.assigned_user_id = null
-    }
-  } catch (error) {
-    editAssignableWorkers.value = []
-    if (editShift.value.assigned_user_id) editShift.value.assigned_user_id = null
-    errorMessage.value = error?.response?.data?.message || 'Failed to load assignable workers'
-    showError.value = true
-  } finally {
-    loadingEditWorkers.value = false
-  }
-}
-
-const validateSelectedWorkerEligibility = async ({
-  assignedUserId,
-  positionId,
-  shiftDate,
-  startTime,
-  endTime,
-  excludeShiftId = null,
-}) => {
-  if (!assignedUserId) return true
-
-  const response = await shiftService.getAssignableWorkers({
-    department_id: currentDeptId,
-    position_id: positionId,
-    shift_date: shiftDate,
-    start_time: startTime,
-    end_time: endTime,
-    ...(excludeShiftId ? { exclude_shift_id: excludeShiftId } : {}),
-  })
-  const options = mapAssignableWorkers(response?.data?.data || response?.data || [])
-  return options.some((worker) => worker.value === Number(assignedUserId))
 }
 
 const loadDepartments = async () => {
@@ -1615,29 +1515,6 @@ const createShift = async () => {
     errorMessage.value = validation.message
     showError.value = true
     return
-  }
-
-  if (!newShift.value.post_as_open && newShift.value.assigned_user_id) {
-    try {
-      const stillEligible = await validateSelectedWorkerEligibility({
-        assignedUserId: newShift.value.assigned_user_id,
-        positionId: newShift.value.position_id,
-        shiftDate: newShift.value.shift_date,
-        startTime: newShift.value.start_time,
-        endTime: newShift.value.end_time,
-      })
-
-      if (!stillEligible) {
-        errorMessage.value = 'Selected worker no longer qualifies for this shift. Please choose another worker.'
-        showError.value = true
-        await loadAssignableWorkersForCreate()
-        return
-      }
-    } catch (error) {
-      errorMessage.value = error?.response?.data?.message || 'Unable to validate assigned worker eligibility.'
-      showError.value = true
-      return
-    }
   }
 
   try {
@@ -1706,30 +1583,6 @@ const saveShiftEdits = async () => {
     errorMessage.value = validation.message
     showError.value = true
     return
-  }
-
-  if (!editShift.value.post_as_open && editShift.value.assigned_user_id) {
-    try {
-      const stillEligible = await validateSelectedWorkerEligibility({
-        assignedUserId: editShift.value.assigned_user_id,
-        positionId: editShift.value.position_id,
-        shiftDate: editShift.value.shift_date,
-        startTime: editShift.value.start_time,
-        endTime: editShift.value.end_time,
-        excludeShiftId: editShift.value.shift_id,
-      })
-
-      if (!stillEligible) {
-        errorMessage.value = 'Selected worker no longer qualifies for this shift. Please choose another worker.'
-        showError.value = true
-        await loadAssignableWorkersForEdit()
-        return
-      }
-    } catch (error) {
-      errorMessage.value = error?.response?.data?.message || 'Unable to validate assigned worker eligibility.'
-      showError.value = true
-      return
-    }
   }
 
   try {
@@ -1832,41 +1685,6 @@ watch(
   },
 )
 
-watch(
-  () => [
-    showCreateDialog.value,
-    newShift.value.position_id,
-    newShift.value.shift_date,
-    newShift.value.start_time,
-    newShift.value.end_time,
-  ],
-  async ([isOpen]) => {
-    if (!isOpen) {
-      createAssignableWorkers.value = []
-      return
-    }
-    await loadAssignableWorkersForCreate()
-  },
-)
-
-watch(
-  () => [
-    showEditDialog.value,
-    editShift.value.shift_id,
-    editShift.value.position_id,
-    editShift.value.shift_date,
-    editShift.value.start_time,
-    editShift.value.end_time,
-  ],
-  async ([isOpen]) => {
-    if (!isOpen) {
-      editAssignableWorkers.value = []
-      return
-    }
-    await loadAssignableWorkersForEdit()
-  },
-)
-
 const onShiftAssigned = (assignmentData) => {
   successMessage.value = `Shift assigned to ${assignmentData.userName} successfully!`
   showSuccess.value = true
@@ -1886,6 +1704,7 @@ onMounted(async () => {
     loadDepartmentCalendarHours(),
     loadShifts(),
     loadPositions(),
+    loadDepartmentWorkers(),
     loadTaskLists()
   ])
 

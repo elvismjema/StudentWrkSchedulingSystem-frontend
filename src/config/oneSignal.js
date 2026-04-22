@@ -54,7 +54,7 @@ function withOneSignal(fn) {
  * the SW controls, and must match our Vite `base` so the SW covers the whole
  * app.
  */
-export function initOneSignal() {
+export function initOneSignal(userId = null) {
   if (!APP_ID) {
     console.warn(
       "[OneSignal] VITE_ONESIGNAL_APP_ID is not set; push notifications will be disabled in this build.",
@@ -81,6 +81,13 @@ export function initOneSignal() {
       serviceWorkerPath: swPath,
       serviceWorkerParam: { scope },
     });
+    // Login immediately after init() completes, inside the same deferred
+    // callback. This is required because OneSignal processes OneSignalDeferred
+    // entries concurrently — a separate loginOneSignal() push would race
+    // against init() and be silently ignored if init() hasn't finished yet.
+    if (userId !== null && userId !== undefined) {
+      await OneSignal.login(String(userId));
+    }
   });
 }
 

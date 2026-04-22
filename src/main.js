@@ -4,7 +4,7 @@ import router from "./router.js";
 import vuetify from "./plugins/vuetify.js";
 import "./styles/tokens.css";
 import Utils from "./config/utils.js";
-import { initOneSignal, loginOneSignal } from "./config/oneSignal.js";
+import { initOneSignal } from "./config/oneSignal.js";
 
 // ---------------------------------------------------------------------------
 // Explicit service worker registration.
@@ -60,15 +60,20 @@ if ("serviceWorker" in navigator) {
 //      frontend hasn't told OneSignal who this user is, the push lands on
 //      "no valid subscriptions" and the student gets nothing.
 // ---------------------------------------------------------------------------
-initOneSignal();
 try {
   const existingUser = Utils.getStore("user");
-  if (existingUser && existingUser.id !== undefined && existingUser.id !== null) {
-    loginOneSignal(existingUser.id);
-  }
+  const storedUserId =
+    existingUser && existingUser.id !== undefined && existingUser.id !== null
+      ? existingUser.id
+      : null;
+  // Pass userId into initOneSignal so login() fires in the same deferred
+  // callback immediately after init() completes, avoiding the race where a
+  // separate loginOneSignal() push runs before init() has finished.
+  initOneSignal(storedUserId);
 } catch (err) {
   // Never let a OneSignal problem block app boot. Log and keep going.
   console.warn("[OneSignal] bootstrap login skipped:", err);
+  initOneSignal();
 }
 
 // When a lazy-loaded chunk (JS or CSS) fails to load (e.g. 404 after a new

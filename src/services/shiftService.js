@@ -43,19 +43,6 @@ export default {
     return this.updateShift(shiftId, { assigned_user_id: userId });
   },
 
-  // Get workers who can be assigned for a specific shift window
-  getAssignableWorkers(params = {}) {
-    const query = new URLSearchParams();
-    if (params.department_id) query.append('department_id', params.department_id);
-    if (params.position_id) query.append('position_id', params.position_id);
-    if (params.shift_date) query.append('shift_date', params.shift_date);
-    if (params.start_time) query.append('start_time', params.start_time);
-    if (params.end_time) query.append('end_time', params.end_time);
-    if (params.exclude_shift_id) query.append('exclude_shift_id', params.exclude_shift_id);
-
-    return apiClient.get(`shifts/assignable-workers?${query.toString()}`);
-  },
-
   // Remove user assignment from shift
   removeUserAssignment(shiftId) {
     return this.updateShift(shiftId, { assigned_user_id: null });

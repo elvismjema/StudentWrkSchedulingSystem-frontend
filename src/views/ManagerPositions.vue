@@ -252,27 +252,36 @@ const isStudentMembership = (membership) => {
   return roleName.includes("student") || roleName.includes("worker") || permissionLevel < 50;
 };
 
+// A worker appears under a position if ANY of their active memberships in this
+// department points to that position. Students can hold multiple positions, so
+// we aggregate all `positionIds` per worker instead of relying on a single one.
 const assignedWorkersForEdit = computed(() => {
   const positionId = Number(editPositionModal.position?.position_id || 0);
   if (!positionId) return [];
-  return departmentWorkers.value.filter((worker) => Number(worker.positionId) === positionId);
+  return departmentWorkers.value.filter((worker) =>
+    (worker.positionIds || []).map(Number).includes(positionId),
+  );
 });
 
+// All department workers EXCEPT those already in this position. Workers who
+// already hold other positions remain selectable — assignment is additive.
 const availableWorkersForEdit = computed(() => {
   const positionId = Number(editPositionModal.position?.position_id || 0);
   if (!positionId) return [];
 
   return departmentWorkers.value
-    .filter((worker) => Number(worker.positionId) !== positionId)
+    .filter((worker) => !(worker.positionIds || []).map(Number).includes(positionId))
     .map((worker) => {
-      const currentPosition = positions.value.find((position) => Number(position.position_id) === Number(worker.positionId));
-      const currentPositionLabel = currentPosition?.position_name
-        ? ` (currently ${currentPosition.position_name})`
+      const otherPositionNames = (worker.positionIds || [])
+        .map((pid) => positions.value.find((p) => Number(p.position_id) === Number(pid))?.position_name)
+        .filter(Boolean);
+      const suffix = otherPositionNames.length
+        ? ` (also: ${otherPositionNames.join(", ")})`
         : "";
 
       return {
         value: worker.userId,
-        label: `${worker.name}${currentPositionLabel}`,
+        label: `${worker.name}${suffix}`,
       };
     });
 });
@@ -288,28 +297,37 @@ const loadWorkers = async () => {
     const users = toItems(response);
     const departmentId = Number(deptContext.department_id);
 
-    const normalized = users.flatMap((user) => {
+    // A single user can now have multiple active memberships in the same
+    // department — one per position. Group them so each UI worker row carries
+    // the FULL set of position ids they hold.
+    const byUser = new Map();
+    users.forEach((user) => {
       const memberships = (user.userDepartments || [])
         .filter((membership) => Number(membership.department_id) === departmentId)
         .filter((membership) => membership.is_active !== false)
         .filter((membership) => isStudentMembership(membership));
 
-      return memberships.map((membership) => ({
-        userId: Number(user.id || user.userId),
+      if (!memberships.length) return;
+
+      const userId = Number(user.id || user.userId);
+      const existing = byUser.get(userId) || {
+        userId,
         name: `${user.fName || ""} ${user.lName || ""}`.trim() || user.email || "Worker",
         email: user.email || "",
-        positionId: membership.position_id || membership.position?.position_id || null,
-      }));
+        positionIds: [],
+      };
+
+      memberships.forEach((membership) => {
+        const pid = Number(membership.position_id || membership.position?.position_id || 0);
+        if (pid && !existing.positionIds.includes(pid)) {
+          existing.positionIds.push(pid);
+        }
+      });
+
+      byUser.set(userId, existing);
     });
 
-    const uniqueWorkers = new Map();
-    normalized.forEach((worker) => {
-      if (!uniqueWorkers.has(worker.userId)) {
-        uniqueWorkers.set(worker.userId, worker);
-      }
-    });
-
-    departmentWorkers.value = Array.from(uniqueWorkers.values());
+    departmentWorkers.value = Array.from(byUser.values());
   } catch {
     departmentWorkers.value = [];
   }
@@ -327,8 +345,8 @@ const loadPositions = async () => {
     const response = await apiClient.get(`/positions?department_id=${deptContext.department_id}`);
     const items = toItems(response);
     positions.value = items.map((position) => {
-      const workerCount = departmentWorkers.value.filter(
-        (worker) => Number(worker.positionId) === Number(position.position_id),
+      const workerCount = departmentWorkers.value.filter((worker) =>
+        (worker.positionIds || []).map(Number).includes(Number(position.position_id)),
       ).length;
       return { ...position, workerCount };
     });
@@ -366,6 +384,9 @@ const refreshWorkersAndPositions = async () => {
   }
 };
 
+// Additive assign: hits the new /add-worker-position endpoint which inserts a
+// new membership row for (user, dept, position) without touching the worker's
+// other position memberships.
 const assignWorkersToPosition = async () => {
   if (!editPositionModal.position || !editPositionModal.selectedWorkerIds.length) return;
 
@@ -374,7 +395,7 @@ const assignWorkersToPosition = async () => {
   try {
     await Promise.all(
       editPositionModal.selectedWorkerIds.map((userId) =>
-        apiClient.post("/user-departments/assign-worker", {
+        apiClient.post("/user-departments/add-worker-position", {
           userId,
           departmentId: deptContext.department_id,
           positionId: editPositionModal.position.position_id,
@@ -391,16 +412,18 @@ const assignWorkersToPosition = async () => {
   }
 };
 
+// Scoped remove: only deactivates the single (user, dept, position) row, so
+// the worker keeps any other positions they hold in this department.
 const removeWorkerFromPosition = async (userId) => {
   if (!editPositionModal.position) return;
 
   editPositionModal.assignmentBusy = true;
   editPositionModal.error = "";
   try {
-    await apiClient.post("/user-departments/assign-worker", {
+    await apiClient.post("/user-departments/remove-worker-position", {
       userId,
       departmentId: deptContext.department_id,
-      positionId: null,
+      positionId: editPositionModal.position.position_id,
     });
 
     await refreshWorkersAndPositions();

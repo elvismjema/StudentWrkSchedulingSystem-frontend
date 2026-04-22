@@ -247,23 +247,38 @@ const endTimeOptions = computed(() => {
 });
 
 const workerOptions = computed(() =>
-  (departmentWorkers.value || []).map((worker) => ({
+  visibleWorkers.value.map((worker) => ({
     value: worker.userId || worker.id,
     label: `${worker.fName || ""} ${worker.lName || ""}`.trim() || worker.email || "Worker",
   })),
 );
+
+// Step 2 client-side narrowing: filter the already-fetched time-eligible list
+// by selected position. When no position is picked yet, show everyone who is
+// time-eligible so the manager can see who is free before committing.
+const visibleWorkers = computed(() => {
+  const positionId = Number(form.position_id) || null;
+  if (!positionId) return departmentWorkers.value;
+  return departmentWorkers.value.filter((w) => Number(w.position_id) === positionId);
+});
 
 const hasRequiredFields = computed(
   () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
 const isPastDate = computed(() => !!form.shift_date && form.shift_date < todayIso.value);
 const workersNeededValid = computed(() => Number(form.workers_needed) >= 1 && Number(form.workers_needed) <= 10);
+// Position is NOT required to fetch workers - the Step 1 fetch triggers on
+// date/start/end alone, and position filtering happens client-side.
 const hasWorkerQueryInputs = computed(
-  () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
+  () => !!form.department_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
 const workerNoDataText = computed(() => {
   if (loadingWorkers.value) return "Loading workers...";
-  if (!hasWorkerQueryInputs.value) return "Select position, date, and time first";
+  if (!hasWorkerQueryInputs.value) return "Select date and time first";
+  if (departmentWorkers.value.length === 0) return "No workers are free in this time window";
+  if (form.position_id && visibleWorkers.value.length === 0) {
+    return "No free workers are assigned to this position";
+  }
   return "No available workers match this shift";
 });
 
@@ -328,9 +343,11 @@ const loadWorkers = async () => {
 
   loadingWorkers.value = true;
   try {
+    // Step 1: department-wide list of time-eligible workers. No position_id
+    // is sent - backend enforces the 5 eligibility rules, position filtering
+    // is applied client-side via visibleWorkers.
     const response = await shiftService.getAssignableWorkers({
       department_id: form.department_id,
-      position_id: form.position_id,
       shift_date: form.shift_date,
       start_time: form.start_time,
       end_time: form.end_time,
@@ -344,6 +361,8 @@ const loadWorkers = async () => {
         fName: user.fName,
         lName: user.lName,
         email: user.email,
+        position_id: user.position_id != null ? Number(user.position_id) : null,
+        position_name: user.position_name || null,
       }));
 
     if (
@@ -383,10 +402,26 @@ watch(
   { immediate: true },
 );
 
+// Step 1 trigger: refetch only when the time window changes. Position
+// changes re-filter the existing list via visibleWorkers (no network call).
 watch(
-  () => [form.position_id, form.shift_date, form.start_time, form.end_time],
+  () => [form.shift_date, form.start_time, form.end_time],
   () => {
     loadWorkers();
+  },
+);
+
+// If the manager switches positions, clear any previously-selected worker
+// that is no longer in the narrowed set so we do not submit a worker who
+// is not in the chosen position.
+watch(
+  () => form.position_id,
+  (positionId) => {
+    if (!positionId || !form.assigned_user_id) return;
+    const stillVisible = visibleWorkers.value.some(
+      (w) => Number(w.userId || w.id) === Number(form.assigned_user_id),
+    );
+    if (!stillVisible) form.assigned_user_id = null;
   },
 );
 

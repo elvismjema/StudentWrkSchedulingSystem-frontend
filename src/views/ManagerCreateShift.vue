@@ -469,8 +469,16 @@ const clearTime = (target) => {
   endTimeMenu.value = false;
 };
 
+// Step 2 client-side narrowing. When no position is picked yet, show everyone
+// who is time-eligible; when one is picked, narrow to workers in that position.
+const visibleWorkers = computed(() => {
+  const positionId = Number(form.position_id) || null;
+  if (!positionId) return departmentWorkers.value;
+  return departmentWorkers.value.filter((w) => Number(w.position_id) === positionId);
+});
+
 const workerOptions = computed(() =>
-  (departmentWorkers.value || []).map((worker) => ({
+  visibleWorkers.value.map((worker) => ({
     value: worker.userId || worker.id,
     label: `${worker.fName || ""} ${worker.lName || ""}`.trim() || worker.email || "Worker",
   })),
@@ -480,13 +488,19 @@ const isPastDate = computed(() => !!form.shift_date && form.shift_date < todayIs
 const hasRequiredFields = computed(
   () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
+// Position is NOT required for the Step 1 fetch - manager can see who is free
+// in the time window before committing to a position.
 const hasWorkerQueryInputs = computed(
-  () => !!form.department_id && !!form.position_id && !!form.shift_date && !!form.start_time && !!form.end_time,
+  () => !!form.department_id && !!form.shift_date && !!form.start_time && !!form.end_time,
 );
 const workersNeededValid = computed(() => Number(form.workers_needed) >= 1 && Number(form.workers_needed) <= 10);
 const workerNoDataText = computed(() => {
   if (loadingWorkers.value) return "Loading workers...";
-  if (!hasWorkerQueryInputs.value) return "Select position, date, and time first";
+  if (!hasWorkerQueryInputs.value) return "Select date and time first";
+  if (departmentWorkers.value.length === 0) return "No workers are free in this time window";
+  if (form.position_id && visibleWorkers.value.length === 0) {
+    return "No free workers are assigned to this position";
+  }
   return "No available workers match this shift";
 });
 
@@ -547,22 +561,23 @@ const loadWorkers = async () => {
   if (!hasWorkerQueryInputs.value) {
     departmentWorkers.value = [];
     form.assigned_user_id = null;
-    workerLoadError.value = "Select position, shift date, and time to load available students.";
+    workerLoadError.value = "Select shift date and time to load available students.";
     return;
   }
 
   loadingWorkers.value = true;
   workerLoadError.value = "";
   try {
+    // Step 1: fetch department-wide, time-eligible list. We deliberately do
+    // NOT send position_id - the backend enforces the 5 eligibility rules
+    // regardless, and position filtering happens client-side in visibleWorkers.
+    // This lets the manager see who is free before committing to a position.
     const params = new URLSearchParams({
       department_id: String(departmentId),
       shift_date: String(form.shift_date),
       start_time: String(form.start_time),
       end_time: String(form.end_time),
     });
-    if (form.position_id) {
-      params.append("position_id", String(form.position_id));
-    }
 
     const response = await apiClient.get(`/shifts/assignable-workers?${params.toString()}`);
     const workers = toItems(response);
@@ -574,6 +589,8 @@ const loadWorkers = async () => {
         fName: user.fName,
         lName: user.lName,
         email: user.email,
+        position_id: user.position_id != null ? Number(user.position_id) : null,
+        position_name: user.position_name || null,
       }));
 
     if (
@@ -584,9 +601,7 @@ const loadWorkers = async () => {
     }
 
     if (departmentWorkers.value.length === 0) {
-      workerLoadError.value = form.position_id
-        ? "No available students match this position and time."
-        : "No available students for this shift time.";
+      workerLoadError.value = "No available students for this shift time.";
     }
   } catch (error) {
     departmentWorkers.value = [];
@@ -606,10 +621,25 @@ watch(
   { immediate: true },
 );
 
+// Step 1 trigger: only the time window affects the fetch. Position changes
+// re-filter via visibleWorkers without a network call.
 watch(
-  () => [form.position_id, form.shift_date, form.start_time, form.end_time],
+  () => [form.shift_date, form.start_time, form.end_time],
   () => {
     loadWorkers();
+  },
+);
+
+// When manager switches positions, clear a previously-selected worker that
+// is no longer in the narrowed set so they must pick again from the right list.
+watch(
+  () => form.position_id,
+  (positionId) => {
+    if (!positionId || !form.assigned_user_id) return;
+    const stillVisible = visibleWorkers.value.some(
+      (w) => Number(w.userId || w.id) === Number(form.assigned_user_id),
+    );
+    if (!stillVisible) form.assigned_user_id = null;
   },
 );
 

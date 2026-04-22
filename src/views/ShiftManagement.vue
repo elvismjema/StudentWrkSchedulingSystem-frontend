@@ -261,7 +261,7 @@
               <v-col cols="12">
                 <v-select
                   v-model="newShift.assigned_user_id"
-                  :items="createAssignableWorkers"
+                  :items="visibleCreateWorkers"
                   item-title="title"
                   item-value="value"
                   :label="newShift.post_as_open ? 'Assign To (optional — open shift)' : 'Assign To *'"
@@ -386,7 +386,7 @@
               <v-col cols="12">
                 <v-select
                   v-model="editShift.assigned_user_id"
-                  :items="editAssignableWorkers"
+                  :items="visibleEditWorkers"
                   item-title="title"
                   item-value="value"
                   :label="editShift.post_as_open ? 'Assign Worker (optional — open shift)' : 'Assign Worker (optional - leave blank for open shift)'"
@@ -660,9 +660,19 @@ const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
+// Two-step manager assignment flow:
+//   Step 1: manager picks date + start + end -> fetch department-wide list of
+//           workers who are free in that window (ignoring position). The backend
+//           applies the 5 eligibility rules (availability, class schedule,
+//           approved time-off, overlapping shift, buffer time) regardless of
+//           whether a position is supplied.
+//   Step 2: manager picks a position -> narrow the fetched list client-side to
+//           workers whose position_id matches. No extra network round-trip.
+//
+// Position is intentionally NOT part of the fetch trigger, so the manager can
+// see 'who is even free at 2-5pm Tuesday' before they commit to a position.
 const hasCreateWorkerQueryInputs = computed(() => (
   !!currentDeptId &&
-  !!newShift.value.position_id &&
   !!newShift.value.shift_date &&
   !!newShift.value.start_time &&
   !!newShift.value.end_time
@@ -670,21 +680,47 @@ const hasCreateWorkerQueryInputs = computed(() => (
 
 const hasEditWorkerQueryInputs = computed(() => (
   !!currentDeptId &&
-  !!editShift.value.position_id &&
   !!editShift.value.shift_date &&
   !!editShift.value.start_time &&
   !!editShift.value.end_time
 ))
 
+// Filter the time-eligible list by selected position (Step 2). When no
+// position is selected yet, we show the full time-eligible list so the
+// manager can see who is free before committing to a position.
+const visibleCreateWorkers = computed(() => {
+  const positionId = Number(newShift.value.position_id) || null
+  if (!positionId) return createAssignableWorkers.value
+  return createAssignableWorkers.value.filter(
+    (w) => Number(w.position_id) === positionId,
+  )
+})
+
+const visibleEditWorkers = computed(() => {
+  const positionId = Number(editShift.value.position_id) || null
+  if (!positionId) return editAssignableWorkers.value
+  return editAssignableWorkers.value.filter(
+    (w) => Number(w.position_id) === positionId,
+  )
+})
+
 const createWorkerNoDataText = computed(() => {
   if (loadingCreateWorkers.value) return 'Loading workers...'
-  if (!hasCreateWorkerQueryInputs.value) return 'Select position, date, and time first'
+  if (!hasCreateWorkerQueryInputs.value) return 'Select date and time first'
+  if (createAssignableWorkers.value.length === 0) return 'No workers are free in this time window'
+  if (newShift.value.position_id && visibleCreateWorkers.value.length === 0) {
+    return 'No free workers are assigned to this position'
+  }
   return 'No available workers match this shift'
 })
 
 const editWorkerNoDataText = computed(() => {
   if (loadingEditWorkers.value) return 'Loading workers...'
-  if (!hasEditWorkerQueryInputs.value) return 'Select position, date, and time first'
+  if (!hasEditWorkerQueryInputs.value) return 'Select date and time first'
+  if (editAssignableWorkers.value.length === 0) return 'No workers are free in this time window'
+  if (editShift.value.position_id && visibleEditWorkers.value.length === 0) {
+    return 'No free workers are assigned to this position'
+  }
   return 'No available workers match this shift'
 })
 
@@ -1487,14 +1523,22 @@ const loadTaskLists = async () => {
   }
 }
 
+// Preserve position_id from the backend response so Step 2 (client-side
+// narrowing by selected position) can filter without a second fetch.
 const mapAssignableWorkers = (rows = []) => rows
   .map((user) => ({
     title: `${user.fName || ''} ${user.lName || ''}`.trim() || user.email || 'Unnamed Worker',
     value: Number(user.userId || user.id),
     email: user.email,
+    position_id: user.position_id != null ? Number(user.position_id) : null,
+    position_name: user.position_name || null,
   }))
   .filter((worker) => Number.isFinite(worker.value))
 
+// Step 1 fetch: pulls the department-wide, time-eligible list. We intentionally
+// do NOT send position_id here so the backend returns everyone in the department
+// who is free in that window; position filtering happens client-side via
+// visibleCreateWorkers / visibleEditWorkers.
 const loadAssignableWorkersForCreate = async () => {
   if (!showCreateDialog.value || !hasCreateWorkerQueryInputs.value) {
     createAssignableWorkers.value = []
@@ -1506,12 +1550,15 @@ const loadAssignableWorkersForCreate = async () => {
     loadingCreateWorkers.value = true
     const response = await shiftService.getAssignableWorkers({
       department_id: currentDeptId,
-      position_id: newShift.value.position_id,
       shift_date: newShift.value.shift_date,
       start_time: newShift.value.start_time,
       end_time: newShift.value.end_time,
     })
     createAssignableWorkers.value = mapAssignableWorkers(response?.data?.data || response?.data || [])
+    // If the currently-selected worker is no longer in the time-eligible
+    // set (e.g. they just became unavailable when the manager bumped the
+    // end time), clear the selection so the save guard does not block save
+    // after the fact.
     if (
       newShift.value.assigned_user_id &&
       !createAssignableWorkers.value.some((worker) => worker.value === Number(newShift.value.assigned_user_id))
@@ -1539,7 +1586,6 @@ const loadAssignableWorkersForEdit = async () => {
     loadingEditWorkers.value = true
     const response = await shiftService.getAssignableWorkers({
       department_id: currentDeptId,
-      position_id: editShift.value.position_id,
       shift_date: editShift.value.shift_date,
       start_time: editShift.value.start_time,
       end_time: editShift.value.end_time,
@@ -1832,10 +1878,12 @@ watch(
   },
 )
 
+// Trigger the Step 1 fetch on changes to date/start/end. Position is NOT in
+// this watcher - switching positions re-filters the already-loaded list
+// via visibleCreateWorkers / visibleEditWorkers (no extra network call).
 watch(
   () => [
     showCreateDialog.value,
-    newShift.value.position_id,
     newShift.value.shift_date,
     newShift.value.start_time,
     newShift.value.end_time,
@@ -1849,11 +1897,24 @@ watch(
   },
 )
 
+// When the manager switches positions, the fetched list stays but the
+// selected worker may no longer match the new position. Clear them so the
+// manager is forced to pick from the narrowed list.
+watch(
+  () => newShift.value.position_id,
+  (positionId) => {
+    if (!positionId || !newShift.value.assigned_user_id) return
+    const stillVisible = visibleCreateWorkers.value.some(
+      (w) => w.value === Number(newShift.value.assigned_user_id),
+    )
+    if (!stillVisible) newShift.value.assigned_user_id = null
+  },
+)
+
 watch(
   () => [
     showEditDialog.value,
     editShift.value.shift_id,
-    editShift.value.position_id,
     editShift.value.shift_date,
     editShift.value.start_time,
     editShift.value.end_time,
@@ -1864,6 +1925,17 @@ watch(
       return
     }
     await loadAssignableWorkersForEdit()
+  },
+)
+
+watch(
+  () => editShift.value.position_id,
+  (positionId) => {
+    if (!positionId || !editShift.value.assigned_user_id) return
+    const stillVisible = visibleEditWorkers.value.some(
+      (w) => w.value === Number(editShift.value.assigned_user_id),
+    )
+    if (!stillVisible) editShift.value.assigned_user_id = null
   },
 )
 

@@ -74,10 +74,36 @@
             <div class="toggle-row">
               <div>
                 <div class="toggle-title">Recurring Shift</div>
-                <div class="toggle-subtitle">Repeat this shift weekly</div>
+                <div class="toggle-subtitle">Repeat this shift on a regular schedule</div>
               </div>
               <v-switch v-model="form.recurring" color="primary" hide-details inset />
             </div>
+            <v-expand-transition>
+              <div v-if="form.recurring" class="mt-3">
+                <div class="text-caption text-medium-emphasis mb-1">Repeat frequency</div>
+                <v-btn-toggle
+                  v-model="form.recurrence_frequency"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  class="mb-3 w-100"
+                  divided
+                  rounded="lg"
+                >
+                  <v-btn value="weekly" class="flex-grow-1">Every Week</v-btn>
+                  <v-btn value="daily" class="flex-grow-1">Every Day</v-btn>
+                </v-btn-toggle>
+                <v-text-field
+                  v-model="form.repeat_until"
+                  type="date"
+                  label="Repeat Until"
+                  variant="outlined"
+                  density="comfortable"
+                  :min="form.shift_date || undefined"
+                  hide-details="auto"
+                />
+              </div>
+            </v-expand-transition>
           </v-col>
 
           <v-col cols="12">
@@ -194,6 +220,8 @@ const form = reactive({
   start_time: "",
   end_time: "",
   recurring: false,
+  recurrence_frequency: "weekly",
+  repeat_until: "",
   post_as_open: false,
   workers_needed: 1,
   assigned_user_id: null,
@@ -254,6 +282,8 @@ const resetForm = () => {
   form.start_time = "";
   form.end_time = "";
   form.recurring = false;
+  form.recurrence_frequency = "weekly";
+  form.repeat_until = "";
   form.post_as_open = false;
   form.workers_needed = 1;
   form.assigned_user_id = null;
@@ -411,8 +441,9 @@ const submitShift = async () => {
       created_by: creatorId,
       is_published: true,
       is_recurring: form.recurring,
-      recurrence_pattern: form.recurring ? "weekly" : null,
+      recurrence_pattern: form.recurring ? form.recurrence_frequency : null,
       recurrence_start_date: form.recurring ? form.shift_date : null,
+      recurrence_end_date: form.recurring ? form.repeat_until || null : null,
       tasks_notes: JSON.stringify({
         tasks: [],
         notes: form.notes?.trim() || null,

@@ -10,8 +10,8 @@
  * and on the Home dashboard as incoming-request cards, so a standalone
  * Swap Board tab is not needed.
  *
- * 'More' is the catch-all hub for everything else (Tasks, Profile,
- * Settings). Anything that doesn't earn one of the four primary tabs
+ * 'More' is the catch-all hub for everything else (Profile, Settings).
+ * Anything that doesn't earn one of the four primary tabs
  * lives behind More — do not add new primary tabs to make a feature
  * more discoverable.
  *
@@ -80,16 +80,6 @@ const studentMobilePrimaryTabs = [
 
 export const studentMoreItems = [
   {
-    key: 'tasks',
-    label: 'Tasks',
-    description: 'Assigned tasks & to-dos',
-    icon: 'mdi-checkbox-marked-circle-outline',
-    routeName: 'student-tasks',
-    title: 'Tasks',
-    tab: null,
-    order: 5,
-  },
-  {
     key: 'profile',
     label: 'Profile',
     description: 'Your account info',
@@ -111,6 +101,16 @@ export const studentMoreItems = [
   },
 ];
 
+const studentHiddenRouteItems = [
+  {
+    key: 'tasks',
+    routeName: 'student-tasks',
+    title: 'Tasks',
+    tab: null,
+    order: 5,
+  },
+];
+
 export const studentMobileTabs = studentMobilePrimaryTabs.map(({ routeName, title, order, ...tab }) => ({
   ...tab,
   routeName,
@@ -124,6 +124,12 @@ const studentMobileRouteConfig = [
     mobileOrder: tab.order,
   })),
   ...studentMoreItems.map((item) => ({
+    routeName: item.routeName,
+    mobileTitle: item.title,
+    mobileTab: item.tab,
+    mobileOrder: item.order,
+  })),
+  ...studentHiddenRouteItems.map((item) => ({
     routeName: item.routeName,
     mobileTitle: item.title,
     mobileTab: item.tab,

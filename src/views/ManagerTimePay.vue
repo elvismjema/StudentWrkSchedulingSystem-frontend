@@ -1,10 +1,15 @@
 <template>
   <div class="time-pay-page">
+    <!--
+      Page header.
+      Left: title + one-line subtitle explaining what the page is for.
+      Right: compact period navigator (type ▸ prev ▸ label ▸ next).
+    -->
     <section class="page-header">
       <div>
         <h1 class="page-title">Time &amp; Pay</h1>
         <p class="page-subtitle">
-          Review worker hours, approve timecards, and track payroll for the current pay period.
+          Approve worker hours for the current pay period.
         </p>
       </div>
 
@@ -14,133 +19,163 @@
           :items="periodTypeOptions"
           item-title="label"
           item-value="value"
-          label="Period Type"
+          label="Period"
           variant="outlined"
           density="comfortable"
           hide-details
           class="period-type-field"
         />
-        <v-btn icon variant="outlined" :disabled="false" @click="goToPreviousPeriod">
-          <v-icon>mdi-chevron-left</v-icon>
-        </v-btn>
-        <v-btn variant="outlined" class="period-label" :ripple="false">
-          {{ periodLabel }}
-        </v-btn>
-        <v-btn icon variant="outlined" :disabled="!canGoForward" @click="goToNextPeriod">
-          <v-icon>mdi-chevron-right</v-icon>
-        </v-btn>
+        <div class="period-pill">
+          <v-btn
+            icon="mdi-chevron-left"
+            variant="text"
+            size="small"
+            density="comfortable"
+            aria-label="Previous period"
+            @click="goToPreviousPeriod"
+          />
+          <span class="period-pill__label">{{ periodLabel }}</span>
+          <v-btn
+            icon="mdi-chevron-right"
+            variant="text"
+            size="small"
+            density="comfortable"
+            aria-label="Next period"
+            :disabled="!canGoForward"
+            @click="goToNextPeriod"
+          />
+        </div>
       </div>
     </section>
 
-    <v-alert
-      v-if="showPayrollDueBanner"
-      type="warning"
-      variant="tonal"
-      class="mb-4"
-      border="start"
+    <!--
+      Payroll-due banner — only appears in the final 3 days of the period,
+      OR any time there are pending timecards (so managers always see the
+      number of approvals they still owe). Offers a one-click
+      "approve everything still pending" shortcut.
+    -->
+    <section
+      v-if="pendingCount > 0"
+      class="pending-banner"
+      :class="{ 'pending-banner--urgent': showPayrollDueBanner }"
     >
-      <div class="d-flex align-center justify-space-between flex-wrap gap-2">
-        <div>
-          <div class="font-weight-medium">
-            Payroll closes in {{ payrollDaysLeft }} day{{ payrollDaysLeft === 1 ? "" : "s" }}
-          </div>
-          <div class="text-body-2">
-            {{ pendingCount }} pending timecard{{ pendingCount === 1 ? "" : "s" }} for this period.
-          </div>
+      <div class="pending-banner__text">
+        <div class="pending-banner__headline">
+          {{ pendingCount }} pending timecard{{ pendingCount === 1 ? '' : 's' }}
         </div>
-        <v-btn
-          color="primary"
-          variant="flat"
-          prepend-icon="mdi-check-all"
-          :disabled="pendingCount === 0 || approvingAll"
-          :loading="approvingAll"
-          @click="confirmAction({
-            title: 'Approve All Pending Timecards',
-            message: `Approve ${pendingCount} time entr${pendingCount === 1 ? 'y' : 'ies'}?`,
-            confirmLabel: 'Approve All',
-            confirmColor: 'success',
-            action: approveAllPending,
-          })"
-        >
-          Approve All
-        </v-btn>
+        <div v-if="showPayrollDueBanner" class="pending-banner__sub">
+          Payroll closes in {{ payrollDaysLeft }}
+          day{{ payrollDaysLeft === 1 ? '' : 's' }}
+        </div>
+        <div v-else class="pending-banner__sub">
+          Waiting on your review
+        </div>
       </div>
-    </v-alert>
+      <v-btn
+        color="primary"
+        variant="flat"
+        prepend-icon="mdi-check-all"
+        :disabled="approvingAll"
+        :loading="approvingAll"
+        @click="confirmAction({
+          title: 'Approve All Pending Timecards',
+          message: `Approve ${pendingCount} time entr${pendingCount === 1 ? 'y' : 'ies'}?`,
+          confirmLabel: 'Approve All',
+          confirmColor: 'success',
+          action: approveAllPending,
+        })"
+      >
+        Approve All
+      </v-btn>
+    </section>
 
-    <v-card class="filters-card mb-4" elevation="0">
-      <v-card-text class="d-flex flex-wrap gap-3">
-        <v-text-field
-          v-model="searchQuery"
-          prepend-inner-icon="mdi-magnify"
-          label="Search workers..."
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          class="search-field"
-        />
+    <!--
+      Timecards card. Filters live inside the card head so the page feels
+      like one primary surface (matching the dashboard's single-card
+      hierarchy). The table below is the star.
+    -->
+    <article class="db-card timecards-card">
+      <header class="timecards-card__head">
+        <div class="timecards-card__title-row">
+          <h2 class="db-card__title">Worker Timecards</h2>
+          <span class="timecards-card__count">
+            {{ visibleRows.length }} worker{{ visibleRows.length === 1 ? '' : 's' }}
+          </span>
+        </div>
 
-        <v-select
-          v-model="statusFilter"
-          :items="statusOptions"
-          item-title="label"
-          item-value="value"
-          label="Status"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          class="status-field"
-        />
-
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-download"
-          class="csv-btn"
-          @click="exportCsv"
-        >
-          Export CSV
-        </v-btn>
-      </v-card-text>
-    </v-card>
-
-    <v-card class="table-card" elevation="0">
-      <v-card-title class="d-flex align-center justify-space-between">
-        <span>Worker Timecards</span>
-        <span class="text-caption text-medium-emphasis">{{ rows.length }} worker{{ rows.length === 1 ? "" : "s" }}</span>
-      </v-card-title>
-
-      <v-divider />
+        <div class="timecards-card__controls">
+          <v-text-field
+            v-model="searchQuery"
+            prepend-inner-icon="mdi-magnify"
+            placeholder="Search workers…"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            single-line
+            clearable
+            class="timecards-search"
+          />
+          <v-select
+            v-model="statusFilter"
+            :items="statusOptions"
+            item-title="label"
+            item-value="value"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            class="timecards-status"
+          />
+          <v-btn
+            variant="outlined"
+            prepend-icon="mdi-download"
+            class="timecards-export"
+            @click="exportCsv"
+          >
+            Export
+          </v-btn>
+        </div>
+      </header>
 
       <v-progress-linear v-if="loading" indeterminate color="primary" />
 
+      <!--
+        Table is deliberately minimal: Worker • Total Hours • Status •
+        Approve/Reject. Regular vs. OT split, per-shift punch log, and the
+        "reset to pending" / manual-entry power tools all live in the detail
+        modal (one click on the row). Estimated pay is intentionally cut
+        here until per-worker rates exist in the API (currently hardcoded
+        $10/hr, which would be misleading to display as authoritative).
+      -->
       <v-table class="timecard-table" fixed-header>
         <thead>
           <tr>
             <th>Worker</th>
-            <th>Reg Hours</th>
-            <th>OT Hours</th>
-            <th>Total Hours</th>
-            <th>Est. Pay</th>
+            <th class="num">Hours</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th class="actions-col"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!loading && rows.length === 0">
-            <td colspan="7" class="empty-row">No worker timecards found for this period.</td>
+          <tr v-if="!loading && visibleRows.length === 0">
+            <td colspan="4" class="empty-row">
+              No worker timecards found for this period.
+            </td>
           </tr>
           <tr
-            v-for="row in rows"
+            v-for="row in visibleRows"
             :key="`${row.user_id}-${row.department_id}`"
             class="table-row"
+            :class="{ 'table-row--archived': isDeletedRow(row) }"
             @click="openDetail(row)"
           >
             <td>
               <div class="worker-cell">
-                <v-avatar size="38" color="brandPrimaryLt">
-                  <span class="avatar-initials">{{ getInitials(row.worker) }}</span>
-                </v-avatar>
-                <div>
-                  <div v-if="workerLabel(row.worker).deleted" class="worker-name worker-name--deleted">
+                <span class="worker-avatar">{{ getInitials(row.worker) }}</span>
+                <div class="worker-cell__text">
+                  <div
+                    v-if="workerLabel(row.worker).deleted"
+                    class="worker-name worker-name--deleted"
+                  >
                     <v-tooltip
                       text="This time record belongs to a user that was removed from the system. It is kept for payroll integrity."
                       location="top"
@@ -149,37 +184,44 @@
                         <span v-bind="tooltipProps" class="deleted-label">Deleted user</span>
                       </template>
                     </v-tooltip>
-                    <v-chip
-                      color="error"
-                      size="x-small"
-                      variant="tonal"
-                      class="ml-1"
-                    >
-                      Deleted
-                    </v-chip>
                   </div>
                   <div v-else class="worker-name">{{ workerLabel(row.worker).name }}</div>
                   <div class="worker-email">{{ workerLabel(row.worker).email }}</div>
                 </div>
               </div>
             </td>
-            <td>{{ formatHours(row.regular_hours) }}</td>
-            <td>{{ formatHours(row.overtime_hours) }}</td>
-            <td class="font-weight-bold">{{ formatHours(row.total_hours) }}</td>
-            <td>{{ formatMoney(row.estimated_pay) }}</td>
+            <td class="num num--strong">
+              {{ formatHours(row.total_hours) }}
+              <!-- Quiet OT hint so managers spot overtime without a dedicated column. -->
+              <span
+                v-if="Number(row.overtime_hours) > 0"
+                class="ot-hint"
+                :title="`Includes ${formatHours(row.overtime_hours)} overtime`"
+              >
+                · OT
+              </span>
+            </td>
             <td>
-              <v-chip :color="statusColor(row.status)" size="small" variant="tonal">
+              <v-chip
+                :color="statusColor(row.status)"
+                size="small"
+                variant="tonal"
+                class="status-chip"
+              >
                 {{ capitalize(row.status) }}
               </v-chip>
             </td>
-            <td>
-              <div class="d-flex align-center gap-2" @click.stop>
+            <td class="actions-col">
+              <div class="row-actions" @click.stop>
                 <v-btn
+                  v-if="row.status !== 'approved'"
                   size="small"
-                  icon
+                  icon="mdi-check"
                   variant="text"
                   color="success"
+                  density="comfortable"
                   :disabled="updatingStatusKey === statusKey(row, 'approved')"
+                  aria-label="Approve timecard"
                   @click="confirmAction({
                     title: 'Approve Timecard',
                     message: `Approve ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
@@ -188,14 +230,17 @@
                     action: () => setStatus(row, 'approved'),
                   })"
                 >
-                  <v-icon>mdi-check</v-icon>
+                  <v-tooltip activator="parent" location="top">Approve</v-tooltip>
                 </v-btn>
                 <v-btn
+                  v-if="row.status !== 'rejected'"
                   size="small"
-                  icon
+                  icon="mdi-close"
                   variant="text"
                   color="error"
+                  density="comfortable"
                   :disabled="updatingStatusKey === statusKey(row, 'rejected')"
+                  aria-label="Reject timecard"
                   @click="confirmAction({
                     title: 'Reject Timecard',
                     message: `Reject ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry for ${periodLabel}?`,
@@ -204,42 +249,34 @@
                     action: () => setStatus(row, 'rejected'),
                   })"
                 >
-                  <v-icon>mdi-close</v-icon>
-                </v-btn>
-                <v-btn
-                  v-if="row.status !== 'pending'"
-                  size="small"
-                  icon
-                  variant="text"
-                  color="primary"
-                  :disabled="updatingStatusKey === statusKey(row, 'pending')"
-                  @click="confirmAction({
-                    title: 'Reset to Pending',
-                    message: `Reset ${workerLabel(row.worker).deleted ? 'this' : workerLabel(row.worker).name + '\u2019s'} time entry to pending for ${periodLabel}?`,
-                    confirmLabel: 'Reset',
-                    confirmColor: 'primary',
-                    action: () => setStatus(row, 'pending'),
-                  })"
-                >
-                  <v-icon>mdi-restore</v-icon>
-                </v-btn>
-                <!-- Add manual time entry for this worker -->
-                <v-btn
-                  size="small"
-                  icon
-                  variant="text"
-                  color="teal"
-                  @click="openManualEntryDialog(row)"
-                >
-                  <v-tooltip activator="parent" location="top">Add manual time entry</v-tooltip>
-                  <v-icon>mdi-clock-plus-outline</v-icon>
+                  <v-tooltip activator="parent" location="top">Reject</v-tooltip>
                 </v-btn>
               </div>
             </td>
           </tr>
         </tbody>
       </v-table>
-    </v-card>
+
+      <!--
+        Archived toggle. Only appears when there's actually something to
+        reveal — a deleted user who logged real hours. Silent otherwise.
+      -->
+      <footer v-if="archivedRows.length > 0" class="timecards-card__foot">
+        <button
+          type="button"
+          class="archived-toggle"
+          @click="showArchived = !showArchived"
+        >
+          <v-icon size="16">
+            {{ showArchived ? 'mdi-eye-off-outline' : 'mdi-eye-outline' }}
+          </v-icon>
+          {{ showArchived ? 'Hide' : 'Show' }}
+          {{ archivedRows.length }}
+          archived entr{{ archivedRows.length === 1 ? 'y' : 'ies' }}
+          (deleted users with recorded hours)
+        </button>
+      </footer>
+    </article>
 
     <v-dialog v-model="detailDialog" max-width="980">
       <v-card>
@@ -688,7 +725,33 @@ const periodStartStr = computed(() => toDateOnlyString(periodStart.value));
 const periodEndStr = computed(() => toDateOnlyString(periodEnd.value));
 const periodLabel = computed(() => `${formatDate(periodStart.value)} – ${formatDate(periodEnd.value)}`);
 
-const pendingCount = computed(() => rows.value.filter((row) => row.status === "pending").length);
+/*
+  Visibility rules for the timecard table:
+
+  • "Real" rows  → any row with an active worker OR any row with >0 hours.
+    This is what managers actually need to approve.
+  • "Archived" rows → deleted users who happen to have logged hours. These
+    stay in the DB for payroll integrity and are revealed via a toggle.
+  • Everything else (deleted users with 0 hours) is hidden entirely — those
+    are empty ghost shells from users who never actually worked and add pure
+    noise to the page.
+*/
+const isDeletedRow = (row) => !!workerLabel(row?.worker).deleted;
+const hasHours = (row) => Number(row?.total_hours || 0) > 0;
+const isZeroGhostRow = (row) => isDeletedRow(row) && !hasHours(row);
+
+const showArchived = ref(false);
+
+const activeRows = computed(() => rows.value.filter((row) => !isDeletedRow(row)));
+const archivedRows = computed(() =>
+  rows.value.filter((row) => isDeletedRow(row) && hasHours(row))
+);
+const visibleRows = computed(() =>
+  showArchived.value ? [...activeRows.value, ...archivedRows.value] : activeRows.value
+);
+
+const pendingCount = computed(() => activeRows.value.filter((row) => row.status === "pending").length);
+
 const payrollDaysLeft = computed(() => {
   const delta = Math.ceil((endOfDay(periodEnd.value) - new Date()) / 86400000);
   return Math.max(delta, 0);
@@ -1034,132 +1097,309 @@ onMounted(loadRows);
 <style scoped>
 .time-pay-page {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 16px);
 }
 
+/* ── Dashboard-parity primitives (kept in sync with ManagerDashboard.vue) ── */
+.db-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0;
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
+  margin-bottom: 0;
 }
-
 .page-title {
   font-size: 2rem;
   line-height: 1.15;
   margin: 0;
   color: var(--text-1);
 }
-
 .page-subtitle {
   margin: 6px 0 0;
   color: var(--text-2);
   max-width: 760px;
 }
 
+/* Period nav: small select + pill that groups prev/label/next as one unit. */
 .period-nav {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .period-type-field {
-  min-width: 190px;
-  max-width: 240px;
-}
-
-.period-label {
-  text-transform: none;
-  letter-spacing: 0;
-  min-width: 260px;
-}
-
-.filters-card,
-.table-card {
-  border: 1px solid var(--border-1);
-  border-radius: 14px;
-}
-
-.search-field {
-  min-width: 280px;
-  flex: 1;
-}
-
-.status-field {
   min-width: 180px;
   max-width: 220px;
 }
-
-.csv-btn {
-  text-transform: none;
+.period-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+}
+.period-pill__label {
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  min-width: 200px;
+  text-align: center;
 }
 
-.timecard-table th {
+/* ── Pending banner (the single piece of "state" above the table) ────── */
+/* Only appears when there's work to do (pendingCount > 0). Becomes
+   warning-colored when payroll is closing within 3 days. */
+.pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-1, #f5f6f8);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md, 12px);
+  padding: 14px 18px;
+}
+.pending-banner--urgent {
+  background: #fff6e5;
+  border-color: #f5c451;
+}
+.pending-banner__headline {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.pending-banner__sub {
+  font-size: 13px;
   color: var(--text-2);
+  margin-top: 2px;
+}
+
+/* ── Timecards card ─────────────────────────────────────────────────────── */
+/* Filters live inside the card head so the page reads as "one main card",
+   the way the dashboard reads as "a grid of focused cards". */
+.timecards-card {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.timecards-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--space-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-1);
+}
+.timecards-card__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.timecards-card__count {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.timecards-card__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.timecards-search {
+  min-width: 220px;
+  max-width: 320px;
+  flex: 1;
+}
+.timecards-status {
+  min-width: 160px;
+  max-width: 180px;
+  flex-shrink: 0;
+}
+.timecards-export {
+  text-transform: none;
+  flex-shrink: 0;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────── */
+.timecard-table :deep(th) {
+  color: var(--text-2);
+  font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.timecard-table :deep(td),
+.timecard-table :deep(th) {
+  padding: 12px 16px;
+}
+.timecard-table :deep(.num) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.timecard-table :deep(.num--strong) {
+  font-weight: 700;
+  color: var(--text-1);
+}
+.timecard-table :deep(.actions-col) {
+  width: 120px;
+  text-align: right;
 }
 
 .table-row {
   cursor: pointer;
+  transition: background 0.12s ease;
+}
+.table-row:hover {
+  background: var(--surface-1, #f5f6f8);
+}
+/* Archived rows (deleted users with hours) are dimmed so active payroll
+   stays visually dominant even when the toggle reveals them. */
+.table-row--archived {
+  opacity: 0.6;
+}
+.table-row--archived:hover {
+  opacity: 0.85;
 }
 
 .worker-cell {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
-
-.avatar-initials {
-  color: var(--brand-primary);
+.worker-cell__text {
+  min-width: 0;
+}
+.worker-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
   font-weight: 700;
+  flex-shrink: 0;
 }
-
 .worker-name {
   font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
 .worker-name--deleted {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-
 .deleted-label {
   font-style: italic;
   color: var(--text-3);
   font-weight: 400;
 }
-
 .worker-email {
-  font-size: 0.82rem;
+  font-size: 12px;
   color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Subtle "· OT" marker next to hours — no need for a whole column. */
+.ot-hint {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  letter-spacing: 0.03em;
+  cursor: help;
+}
+
+.status-chip {
+  text-transform: capitalize;
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
 }
 
 .empty-row {
   text-align: center;
   color: var(--text-2);
-  padding: 18px 12px;
+  padding: 28px 12px;
 }
 
+/* ── Archived toggle (only shown when archivedRows > 0) ───────────── */
+.timecards-card__foot {
+  padding: 10px var(--space-4);
+  border-top: 1px solid var(--border-1);
+  background: var(--surface-1, #fafbfc);
+}
+.archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.archived-toggle:hover {
+  color: var(--brand-primary);
+  background: var(--surface-2, #eef1f4);
+}
+
+/* ── Detail modal (shared styles used inside the dialog) ──────────── */
 .empty-exception {
   display: flex;
   align-items: center;
   color: var(--state-active);
   padding: 8px 2px;
 }
-
 .stat-label {
   font-size: 0.82rem;
   color: var(--text-2);
 }
-
 .stat-value {
   margin-top: 4px;
   font-size: 1.4rem;
   font-weight: 700;
 }
-
 .manual-preview {
   display: flex;
   align-items: center;
@@ -1168,8 +1408,11 @@ onMounted(loadRows);
 }
 
 @media (max-width: 960px) {
-  .period-label {
-    min-width: 220px;
-  }
+  .page-header { gap: 12px; }
+  .period-nav { width: 100%; }
+  .period-type-field { flex: 1; }
+  .period-pill__label { min-width: 140px; }
+  .timecards-card__controls { width: 100%; }
+  .timecards-search { min-width: 0; max-width: none; }
 }
 </style>

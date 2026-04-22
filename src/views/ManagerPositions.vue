@@ -45,10 +45,6 @@
           </div>
           <p class="position-description">{{ position.description || "No description available" }}</p>
           <div class="position-meta">
-            <v-chip v-if="position.is_critical" size="small" color="warning" variant="tonal">
-              <v-icon start>mdi-alert</v-icon>
-              Critical
-            </v-chip>
             <span class="worker-count">{{ position.workerCount || 0 }} workers assigned</span>
           </div>
         </v-card-text>
@@ -62,7 +58,7 @@
     />
 
     <!-- Edit Position Dialog -->
-    <v-dialog v-model="editPositionModal.open" max-width="500px">
+    <v-dialog v-model="editPositionModal.open" max-width="760px">
       <v-card>
         <v-card-title class="d-flex align-center gap-2 pa-5 pb-3">
           <v-icon color="primary" start>mdi-pencil</v-icon>
@@ -70,6 +66,10 @@
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
+          <v-alert v-if="editPositionModal.error" type="error" variant="tonal" density="compact" class="mb-3">
+            {{ editPositionModal.error }}
+          </v-alert>
+
           <v-text-field
             v-model="editPositionModal.form.position_name"
             label="Position Name *"
@@ -86,16 +86,9 @@
             rows="3"
             class="mb-3"
           />
-          <v-checkbox
-            v-model="editPositionModal.form.is_critical"
-            label="Critical Position"
-            color="primary"
-            hide-details
-            class="mb-4"
-          />
 
           <!-- Color Picker -->
-          <div class="color-picker-section">
+          <div class="color-picker-section mb-4">
             <div class="color-picker-label">Schedule Color</div>
             <p class="color-picker-hint">This color will represent the position on the Manager Schedule.</p>
             <div class="color-picker-row">
@@ -108,6 +101,64 @@
               <span class="color-preview-swatch" :style="{ backgroundColor: editPositionModal.form.color || DEFAULT_POSITION_COLOR }"></span>
               <span class="color-hex-label">{{ editPositionModal.form.color || DEFAULT_POSITION_COLOR }}</span>
               <v-btn size="small" variant="text" @click="editPositionModal.form.color = null">Reset</v-btn>
+            </div>
+          </div>
+
+          <div class="assignment-section">
+            <div class="assignment-header">
+              <div class="assignment-title">Assigned Workers</div>
+              <div class="assignment-subtitle">
+                {{ assignedWorkersForEdit.length }} currently assigned to this position
+              </div>
+            </div>
+
+            <div v-if="assignedWorkersForEdit.length" class="assigned-worker-list">
+              <div v-for="worker in assignedWorkersForEdit" :key="worker.userId" class="assigned-worker-row">
+                <div>
+                  <div class="assigned-worker-name">{{ worker.name }}</div>
+                  <div class="assigned-worker-email">{{ worker.email }}</div>
+                </div>
+                <v-btn
+                  variant="text"
+                  color="error"
+                  size="small"
+                  :loading="editPositionModal.assignmentBusy"
+                  @click="removeWorkerFromPosition(worker.userId)"
+                >
+                  Remove
+                </v-btn>
+              </div>
+            </div>
+            <div v-else class="assignment-empty">
+              No workers are currently assigned to this position.
+            </div>
+
+            <v-divider class="my-4" />
+
+            <v-select
+              v-model="editPositionModal.selectedWorkerIds"
+              :items="availableWorkersForEdit"
+              item-title="label"
+              item-value="value"
+              label="Assign workers from this department"
+              variant="outlined"
+              density="comfortable"
+              multiple
+              chips
+              clearable
+              :disabled="editPositionModal.assignmentBusy"
+              :no-data-text="availableWorkersForEdit.length ? 'No workers available' : 'No additional workers to assign'"
+            />
+            <div class="assignment-actions">
+              <v-btn
+                color="primary"
+                variant="tonal"
+                :disabled="!editPositionModal.selectedWorkerIds.length"
+                :loading="editPositionModal.assignmentBusy"
+                @click="assignWorkersToPosition"
+              >
+                Assign Selected
+              </v-btn>
             </div>
           </div>
         </v-card-text>
@@ -149,10 +200,11 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import apiClient from "../services/services.js";
 import Utils from "../config/utils.js";
 import CreatePositionModal from "../components/CreatePositionModal.vue";
+import UserRoleServices from "../services/userRoleServices.js";
 
 // Default swatch for the position color picker. Mirrors --brand-primary from
 // src/styles/tokens.css; the native <input type="color"> needs a literal hex
@@ -165,7 +217,7 @@ const deptContext = Utils.getStore("currentDepartmentContext") || {};
 
 const loading = ref(false);
 const error = ref("");
-const workers = ref([]);
+const departmentWorkers = ref([]);
 const positions = ref([]);
 
 const createPositionModal = reactive({
@@ -179,9 +231,11 @@ const editPositionModal = reactive({
   form: {
     position_name: '',
     description: '',
-    is_critical: false,
     color: null,
   },
+  selectedWorkerIds: [],
+  assignmentBusy: false,
+  error: "",
 });
 
 const deletePositionModal = reactive({
@@ -191,19 +245,73 @@ const deletePositionModal = reactive({
 
 const toItems = (response) => response?.data?.data || response?.data || [];
 
+const isStudentMembership = (membership) => {
+  const roleName = String(membership?.role?.role_name || "").toLowerCase();
+  const permissionLevel = Number(membership?.role?.permission_level ?? 0);
+  if (!roleName) return permissionLevel < 50;
+  return roleName.includes("student") || roleName.includes("worker") || permissionLevel < 50;
+};
+
+const assignedWorkersForEdit = computed(() => {
+  const positionId = Number(editPositionModal.position?.position_id || 0);
+  if (!positionId) return [];
+  return departmentWorkers.value.filter((worker) => Number(worker.positionId) === positionId);
+});
+
+const availableWorkersForEdit = computed(() => {
+  const positionId = Number(editPositionModal.position?.position_id || 0);
+  if (!positionId) return [];
+
+  return departmentWorkers.value
+    .filter((worker) => Number(worker.positionId) !== positionId)
+    .map((worker) => {
+      const currentPosition = positions.value.find((position) => Number(position.position_id) === Number(worker.positionId));
+      const currentPositionLabel = currentPosition?.position_name
+        ? ` (currently ${currentPosition.position_name})`
+        : "";
+
+      return {
+        value: worker.userId,
+        label: `${worker.name}${currentPositionLabel}`,
+      };
+    });
+});
+
 const loadWorkers = async () => {
   if (!deptContext.department_id) {
-    workers.value = [];
+    departmentWorkers.value = [];
     return;
   }
+
   try {
-    const response = await apiClient.get(`/user-departments?departmentId=${deptContext.department_id}&status=approved`);
-    const assignments = toItems(response);
-    workers.value = assignments
-      .map((assignment) => assignment.user || assignment)
-      .filter((worker) => worker && (worker.userId || worker.id));
+    const response = await UserRoleServices.getAllUsersWithRoles(true);
+    const users = toItems(response);
+    const departmentId = Number(deptContext.department_id);
+
+    const normalized = users.flatMap((user) => {
+      const memberships = (user.userDepartments || [])
+        .filter((membership) => Number(membership.department_id) === departmentId)
+        .filter((membership) => membership.is_active !== false)
+        .filter((membership) => isStudentMembership(membership));
+
+      return memberships.map((membership) => ({
+        userId: Number(user.id || user.userId),
+        name: `${user.fName || ""} ${user.lName || ""}`.trim() || user.email || "Worker",
+        email: user.email || "",
+        positionId: membership.position_id || membership.position?.position_id || null,
+      }));
+    });
+
+    const uniqueWorkers = new Map();
+    normalized.forEach((worker) => {
+      if (!uniqueWorkers.has(worker.userId)) {
+        uniqueWorkers.set(worker.userId, worker);
+      }
+    });
+
+    departmentWorkers.value = Array.from(uniqueWorkers.values());
   } catch {
-    workers.value = [];
+    departmentWorkers.value = [];
   }
 };
 
@@ -219,10 +327,8 @@ const loadPositions = async () => {
     const response = await apiClient.get(`/positions?department_id=${deptContext.department_id}`);
     const items = toItems(response);
     positions.value = items.map((position) => {
-      const workerCount = workers.value.filter(
-        (worker) =>
-          worker.positionId === position.position_id ||
-          worker.position?.position_id === position.position_id,
+      const workerCount = departmentWorkers.value.filter(
+        (worker) => Number(worker.positionId) === Number(position.position_id),
       ).length;
       return { ...position, workerCount };
     });
@@ -242,9 +348,67 @@ const openEditPosition = (position) => {
   editPositionModal.position = position;
   editPositionModal.form.position_name = position.position_name || '';
   editPositionModal.form.description = position.description || '';
-  editPositionModal.form.is_critical = !!position.is_critical;
   editPositionModal.form.color = position.color || null;
+  editPositionModal.selectedWorkerIds = [];
+  editPositionModal.error = "";
   editPositionModal.open = true;
+};
+
+const refreshWorkersAndPositions = async () => {
+  await loadWorkers();
+  await loadPositions();
+
+  if (editPositionModal.position) {
+    const updated = positions.value.find(
+      (position) => Number(position.position_id) === Number(editPositionModal.position.position_id),
+    );
+    if (updated) editPositionModal.position = updated;
+  }
+};
+
+const assignWorkersToPosition = async () => {
+  if (!editPositionModal.position || !editPositionModal.selectedWorkerIds.length) return;
+
+  editPositionModal.assignmentBusy = true;
+  editPositionModal.error = "";
+  try {
+    await Promise.all(
+      editPositionModal.selectedWorkerIds.map((userId) =>
+        apiClient.post("/user-departments/assign-worker", {
+          userId,
+          departmentId: deptContext.department_id,
+          positionId: editPositionModal.position.position_id,
+        }),
+      ),
+    );
+
+    editPositionModal.selectedWorkerIds = [];
+    await refreshWorkersAndPositions();
+  } catch (err) {
+    editPositionModal.error = err?.response?.data?.message || "Failed to assign workers to this position.";
+  } finally {
+    editPositionModal.assignmentBusy = false;
+  }
+};
+
+const removeWorkerFromPosition = async (userId) => {
+  if (!editPositionModal.position) return;
+
+  editPositionModal.assignmentBusy = true;
+  editPositionModal.error = "";
+  try {
+    await apiClient.post("/user-departments/assign-worker", {
+      userId,
+      departmentId: deptContext.department_id,
+      positionId: null,
+    });
+
+    await refreshWorkersAndPositions();
+  } catch (err) {
+    editPositionModal.error = err?.response?.data?.message || "Failed to remove worker from this position.";
+  } finally {
+    editPositionModal.assignmentBusy = false;
+  }
 };
 
 const saveEditPosition = async () => {
@@ -255,11 +419,12 @@ const saveEditPosition = async () => {
     await apiClient.put(`/positions/${editPositionModal.position.position_id}`, {
       position_name: editPositionModal.form.position_name.trim(),
       description: editPositionModal.form.description?.trim() || null,
-      is_critical: editPositionModal.form.is_critical,
       color: editPositionModal.form.color || null,
     });
     editPositionModal.open = false;
     editPositionModal.position = null;
+    editPositionModal.selectedWorkerIds = [];
+    editPositionModal.error = "";
     await loadPositions();
   } catch (err) {
     error.value = err?.response?.data?.message || 'Failed to update position.';
@@ -457,6 +622,63 @@ onMounted(async () => {
   font-size: 13px;
   font-family: monospace;
   color: var(--text-2);
+}
+
+.assignment-section {
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.assignment-header {
+  margin-bottom: 10px;
+}
+
+.assignment-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.assignment-subtitle {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.assigned-worker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assigned-worker-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.assigned-worker-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.assigned-worker-email {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.assignment-empty {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.assignment-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 768px) {

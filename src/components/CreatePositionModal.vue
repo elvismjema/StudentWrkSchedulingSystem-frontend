@@ -46,32 +46,6 @@
 
             <v-row>
               <v-col cols="12">
-                <v-checkbox
-                  v-model="form.isCritical"
-                  label="Critical Position"
-                  color="primary"
-                  hide-details
-                >
-                  <template #append>
-                    <v-tooltip>
-                      <template #activator="{ props }">
-                        <v-icon
-                          v-bind="props"
-                          size="small"
-                          color="info"
-                        >mdi-help-circle-outline</v-icon>
-                      </template>
-                      <span>
-                        Critical positions require immediate attention when unfilled (e.g., Lifeguard, Front Desk)
-                      </span>
-                    </v-tooltip>
-                  </template>
-                </v-checkbox>
-              </v-col>
-            </v-row>
-
-            <v-row>
-              <v-col cols="12">
                 <div class="color-picker-section">
                   <div class="color-picker-label">Schedule Color <span class="optional-label">(optional)</span></div>
                   <p class="color-picker-hint">Choose a color to represent this position on the Manager Schedule.</p>
@@ -147,7 +121,6 @@ const dialogOpen = computed({
 const form = reactive({
   positionName: '',
   description: '',
-  isCritical: false,
   color: null,
 });
 
@@ -169,7 +142,6 @@ const closeModal = () => {
 const resetForm = () => {
   form.positionName = '';
   form.description = '';
-  form.isCritical = false;
   form.color = null;
   valid.value = false;
   submitting.value = false;
@@ -182,7 +154,6 @@ const submitForm = async () => {
       department_id: props.departmentId,
       position_name: form.positionName.trim(),
       description: form.description.trim() || null,
-      is_critical: form.isCritical,
       color: form.color || null,
     };
 

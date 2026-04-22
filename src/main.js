@@ -1,5 +1,4 @@
 import { createApp } from "vue";
-import { registerSW } from "virtual:pwa-register";
 import App from "./App.vue";
 import router from "./router.js";
 import vuetify from "./plugins/vuetify.js";
@@ -25,29 +24,26 @@ import { initOneSignal, loginOneSignal } from "./config/oneSignal.js";
 // what OneSignal uses for push delivery too — no separate OneSignalSDKWorker.js
 // registration is needed.
 // ---------------------------------------------------------------------------
+// We deliberately do NOT use vite-plugin-pwa's `registerSW` helper. Its
+// generated runtime wires an `activated` listener on the Workbox instance
+// that force-reloads the page whenever a new SW activates with isUpdate or
+// isExternal set — and there is no public option to disable it, overriding
+// onNeedRefresh/onRegisteredSW does not turn it off. OneSignal's CDN-hosted
+// SW module (imported via importScripts at the top of src/sw.js) can return
+// slightly different bytes between fetches, which makes the browser treat
+// every navigation as a SW update, which in turn fires the reload listener,
+// which logs the user out, which reloads again — the observed loop.
+//
+// Registering the same sw.js manually gives us SW registration (required so
+// iOS PWAs can subscribe to push) without any auto-reload behavior. New SW
+// versions still install in the background and take control on the next
+// natural tab close/reopen, which is the standard PWA lifecycle.
 if ("serviceWorker" in navigator) {
-  // `registerSW` from vite-plugin-pwa by default triggers an automatic page
-  // reload when a newly-installed service worker takes control of the tab.
-  // With skipWaiting() + clients.claim() set in sw.js, a new SW activates as
-  // soon as it installs and immediately claims the current tab \u2014 which,
-  // combined with the default reload behavior, causes the page to refresh on
-  // every deploy AND can loop when the browser re-downloads sw.js on each
-  // navigation (e.g. when importScripts'd remote modules like OneSignal's
-  // CDN-served SW return slightly different bytes between fetches).
-  //
-  // We override onNeedRefresh/onRegisteredSW to do NOTHING on update \u2014 the
-  // new SW still installs in the background and will take control naturally
-  // the next time the user closes and reopens the tab, which is the
-  // standard PWA update lifecycle. No more forced reloads, no loops.
-  registerSW({
-    immediate: true,
-    onNeedRefresh() {
-      // Intentionally no-op. Letting vite-plugin-pwa auto-reload was the
-      // source of the "page keeps refreshing" regression on /login.
-    },
-    onOfflineReady() {},
-    onRegisteredSW() {},
-  });
+  navigator.serviceWorker
+    .register("/sev2026/t2/sw.js", { scope: "/sev2026/t2/" })
+    .catch((err) => {
+      console.warn("[SW] registration failed:", err);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +76,25 @@ try {
 // as an unhandled Promise rejection and breaks ALL subsequent router
 // navigations, not just the one that triggered the missing file.
 // Reloading fetches the latest index.html and its correct asset hashes.
+//
+// Guard against a reload loop: if a stale index.html is still being served
+// (CDN/cache lag) after deploy, the freshly-loaded page will 404 on the same
+// chunk and trigger another preload-error → reload → preload-error cycle. We
+// allow exactly one reload per tab session; if it happens again, we log it
+// and leave the page alone so the user can see what broke instead of being
+// trapped in a refresh loop.
 window.addEventListener("vite:preload-error", () => {
+  try {
+    if (sessionStorage.getItem("vite-preload-reloaded") === "1") {
+      console.warn(
+        "[vite] preload error after reload — skipping auto-reload to avoid loop"
+      );
+      return;
+    }
+    sessionStorage.setItem("vite-preload-reloaded", "1");
+  } catch (_) {
+    // sessionStorage unavailable (e.g. private mode) — fall through to reload
+  }
   window.location.reload();
 });
 

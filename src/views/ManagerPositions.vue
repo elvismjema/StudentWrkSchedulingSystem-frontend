@@ -58,70 +58,128 @@
     />
 
     <!-- Edit Position Dialog -->
-    <v-dialog v-model="editPositionModal.open" max-width="760px">
-      <v-card>
-        <v-card-title class="d-flex align-center gap-2 pa-5 pb-3">
-          <v-icon color="primary" start>mdi-pencil</v-icon>
-          Edit Position
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="pa-5">
+    <v-dialog v-model="editPositionModal.open" max-width="720px" scrollable>
+      <v-card class="edit-modal">
+        <!-- Header -->
+        <div class="edit-modal__header">
+          <div class="edit-modal__header-left">
+            <span
+              class="edit-modal__swatch"
+              :style="{ backgroundColor: editPositionModal.form.color || DEFAULT_POSITION_COLOR }"
+            />
+            <div>
+              <div class="edit-modal__title">Edit Position</div>
+              <div class="edit-modal__subtitle">
+                {{ assignedWorkersForEdit.length }} worker{{ assignedWorkersForEdit.length === 1 ? '' : 's' }} assigned
+              </div>
+            </div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="editPositionModal.open = false" />
+        </div>
+
+        <div class="edit-modal__body">
           <v-alert v-if="editPositionModal.error" type="error" variant="tonal" density="compact" class="mb-3">
             {{ editPositionModal.error }}
           </v-alert>
 
-          <v-text-field
-            v-model="editPositionModal.form.position_name"
-            label="Position Name *"
-            variant="outlined"
-            density="comfortable"
-            :rules="[v => !!v?.trim() || 'Position name is required']"
-            class="mb-3"
-          />
-          <v-textarea
-            v-model="editPositionModal.form.description"
-            label="Description"
-            variant="outlined"
-            density="comfortable"
-            rows="3"
-            class="mb-3"
-          />
-
-          <!-- Color Picker -->
-          <div class="color-picker-section mb-4">
-            <div class="color-picker-label">Schedule Color</div>
-            <p class="color-picker-hint">This color will represent the position on the Manager Schedule.</p>
-            <div class="color-picker-row">
-              <input
-                type="color"
-                class="color-input"
-                :value="editPositionModal.form.color || DEFAULT_POSITION_COLOR"
-                @input="editPositionModal.form.color = $event.target.value"
-              />
-              <span class="color-preview-swatch" :style="{ backgroundColor: editPositionModal.form.color || DEFAULT_POSITION_COLOR }"></span>
-              <span class="color-hex-label">{{ editPositionModal.form.color || DEFAULT_POSITION_COLOR }}</span>
-              <v-btn size="small" variant="text" @click="editPositionModal.form.color = null">Reset</v-btn>
-            </div>
-          </div>
-
-          <div class="assignment-section">
-            <div class="assignment-header">
-              <div class="assignment-title">Assigned Workers</div>
-              <div class="assignment-subtitle">
-                {{ assignedWorkersForEdit.length }} currently assigned to this position
+          <!-- Details — fields stand on their own; the modal header already
+               tells the user what they're editing, so no extra section title. -->
+          <section class="pm-card pm-card--tight">
+            <v-text-field
+              v-model="editPositionModal.form.position_name"
+              label="Position name"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              :rules="[v => !!v?.trim() || 'Position name is required']"
+            />
+            <v-textarea
+              v-model="editPositionModal.form.description"
+              label="Description"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              rows="2"
+              auto-grow
+            />
+            <div class="color-row">
+              <span class="color-row__label">Schedule color</span>
+              <div class="color-row__controls">
+                <input
+                  type="color"
+                  class="color-input"
+                  :value="editPositionModal.form.color || DEFAULT_POSITION_COLOR"
+                  @input="editPositionModal.form.color = $event.target.value"
+                />
+                <span class="color-hex-label">{{ editPositionModal.form.color || DEFAULT_POSITION_COLOR }}</span>
+                <v-btn size="x-small" variant="text" @click="editPositionModal.form.color = null">Reset</v-btn>
               </div>
             </div>
+          </section>
 
-            <div v-if="assignedWorkersForEdit.length" class="assigned-worker-list">
-              <div v-for="worker in assignedWorkersForEdit" :key="worker.userId" class="assigned-worker-row">
-                <div>
-                  <div class="assigned-worker-name">{{ worker.name }}</div>
-                  <div class="assigned-worker-email">{{ worker.email }}</div>
+          <!-- Workers card -->
+          <section class="pm-card">
+            <div class="pm-card__head">
+              <div>
+                <div class="pm-card__title">Assigned Workers</div>
+                <div class="pm-card__sub">
+                  {{ assignedWorkersForEdit.length }} currently on this position · students can hold more than one
+                </div>
+              </div>
+              <v-btn
+                variant="tonal"
+                color="primary"
+                size="small"
+                prepend-icon="mdi-plus"
+                :disabled="editPositionModal.assignmentBusy || !availableWorkersForEdit.length"
+                @click="assignMenuOpen = !assignMenuOpen"
+              >
+                Add Worker
+              </v-btn>
+            </div>
+
+            <!-- Inline add-worker picker (auto-commits on select) -->
+            <div v-if="assignMenuOpen" class="inline-picker">
+              <v-autocomplete
+                v-model="inlinePickerValue"
+                :items="availableWorkersForEdit"
+                item-title="label"
+                item-value="value"
+                variant="outlined"
+                density="comfortable"
+                placeholder="Search by name…"
+                hide-details
+                autofocus
+                :disabled="editPositionModal.assignmentBusy"
+                :no-data-text="availableWorkersForEdit.length ? 'No match' : 'All department workers already on this position'"
+                @update:model-value="onInlinePick"
+              />
+              <div class="inline-picker__hint">Select a worker to add them — changes save instantly.</div>
+            </div>
+
+            <div v-if="assignedWorkersForEdit.length" class="worker-rows">
+              <div
+                v-for="worker in assignedWorkersForEdit"
+                :key="worker.userId"
+                class="worker-row"
+              >
+                <span class="worker-avatar">{{ initialsFor(worker.name) }}</span>
+                <div class="worker-info">
+                  <span class="worker-name">{{ worker.name }}</span>
+                  <span class="worker-email">{{ worker.email }}</span>
+                </div>
+                <div class="worker-other-positions">
+                  <span
+                    v-for="pid in otherPositionsFor(worker)"
+                    :key="pid"
+                    class="pos-chip"
+                    :style="chipStyleFor(pid)"
+                  >{{ positionNameFor(pid) }}</span>
                 </div>
                 <v-btn
                   variant="text"
-                  color="error"
                   size="small"
+                  color="error"
                   :loading="editPositionModal.assignmentBusy"
                   @click="removeWorkerFromPosition(worker.userId)"
                 >
@@ -129,46 +187,26 @@
                 </v-btn>
               </div>
             </div>
-            <div v-else class="assignment-empty">
-              No workers are currently assigned to this position.
+            <div v-else class="worker-empty">
+              <v-icon size="28" color="text-2">mdi-account-group-outline</v-icon>
+              <div>No workers on this position yet.</div>
+              <div class="worker-empty__hint">Click “Add Worker” above to assign someone.</div>
             </div>
+          </section>
+        </div>
 
-            <v-divider class="my-4" />
-
-            <v-select
-              v-model="editPositionModal.selectedWorkerIds"
-              :items="availableWorkersForEdit"
-              item-title="label"
-              item-value="value"
-              label="Assign workers from this department"
-              variant="outlined"
-              density="comfortable"
-              multiple
-              chips
-              clearable
-              :disabled="editPositionModal.assignmentBusy"
-              :no-data-text="availableWorkersForEdit.length ? 'No workers available' : 'No additional workers to assign'"
-            />
-            <div class="assignment-actions">
-              <v-btn
-                color="primary"
-                variant="tonal"
-                :disabled="!editPositionModal.selectedWorkerIds.length"
-                :loading="editPositionModal.assignmentBusy"
-                @click="assignWorkersToPosition"
-              >
-                Assign Selected
-              </v-btn>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions class="pa-5 pt-0">
-          <v-spacer />
+        <!-- Single, clear primary action -->
+        <div class="edit-modal__footer">
           <v-btn variant="text" @click="editPositionModal.open = false">Cancel</v-btn>
-          <v-btn color="primary" variant="elevated" :loading="editPositionModal.saving" @click="saveEditPosition">
-            Save Changes
+          <v-btn
+            color="primary"
+            variant="elevated"
+            :loading="editPositionModal.saving"
+            @click="saveEditPosition"
+          >
+            Done
           </v-btn>
-        </v-card-actions>
+        </div>
       </v-card>
     </v-dialog>
 
@@ -223,6 +261,12 @@ const positions = ref([]);
 const createPositionModal = reactive({
   open: false,
 });
+
+// UI state for the inline “Add Worker” picker inside the edit modal. Splitting
+// this out from editPositionModal so it can be reset independently when the
+// user re-opens the picker or finishes adding someone.
+const assignMenuOpen = ref(false);
+const inlinePickerValue = ref(null);
 
 const editPositionModal = reactive({
   open: false,
@@ -370,6 +414,67 @@ const openEditPosition = (position) => {
   editPositionModal.selectedWorkerIds = [];
   editPositionModal.error = "";
   editPositionModal.open = true;
+  assignMenuOpen.value = false;
+  inlinePickerValue.value = null;
+};
+
+// Build initials (max 2 chars) from “First Last” for the avatar circle.
+const initialsFor = (name) => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+// All OTHER position ids a worker holds (excluding the one being edited).
+// Used to render small color-coded chips next to each assigned worker so
+// managers can see at a glance that a student also covers X and Y.
+const otherPositionsFor = (worker) => {
+  const currentId = Number(editPositionModal.position?.position_id || 0);
+  return (worker.positionIds || [])
+    .map(Number)
+    .filter((pid) => pid && pid !== currentId);
+};
+
+const positionNameFor = (positionId) => {
+  const match = positions.value.find((p) => Number(p.position_id) === Number(positionId));
+  return match?.position_name || "";
+};
+
+// Subtle tinted chip using the position's own schedule color. Falls back to a
+// neutral surface tone when a position has no color configured.
+const chipStyleFor = (positionId) => {
+  const match = positions.value.find((p) => Number(p.position_id) === Number(positionId));
+  const color = match?.color;
+  if (!color) {
+    return { background: "var(--surface-2)", color: "var(--text-2)", borderColor: "var(--border-1)" };
+  }
+  return {
+    background: `${color}18`, // ~9% alpha
+    color,
+    borderColor: `${color}40`,
+  };
+};
+
+// When the user picks someone in the inline autocomplete, assign immediately
+// (no separate Assign button). Clears the field so they can add another.
+const onInlinePick = async (userId) => {
+  if (!userId) return;
+  editPositionModal.assignmentBusy = true;
+  editPositionModal.error = "";
+  try {
+    await apiClient.post("/user-departments/add-worker-position", {
+      userId,
+      departmentId: deptContext.department_id,
+      positionId: editPositionModal.position.position_id,
+    });
+    inlinePickerValue.value = null;
+    await refreshWorkersAndPositions();
+  } catch (err) {
+    editPositionModal.error = err?.response?.data?.message || "Failed to add worker to this position.";
+  } finally {
+    editPositionModal.assignmentBusy = false;
+  }
 };
 
 const refreshWorkersAndPositions = async () => {
@@ -597,35 +702,128 @@ onMounted(async () => {
   border: 1px solid rgba(0,0,0,0.1);
 }
 
-/* Color picker in edit dialog */
-.color-picker-section {
-  border: 1px solid var(--border-1);
-  border-radius: 10px;
-  padding: 14px 16px;
+/* ── Edit Position modal ─────────────────────────────────────────────── */
+.edit-modal {
+  background: var(--surface-0);
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
 }
 
-.color-picker-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-1);
-  margin-bottom: 4px;
-}
-
-.color-picker-hint {
-  font-size: 12px;
-  color: var(--text-2);
-  margin: 0 0 10px;
-}
-
-.color-picker-row {
+.edit-modal__header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.edit-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.edit-modal__swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+}
+
+.edit-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+
+.edit-modal__subtitle {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.edit-modal__body {
+  padding: 16px 20px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.edit-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-1);
+  background: var(--surface-0);
+}
+
+/* ── Section cards inside the modal (mirror dashboard .db-card) ──────── */
+.pm-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md, 12px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tighter variant when a card only holds form fields and doesn't need a head. */
+.pm-card--tight {
+  gap: 14px;
+}
+
+.pm-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pm-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.pm-card__sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+/* ── Color row (compact one-liner) ───────────────────────────────────── */
+.color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.color-row__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.color-row__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .color-input {
-  width: 44px;
-  height: 36px;
+  width: 36px;
+  height: 28px;
   border: 1px solid var(--border-1);
   border-radius: 6px;
   padding: 2px;
@@ -633,75 +831,122 @@ onMounted(async () => {
   background: none;
 }
 
-.color-preview-swatch {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: 1px solid rgba(0,0,0,0.12);
-}
-
 .color-hex-label {
-  font-size: 13px;
-  font-family: monospace;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-2);
 }
 
-.assignment-section {
+/* ── Inline add-worker picker ────────────────────────────────────────── */
+.inline-picker {
+  background: var(--surface-1);
   border: 1px solid var(--border-1);
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-
-.assignment-header {
-  margin-bottom: 10px;
-}
-
-.assignment-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-1);
-}
-
-.assignment-subtitle {
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-.assigned-worker-list {
+  border-radius: var(--radius-sm, 8px);
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.assigned-worker-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid var(--border-1);
-  border-radius: 8px;
-  padding: 8px 10px;
+.inline-picker__hint {
+  font-size: 11px;
+  color: var(--text-2);
 }
 
-.assigned-worker-name {
+/* ── Assigned workers list (dashboard-style rows) ────────────────────── */
+.worker-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.worker-row:last-child { border-bottom: none; }
+
+.worker-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.worker-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.worker-info .worker-name {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.assigned-worker-email {
+.worker-info .worker-email {
   font-size: 12px;
   color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.assignment-empty {
+.worker-other-positions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  max-width: 40%;
+}
+
+.pos-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.worker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 0;
   color: var(--text-2);
   font-size: 13px;
+  text-align: center;
 }
 
-.assignment-actions {
-  display: flex;
-  justify-content: flex-end;
+.worker-empty__hint {
+  font-size: 12px;
+  color: var(--text-2);
+  opacity: 0.85;
+}
+
+@media (max-width: 560px) {
+  .worker-other-positions { display: none; }
+  .color-row { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 768px) {

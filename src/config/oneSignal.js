@@ -23,6 +23,26 @@
 const APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
+/** Write a debug entry to localStorage for diagnosis without remote devtools. */
+function _writeDebug(entry) {
+  try {
+    const raw = localStorage.getItem("_onesignal_debug") || "[]";
+    const log = JSON.parse(raw);
+    log.push({ ts: new Date().toISOString(), appId: APP_ID ? APP_ID.slice(0, 8) + "…" : "MISSING", ...entry });
+    // Keep last 20 entries.
+    localStorage.setItem("_onesignal_debug", JSON.stringify(log.slice(-20)));
+  } catch { /* never block the caller */ }
+}
+
+/** Read the debug log (call from Settings page to display diagnostics). */
+export function readOneSignalDebug() {
+  try {
+    return JSON.parse(localStorage.getItem("_onesignal_debug") || "[]");
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Queue a function to run once the OneSignal SDK has initialized.
  * Safe to call any number of times, before or after init.
@@ -68,25 +88,32 @@ export function initOneSignal(userId = null) {
   const swPath = scope.replace(/^\//, "") + "sw.js";
 
   withOneSignal(async (OneSignal) => {
-    await OneSignal.init({
-      appId: APP_ID,
-      // Allow testing push flow over http://localhost during `npm run dev`.
-      // No-op in production (which is HTTPS anyway).
-      allowLocalhostAsSecureOrigin: true,
-      // We own the UI for opting in/out — do NOT let OneSignal render its own
-      // bell widget or auto-prompt on page load. The student-settings toggle
-      // calls optIn()/optOut() directly.
-      notifyButton: { enable: false },
-      autoResubscribe: true,
-      serviceWorkerPath: swPath,
-      serviceWorkerParam: { scope },
-    });
-    // Login immediately after init() completes, inside the same deferred
-    // callback. This is required because OneSignal processes OneSignalDeferred
-    // entries concurrently — a separate loginOneSignal() push would race
-    // against init() and be silently ignored if init() hasn't finished yet.
+    // Init and login have independent try/catch so an init error (e.g. called
+    // twice on iOS) does not silently suppress the login call.
+    try {
+      await OneSignal.init({
+        appId: APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        notifyButton: { enable: false },
+        autoResubscribe: true,
+        serviceWorkerPath: swPath,
+        serviceWorkerParam: { scope },
+      });
+      _writeDebug({ step: "init", ok: true });
+    } catch (err) {
+      console.error("[OneSignal] init failed:", err);
+      _writeDebug({ step: "init", ok: false, error: String(err) });
+      // Don't return — attempt login anyway. Init is idempotent; if it threw
+      // because it was already called, the SDK is still usable.
+    }
     if (userId !== null && userId !== undefined) {
-      await OneSignal.login(String(userId));
+      try {
+        await OneSignal.login(String(userId));
+        _writeDebug({ step: "login", ok: true, userId: String(userId) });
+      } catch (err) {
+        console.error("[OneSignal] login failed:", err);
+        _writeDebug({ step: "login", ok: false, userId: String(userId), error: String(err) });
+      }
     }
   });
 }
@@ -104,7 +131,13 @@ export function loginOneSignal(userId) {
   if (!APP_ID || userId === undefined || userId === null) return;
   const externalId = String(userId);
   withOneSignal(async (OneSignal) => {
-    await OneSignal.login(externalId);
+    try {
+      await OneSignal.login(externalId);
+      _writeDebug({ step: "loginOneSignal", ok: true, userId: externalId });
+    } catch (err) {
+      console.error("[OneSignal] loginOneSignal failed:", err);
+      _writeDebug({ step: "loginOneSignal", ok: false, userId: externalId, error: String(err) });
+    }
   });
 }
 
